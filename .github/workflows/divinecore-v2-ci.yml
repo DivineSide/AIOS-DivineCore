@@ -7,6 +7,7 @@ on:
       - 'divinecore-v2/**'
       - 'sales_os/**'
       - 'ops_os/**'
+      - 'branding_os/**'
       - '.github/workflows/divinecore-v2-ci.yml'
   pull_request:
     branches: [main]
@@ -14,12 +15,13 @@ on:
       - 'divinecore-v2/**'
       - 'sales_os/**'
       - 'ops_os/**'
+      - 'branding_os/**'
       - '.github/workflows/divinecore-v2-ci.yml'
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_OWNER: onebox69/aios-divinecore
+  IMAGE_OWNER: divineside/aios-divinecore
 
 jobs:
   build-and-push:
