@@ -2,12 +2,15 @@ import os
 import json
 import httpx
 import psycopg2
+import logging
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timezone
 from openai import OpenAI
 import anthropic
 
 from settings import settings
+
+logger = logging.getLogger(__name__)
 
 # ── Clients ────────────────────────────────────────────────────────────────────
 openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -179,10 +182,10 @@ async def send_discord_reply(channel_id: str, content: str, reply_to_id: str):
 
 
 # ── Agentic Loop — OpenAI ──────────────────────────────────────────────────────
-def run_openai_loop(messages: list[dict]) -> str:
+def run_openai_compatible_loop(client: OpenAI, model: str, messages: list[dict]) -> str:
     while True:
-        response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+        response = client.chat.completions.create(
+            model=model,
             messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
             tools=TOOLS,
             tool_choice="auto"
@@ -201,6 +204,24 @@ def run_openai_loop(messages: list[dict]) -> str:
                 "tool_call_id": tc.id,
                 "content": json.dumps(results)
             })
+
+
+def run_gpt_loop(messages: list[dict]) -> str:
+    if settings.OPENROUTER_API_KEY:
+        try:
+            return run_openai_compatible_loop(
+                openrouter_client,
+                "openai/gpt-4o-mini",
+                [dict(message) for message in messages],
+            )
+        except Exception:
+            logger.exception("IMAGYN OpenRouter GPT loop failed; falling back to OpenAI")
+
+    return run_openai_compatible_loop(
+        openai_client,
+        "gpt-4o-mini",
+        [dict(message) for message in messages],
+    )
 
 
 # ── Agentic Loop — Anthropic ───────────────────────────────────────────────────
@@ -248,9 +269,13 @@ async def run(username: str, message: str, channel_id: str, message_id: str):
     messages = history + [{"role": "user", "content": f"{username}: {message}"}]
 
     if selected_model == "claude-sonnet-4-6":
-        reply = run_anthropic_loop(messages)
+        try:
+            reply = run_anthropic_loop(messages)
+        except Exception:
+            logger.exception("IMAGYN Anthropic loop failed; falling back to GPT loop")
+            reply = run_gpt_loop(messages)
     else:
-        reply = run_openai_loop(messages)
+        reply = run_gpt_loop(messages)
 
     save_turn(conn, f"{username}: {message}", reply)
     conn.close()
