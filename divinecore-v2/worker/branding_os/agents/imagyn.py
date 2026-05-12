@@ -24,6 +24,7 @@ openrouter_client = OpenAI(
 IMAGYN_BOT_ID = "1496791428020572230"
 SESSION_KEY = "imagyn_global_memory"
 MEMORY_LIMIT = 15
+VALID_CHAT_ROLES = {"system", "assistant", "user", "function", "tool", "developer"}
 
 SYSTEM_PROMPT = open(
     os.path.join(os.path.dirname(__file__), "IMAGYN_system_prompt.md")
@@ -137,11 +138,30 @@ def load_history(conn) -> list[dict]:
         cur.execute("""
             SELECT role, content FROM imagyn_messages
             WHERE session_id = %s
+            AND role IN ('system', 'assistant', 'user', 'function', 'tool', 'developer')
+            AND content IS NOT NULL
             ORDER BY created_at DESC
             LIMIT %s
         """, (SESSION_KEY, MEMORY_LIMIT))
         rows = cur.fetchall()
-    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
+
+    history: list[dict] = []
+    skipped_rows = 0
+    for row in reversed(rows):
+        role = row.get("role")
+        content = row.get("content")
+        if role not in VALID_CHAT_ROLES:
+            skipped_rows += 1
+            continue
+        if not isinstance(content, str) or not content.strip():
+            skipped_rows += 1
+            continue
+        history.append({"role": role, "content": content})
+
+    if skipped_rows:
+        logger.warning("IMAGYN skipped %s invalid history rows for session %s", skipped_rows, SESSION_KEY)
+
+    return history
 
 
 def save_turn(conn, user_content: str, assistant_content: str):
@@ -163,7 +183,7 @@ def search_knowledge_base(categories: list[str]) -> list[dict]:
     placeholders = ",".join(["%s"] * len(categories))
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
-            f"SELECT title, category, core_lesson, full_explanation FROM branding_kb WHERE category IN ({placeholders})",
+            f"SELECT title, category, core_lesson, full_explanation FROM branding_knowledge_base WHERE category IN ({placeholders})",
             tuple(categories)
         )
         results = [dict(r) for r in cur.fetchall()]
