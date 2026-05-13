@@ -358,3 +358,74 @@ async def run(username: str, message: str, channel_id: str, message_id: str):
     await send_discord_reply(channel_id, reply, message_id)
 
     return reply
+
+
+# ── Dry Run (local testing) ────────────────────────────────────────────────────
+if __name__ == "__main__":
+    import asyncio
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Test IMAGYN locally without posting to Discord.")
+    parser.add_argument("message", help="The message to send to IMAGYN")
+    parser.add_argument("--username", default="mayank082527", help="Simulated Discord username")
+    args = parser.parse_args()
+
+    async def dry_run():
+        msg = args.message.strip()
+        selected_model = route_model(msg)
+        print(f"\n[router] selected model: {selected_model}")
+
+        conn = get_db()
+        history = load_history(conn)
+
+        kb_context_parts = []
+        for categories in [["Hook"], ["Format"], ["Emotion"], ["Hook", "Format", "Emotion"], ["Format", "Emotion"]]:
+            cache_key = f"{KB_CACHE_KEY}:{':'.join(sorted(categories))}"
+            cached = load_kb_cache(cache_key)
+            if cached:
+                kb_context_parts.append(cached)
+
+        kb_injection = []
+        if kb_context_parts:
+            combined = []
+            seen = set()
+            for part in kb_context_parts:
+                for record in json.loads(part):
+                    uid = record.get("title", "") + record.get("category", "")
+                    if uid not in seen:
+                        seen.add(uid)
+                        combined.append(record)
+            kb_injection = [{
+                "role": "system",
+                "content": (
+                    "The following Kallaway knowledge base records were fetched earlier in this session "
+                    "and are available for the next hour. Use them directly — do not call the knowledge base tool again "
+                    "unless you need a category not covered below.\n\n"
+                    + json.dumps(combined, indent=2)
+                )
+            }]
+            print(f"[redis] KB cache hit — {len(combined)} records injected")
+        else:
+            print("[redis] KB cache empty — agent will fetch from Supabase if needed")
+
+        messages = kb_injection + history + [{"role": "user", "content": f"{args.username}: {msg}"}]
+        print(f"[memory] {len(history)} history turns loaded\n")
+
+        if selected_model == "claude-sonnet-4-6":
+            try:
+                reply = run_anthropic_loop(messages)
+            except Exception:
+                logger.exception("Anthropic loop failed; falling back to GPT")
+                reply = run_gpt_loop(messages)
+        else:
+            reply = run_gpt_loop(messages)
+
+        save_turn(conn, f"{args.username}: {msg}", reply)
+        conn.close()
+
+        print("─" * 60)
+        print(reply)
+        print("─" * 60)
+        print("\n[dry-run] Discord send skipped. Turn saved to memory.")
+
+    asyncio.run(dry_run())
