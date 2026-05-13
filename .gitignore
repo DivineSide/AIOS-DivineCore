@@ -3,7 +3,7 @@
 __pycache__/
 *.pyc
 *.pyo
-
+AGENTS.md
 # Celery Beat schedule state file (runtime, not source)
 celerybeat-schedule
 celerybeat-schedule.*
