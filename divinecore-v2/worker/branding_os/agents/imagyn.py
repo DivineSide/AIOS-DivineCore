@@ -3,6 +3,7 @@ import json
 import httpx
 import psycopg2
 import logging
+import redis as redis_lib
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timezone
 from openai import OpenAI
@@ -19,11 +20,14 @@ openrouter_client = OpenAI(
     api_key=settings.OPENROUTER_API_KEY,
     base_url=settings.OPENROUTER_BASE_URL,
 )
+redis_client = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 IMAGYN_BOT_ID = "1496791428020572230"
 SESSION_KEY = "imagyn_global_memory"
 MEMORY_LIMIT = 15
+KB_CACHE_KEY = "imagyn:kb_context"
+KB_CACHE_TTL = 3600  # 1 hour
 VALID_CHAT_ROLES = {"system", "assistant", "user", "function", "tool", "developer"}
 
 SYSTEM_PROMPT = open(
@@ -128,6 +132,22 @@ def route_model(message: str) -> str:
     return "gpt-4o-mini"
 
 
+# ── KB Cache (Redis, 1 hour TTL) ───────────────────────────────────────────────
+def load_kb_cache(cache_key: str) -> str | None:
+    try:
+        return redis_client.get(cache_key)
+    except Exception:
+        logger.warning("IMAGYN could not read KB cache from Redis")
+        return None
+
+
+def save_kb_cache(cache_key: str, results: list[dict]):
+    try:
+        redis_client.setex(cache_key, KB_CACHE_TTL, json.dumps(results))
+    except Exception:
+        logger.warning("IMAGYN could not write KB cache to Redis")
+
+
 # ── Database ───────────────────────────────────────────────────────────────────
 def get_db():
     return psycopg2.connect(settings.SUPABASE_DB_URL)
@@ -179,6 +199,12 @@ def save_turn(conn, user_content: str, assistant_content: str):
 
 
 def search_knowledge_base(categories: list[str]) -> list[dict]:
+    cache_key = f"{KB_CACHE_KEY}:{':'.join(sorted(categories))}"
+    cached = load_kb_cache(cache_key)
+    if cached:
+        logger.info("IMAGYN KB cache hit for categories: %s", categories)
+        return json.loads(cached)
+
     conn = get_db()
     placeholders = ",".join(["%s"] * len(categories))
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -188,6 +214,7 @@ def search_knowledge_base(categories: list[str]) -> list[dict]:
         )
         results = [dict(r) for r in cur.fetchall()]
     conn.close()
+    save_kb_cache(cache_key, results)
     return results
 
 
@@ -201,7 +228,7 @@ async def send_discord_reply(channel_id: str, content: str, reply_to_id: str):
         )
 
 
-# ── Agentic Loop — OpenAI ──────────────────────────────────────────────────────
+# ── Agentic Loop — OpenAI compatible ──────────────────────────────────────────
 def run_openai_compatible_loop(client: OpenAI, model: str, messages: list[dict]) -> str:
     while True:
         response = client.chat.completions.create(
@@ -286,7 +313,36 @@ async def run(username: str, message: str, channel_id: str, message_id: str):
 
     conn = get_db()
     history = load_history(conn)
-    messages = history + [{"role": "user", "content": f"{username}: {message}"}]
+
+    # If KB was fetched in the last hour, inject it so the agent doesn't need to re-fetch
+    kb_context_parts = []
+    for categories in [["Hook"], ["Format"], ["Emotion"], ["Hook", "Format", "Emotion"], ["Format", "Emotion"]]:
+        cache_key = f"{KB_CACHE_KEY}:{':'.join(sorted(categories))}"
+        cached = load_kb_cache(cache_key)
+        if cached:
+            kb_context_parts.append(cached)
+
+    kb_injection = []
+    if kb_context_parts:
+        combined = []
+        seen = set()
+        for part in kb_context_parts:
+            for record in json.loads(part):
+                uid = record.get("title", "") + record.get("category", "")
+                if uid not in seen:
+                    seen.add(uid)
+                    combined.append(record)
+        kb_injection = [{
+            "role": "system",
+            "content": (
+                "The following Kallaway knowledge base records were fetched earlier in this session "
+                "and are available for the next hour. Use them directly — do not call the knowledge base tool again "
+                "unless you need a category not covered below.\n\n"
+                + json.dumps(combined, indent=2)
+            )
+        }]
+
+    messages = kb_injection + history + [{"role": "user", "content": f"{username}: {message}"}]
 
     if selected_model == "claude-sonnet-4-6":
         try:
