@@ -30,6 +30,7 @@ def upwork_generate_proposal(job_description: str) -> dict:
             "stepByStepBulletPoints": fields.get("stepByStepBulletPoints", ""),
             "leftToRightFlowWithArrows": fields.get("leftToRightFlowWithArrows", ""),
             "aboutMeBulletPoints": fields.get("aboutMeBulletPoints", ""),
+            "offer": fields.get("offer", ""),
         },
     )
     proposal_url = google_client.doc_url(proposal_id)
