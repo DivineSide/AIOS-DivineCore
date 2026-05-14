@@ -15,6 +15,7 @@ app = Celery(
         "sales_os.integrations.upwork.processor",
         "sales_os.integrations.instantly.processor",
         "branding_os.agents.imagyn",
+        "branding_os.agents.lyra",
     ],
 )
 

@@ -36,8 +36,9 @@ class WorkerSettings(BaseSettings):
     DISCORD_OUTREACH_WEBHOOK_URL: str = ""
     DISCORD_OUTREACH_THREAD_ID: str = ""
 
-    # IMAGYN agent
+    # Branding OS agents
     IMAGYN_BOT_TOKEN: str = ""
+    LYRA_BOT_TOKEN: str = ""
 
 
 settings = WorkerSettings()
