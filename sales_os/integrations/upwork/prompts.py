@@ -83,6 +83,8 @@ A little bit about me: {{aboutMeShortParagraph}}
 
 I don't build commoditized automations. I build AI Operating Systems: your business, running on AI. It's a system that runs the entire function with you, not just a workflow you trigger. It knows everything about your business ({{businessSpecificContextItems}}) so when it acts, it acts the way you would.
 
+{{guaranteeParagraph}}
+
 Thank you for reviewing my proposal. If this seems like a fit, please do shoot over a reply.
 
 ---
@@ -117,6 +119,24 @@ One short paragraph after "A little bit about me: ". 3 to 5 short sentences. Sta
 AIOS PARAGRAPH (verbatim, only {{businessSpecificContextItems}} changes)
 "I don't build commoditized automations. I build AI Operating Systems: your business, running on AI. It's a system that runs the entire function with you, not just a workflow you trigger. It knows everything about your business ({{businessSpecificContextItems}}) so when it acts, it acts the way you would."
 
+GUARANTEE PARAGRAPH ({{guaranteeParagraph}}) — pick the right version based on JD type
+
+First, classify the JD into one of two types:
+
+- TYPE A (DIRECT BUYER): The buyer is the business whose own work will be automated. They want the system built for their own team to use. Hours saved benefit the buyer's team directly. This is the default and most common case.
+
+- TYPE B (CONTRACTOR / AGENCY-DELIVERABLE BUYER): The buyer is an agency or operator hiring you as a contractor to deliver automations for THEIR clients, not for themselves. Hours saved would benefit unknown downstream clients, not the buyer directly. Examples of TYPE B signals: "work under our agency", "deliver automation projects for our clients", "we need a contractor to build workflows for our customers", "help us serve our clients", "join our team building for other businesses".
+
+If signals are ambiguous, default to TYPE A.
+
+Use the corresponding paragraph VERBATIM (only the prefix newline placement is yours):
+
+TYPE A (verbatim — keep the markdown bold markers exactly as shown):
+"**Here's my offer:** if the system I build for you doesn't save more than 10 hours per week, either of your time as the founder or your employees' time, by the end of month two, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time."
+
+TYPE B (verbatim — keep the markdown bold markers exactly as shown):
+"**Here's my offer:** if the system you want me to build doesn't perform the functions we agreed at kickoff by the end of week eight, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time."
+
 {{businessSpecificContextItems}} = 3 to 5 short comma-separated context items relevant to the JD's domain. Examples by domain:
 - Sales / lead gen / CRM: "your ICP, your offers and funnels, your email strategy, your lead sources, your follow-up rules"
 - E-commerce: "your customers, your product range, your brand voice, your seasonal patterns"
@@ -136,7 +156,7 @@ GENERAL VOICE RULES
 - Keep $$$ exactly as-is.
 - If the job description has a special phrase requirement (e.g. "start your application with the word 'StackBread'"), comply by slotting it before the hook line.
 - Numbers everywhere. Specific, concrete, measurable.
-- Target body length: 250 to 320 words. Don't pad to hit it; don't amputate the AIOS or person-you're-looking-for paragraphs to fit a shorter target.
+- Target body length: 280 to 360 words. Don't pad to hit it; don't amputate the AIOS, guarantee, or person-you're-looking-for paragraphs to fit a shorter target.
 
 About Me (canonical source. Pick what's relevant, don't invent):
 {ABOUT_ME}
