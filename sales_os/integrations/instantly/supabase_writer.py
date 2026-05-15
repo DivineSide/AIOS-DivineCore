@@ -167,7 +167,7 @@ def fetch_campaigns_with_metrics() -> list[dict[str, Any]]:
     url = (
         f"{_rest_base()}/{CAMPAIGNS_TABLE}"
         "?select=id,name,positioning,status,started_at,"
-        f"{METRICS_TABLE}(emails_sent,emails_opened,replies,bounces,unsubscribes)"
+        f"{METRICS_TABLE}(emails_sent,replies,unsubscribes)"
         "&order=started_at.desc.nullslast"
     )
     response = httpx.get(url, headers=_headers("count=exact"), timeout=30.0)
