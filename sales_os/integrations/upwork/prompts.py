@@ -65,23 +65,27 @@ Rules:
 
 OFFER FIELD ("offer") — pick the right version based on JD type
 
-First, classify the JD into one of two types (same logic as the application body prompt):
+Default is TYPE B. Only choose TYPE A when the JD makes a clear hours-saved case. Bias toward TYPE B in any ambiguous case — most builds are deliverable-focused, not hours-saved-focused, and overpromising hours is harder to defend than overpromising features.
 
-- TYPE A (DIRECT BUYER): The buyer is the business whose own work will be automated. They want the system built for their own team to use. Hours saved benefit the buyer's team directly. This is the default and most common case.
+- TYPE B (FUNCTIONS DELIVERED, DEFAULT): Use this for the vast majority of JDs. The buyer wants a system or workflow built with specific features. Examples: "build me a CRM automation", "set up our funnel in GHL", "create an AI agent that handles X", "deliver a chatbot that does Y", "build a multi-tenant voice system using Retell + Twilio". Also use for contractor-for-agency JDs.
 
-- TYPE B (CONTRACTOR / AGENCY-DELIVERABLE BUYER): The buyer is an agency or operator hiring you as a contractor to deliver automations for THEIR clients, not for themselves. Hours saved would benefit unknown downstream clients, not the buyer directly. Examples of TYPE B signals: "work under our agency", "deliver automation projects for our clients", "we need a contractor to build workflows for our customers", "help us serve our clients", "join our team building for other businesses".
+- TYPE A (HOURS SAVED): Only choose TYPE A when ALL of these are true:
+  1. The JD explicitly mentions saving the buyer's team's hours, freeing up their time, or reducing manual work they currently do.
+  2. The buyer is the operator whose hours would be saved (not a contractor-hire JD).
+  3. The "hours saved per week" can plausibly be measured against a current baseline.
+  4. The pain in the JD reads as "I or my team is drowning in this repetitive work".
 
-If signals are ambiguous, default to TYPE A.
+  If any of those four are not clearly true, default to TYPE B.
 
-Use the corresponding paragraph VERBATIM (no markdown bold markers — the Google Doc renders plain text. Keep the blank line between paragraphs as a literal "\\n\\n" inside the string):
+Use the corresponding paragraph VERBATIM. Keep ALL CAPS exactly as shown. Do NOT wrap the paragraph in quote marks (output plain text). The Google Doc renders plain text. Keep the blank line between paragraphs as a literal "\\n\\n" inside the JSON string value.
 
-TYPE A (verbatim):
-"My goal in the first two months is to save your team at least 10 hours per week. At a conservative $25 per hour, that's $250 per week, $1,000 per month, around $12,000 per year of your team's time freed up to focus on growth instead of repetitive work.
+TYPE A:
+HERE'S MY OFFER: my goal in the first two months is to save your team at least 10 hours per week. At a conservative $25 per hour, that's $250 per week, $1,000 per month, around $12,000 per year of your team's time freed up to focus on growth instead of repetitive work.
 
-Here's how the money works. You don't pay me anything upfront. You only pay when the system is delivered and we've verified it does what we agreed at kickoff. If by the end of month two the system I build for you doesn't save more than 10 hours per week, either of your time as the founder or your employees' time, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time."
+Here's how the money works. You don't pay me anything upfront. You only pay when the system is delivered and we've verified it does what we agreed at kickoff. If by the end of month two the system I build for you doesn't save more than 10 hours per week, either of your time as the founder or your employees' time, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time.
 
-TYPE B (verbatim):
-"Here's how the money works. You don't pay me anything upfront. You only pay when the system is delivered and we've verified it does what we agreed at kickoff. If by the end of week eight the system you want me to build doesn't perform the functions we agreed on at kickoff, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time."
+TYPE B:
+HERE'S MY OFFER: you don't pay me anything upfront. You only pay when the system is delivered and we've verified it does what we agreed at kickoff. If by the end of week eight the system you want me to build doesn't perform the functions we agreed on at kickoff, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time.
 
 About Me (canonical source — extract relevant bullets, don't invent):
 {ABOUT_ME}
@@ -97,6 +101,8 @@ The body MUST follow this exact shape. Fill {{fields}}, and leave $$$ untouched 
 
 {{hookLineWithLoomTrailer}}
 
+{{guaranteeParagraph}}
+
 {{personYouAreLookingForParagraph}}
 
 I drafted a proposal here: $$$. Inside you'll find my past case studies and a more detailed step-by-step of what I'll do for you.
@@ -104,8 +110,6 @@ I drafted a proposal here: $$$. Inside you'll find my past case studies and a mo
 A little bit about me: {{aboutMeShortParagraph}}
 
 I don't build commoditized automations. I build AI Operating Systems: your business, running on AI. It's a system that runs the entire function with you, not just a workflow you trigger. It knows everything about your business ({{businessSpecificContextItems}}) so when it acts, it acts the way you would.
-
-{{guaranteeParagraph}}
 
 Thank you for reviewing my proposal. If this seems like a fit, please do shoot over a reply.
 
@@ -143,21 +147,25 @@ AIOS PARAGRAPH (verbatim, only {{businessSpecificContextItems}} changes)
 
 GUARANTEE PARAGRAPH ({{guaranteeParagraph}}) — pick the right version based on JD type
 
-First, classify the JD into one of two types:
+Default is TYPE B. Only choose TYPE A when the JD makes a clear hours-saved case (see below). Bias toward TYPE B in any ambiguous case — most builds are deliverable-focused, not hours-saved-focused, and overpromising hours is harder to defend than overpromising features.
 
-- TYPE A (DIRECT BUYER): The buyer is the business whose own work will be automated. They want the system built for their own team to use. Hours saved benefit the buyer's team directly. This is the default and most common case.
+- TYPE B (FUNCTIONS DELIVERED, DEFAULT): Use this for the vast majority of JDs. The buyer wants a system or workflow built with specific features. The deliverable itself is the value. Examples: "build me a CRM automation", "set up our funnel in GHL", "create an AI agent that handles X", "deliver a chatbot that does Y", "build a multi-tenant voice system using Retell + Twilio". Also use TYPE B for contractor-for-agency JDs (buyer hires you to deliver builds for their clients).
 
-- TYPE B (CONTRACTOR / AGENCY-DELIVERABLE BUYER): The buyer is an agency or operator hiring you as a contractor to deliver automations for THEIR clients, not for themselves. Hours saved would benefit unknown downstream clients, not the buyer directly. Examples of TYPE B signals: "work under our agency", "deliver automation projects for our clients", "we need a contractor to build workflows for our customers", "help us serve our clients", "join our team building for other businesses".
+- TYPE A (HOURS SAVED): Only choose TYPE A when ALL of these are true:
+  1. The JD explicitly mentions saving the buyer's team's hours, freeing up their time, or reducing manual work they currently do.
+  2. The buyer is the operator whose hours would be saved (not a contractor-hire JD).
+  3. The "hours saved per week" can plausibly be measured against a current baseline.
+  4. The pain in the JD reads as "I or my team is drowning in this repetitive work".
 
-If signals are ambiguous, default to TYPE A.
+  If any of those four are not clearly true, default to TYPE B.
 
-Use the corresponding paragraph VERBATIM (only the prefix newline placement is yours):
+Use the corresponding paragraph VERBATIM (keep ALL CAPS exactly as shown, do NOT use markdown bold, do NOT wrap the paragraph in quote marks — output it as plain text):
 
-TYPE A (verbatim — keep the markdown bold markers exactly as shown):
-"**Here's my offer:** if the system I build for you doesn't save more than 10 hours per week, either of your time as the founder or your employees' time, by the end of month two, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time."
+TYPE A:
+HERE'S MY OFFER: if the system I build for you doesn't save more than 10 hours per week, either of your time as the founder or your employees' time, by the end of month two, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time.
 
-TYPE B (verbatim — keep the markdown bold markers exactly as shown):
-"**Here's my offer:** if the system you want me to build doesn't perform the functions we agreed at kickoff by the end of week eight, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time."
+TYPE B:
+HERE'S MY OFFER: if the system you want me to build doesn't perform the functions we agreed at kickoff by the end of week eight, you don't pay me anything, and I pay you $500 out of my own pocket for wasting your time.
 
 {{businessSpecificContextItems}} = 3 to 5 short comma-separated context items relevant to the JD's domain. Examples by domain:
 - Sales / lead gen / CRM: "your ICP, your offers and funnels, your email strategy, your lead sources, your follow-up rules"
