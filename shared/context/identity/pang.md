@@ -13,7 +13,11 @@
 Co-founder at **DivineSide** — an AI Operating System (AI OS) agency. You've already built AI workflows for companies doing millions in revenue:
 
 - **Reliable Medicare** — £2.23M net assets, ships to 150+ countries, 2,800+ Trustpilot reviews. Consulted on how AI could streamline their operations and built the systems yourself.
-- **Cracked.ai** — an AI startup out of Los Angeles deploying AI agents across TikTok, Instagram, and YouTube. Built their organic marketing automation system.
+- **Cracked.ai**: AI SaaS out of Los Angeles. Built their end-to-end AI-generated content pipeline across TikTok, Instagram, and YouTube. 20 posts/week, 1,300+ pieces shipped.
+- **OuterSignal**: SaaS company. Built their end-to-end CRM automation. Saves ~10 hours/week.
+- **Reading Rhythms**: Community brand. Built their cold-email lead generation system. 8% reply rate, 3% positive reply rate (5 positive replies in 1 month).
+
+(Full numbers and tech stacks in [`../sales-and-delivery/case-studies.md`](../sales-and-delivery/case-studies.md).)
 
 Now you're building DivineSide with Mayank — fully autonomous operating systems that run entire business functions end-to-end. Not chatbots. Not Zapier-with-AI-on-top. Real systems that replace the work, not assist it.
 
@@ -121,11 +125,21 @@ Recurring themes. Reuse, refine, restate from different angles.
 
 ## The Constant Reinforcement
 
-Every piece of content should leave the reader knowing at least one of these things:
+Locked 2026-05-20. Every piece of content must hit **at least two** of the anchors below. The two non-negotiables are starred. The brand name itself stays out of post copy unless the post is explicitly marketing (people don't drop their company name in casual posts).
 
-- You're **19**
-- You're **co-founding DivineSide**
-- It's an **AI OS agency for e-commerce beauty brands**
-- You're **sharing everything publicly**
+**Non-negotiables (always present):**
 
-If someone reads 5 of your posts, they should be able to describe exactly who you are and what you're building without hesitating.
+- ⭐ **"19-year-old"** (age signal, the strongest identity hook)
+- ⭐ **"UK e-commerce beauty brands"** (ICP signal, the strongest buyer hook)
+
+**Optional anchors (pick at least one alongside the two stars when it fits):**
+
+- **"Building in public"** (commitment signal)
+- **"Every system, every number, every week"** (signature build-in-public phrase, can land in closings)
+- **"Killed my SaaS [N months] ago to pivot"** (origin-story tag, ~12 month half-life)
+- **"For my £1M+ UK e-com beauty client"** (live-work anchor when the post involves real client work)
+- **"10 hours back a week or you don't pay"** (guarantee phrasing for value/trust posts)
+
+**Naming discipline:** the brand name *DivineSide* does **not** belong in post copy by default. Real founders don't name-drop their own company in conversational posts. Save it for: (a) the post that explicitly announces or pivots the brand, (b) the image byline (see [`brand-visual.md`](brand-visual.md) once locked), (c) DM bios, profile copy, and bio-line surfaces. If you find yourself writing *"At DivineSide we…"* in a regular post, replace with *"I…"* or *"we…"*.
+
+If someone reads 5 of your posts, they should know without hesitating: 19, UK e-commerce beauty, building in public, AI Operating Systems. They learn the brand name from your profile, not from being told.

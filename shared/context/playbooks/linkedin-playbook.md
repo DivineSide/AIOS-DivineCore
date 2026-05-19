@@ -350,7 +350,7 @@ Run through this before every post goes live:
 - [ ] Does the hook have a number or a specific claim?
 - [ ] Does it pass the 'so what?' test — is there a real insight here?
 - [ ] Is every sentence necessary? Cut anything that's filler.
-- [ ] Does it reinforce at least one of: **age / DivineSide / e-comm beauty ICP / building in public**? (See Constant Reinforcement in [`pang.md`](../identity/pang.md))
+- [ ] Does it hit **both non-negotiable anchors** (*"19-year-old"* and *"UK e-commerce beauty brands"*) plus at least one optional anchor? (Locked 2026-05-20. See Constant Reinforcement in [`pang.md`](../identity/pang.md). DivineSide brand name stays OUT of post copy unless the post is explicitly marketing.)
 - [ ] Does it draw at least one explicit distinction between DivineSide and generic "AI automation agencies" — context layer, embedded expertise, operating-system framing, or the guarantee? (See §01 Differentiation Requirement)
 - [ ] Is the closing strong — not a generic question?
 - [ ] No corporate buzzwords. No emojis (unless intentional). No exclamation marks.

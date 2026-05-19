@@ -15,9 +15,9 @@
 >
 > v0 — strategic frame only. Hooks / CTAs / closings / post-type frameworks land here once Pang has a feel for what works on X (mirror the structure of [`linkedin-playbook.md`](linkedin-playbook.md) when adding them).
 
-Last updated: 2026-05-12
+Last updated: 2026-05-18
 
-Adapted from Matt Gray's X Growth Blueprint, pruned to the parts we use.
+Adapted from Matt Gray's X Growth Blueprint and a "Leverage Creator" course Pang watched 2026-05-18, pruned to the parts we use. Community-building, email-list, and sales-launch sections of the latter course are deliberately not loaded here. Per Pang's scope choice, this file is X growth only.
 
 ---
 
@@ -138,6 +138,19 @@ Every thread should serve at least two of these:
 
 - Lean on the founders' own work — meeting transcripts (Fathom), build screenshots, in-flight client wins. Cult following comes from authenticity, not curation.
 
+**Conversation-First Writing**
+
+X optimises for conversations harder than any other platform. Per the open-source X algorithm leak, replies boost a post roughly 13.5x, retweets around 1x, likes around 0.5x. Author replies on the post compound the boost because they signal an active conversation worth surfacing.
+
+So write to spark a reply. Lectures get scrolled past.
+
+- **Spark, don't dump.** A post that triggers a comment outperforms a post that just delivers information. Provide value, but frame it so the reader wants to push back, add their angle, or ask a follow-up. The post is your opening move. The closing argument happens in the replies.
+- **Reply to your own thread.** Add a comment underneath your own post within the first hour (a related thought, a real-world example, an "edit"). The author-reply signal compounds the conversation boost.
+- **"How I" beats "How to."** *"How to grow on X"* is on Google. *"How I went from 0 to 3,700 followers"* is not. Specific personal experience builds authority that generic frameworks can't. Anchor every post in something only you can say.
+- **Two emotional levers: relatability or polarisation.** Logical statements get scrolled past. Emotional posts get read. Lean either into a moment the reader recognises themselves in, or into a sharp take that splits the room. The middle ground is invisible.
+- **The 1-3-1 formatting rule.** One line, three bullets or short lines, one line. The rhythm gives the eye a place to land mid-tweet and keeps mobile readers from bouncing. Vary sentence length. Stacking only short sentences gets monotonous.
+- **Personality is the trust foundation.** People follow personality first, insight second. The 19-year-old Malaysian CS-student-building-in-public framing per [`pang.md`](../identity/pang.md) is the differentiator. Insert it deliberately.
+
 **Differentiation Requirement**
 
 Every X thread (and most single-tweet posts about the build) must make at least one explicit distinction between what DivineSide builds and what generic "AI automation" or "AI agency" players build. Without it, the thread gets bucketed with the rest of the automation timeline and the brand forfeits the category-ownership goal in §05.
@@ -164,6 +177,13 @@ Every X thread (and most single-tweet posts about the build) must make at least 
 - No spam — every reply should be substantive. A bad reply costs more than no reply.
 - The accounts you engage with regularly start engaging with your posts. Follow them; they tend to follow back.
 - This compounds — a known route to 1k+ followers without ever cold-DMing.
+
+**Engagement cadence and targeting** (added 2026-05-18 from the "Leverage Creator" course):
+
+- **Cadence: 20 to 30 quality replies a day.** Most engagement effort goes to people who don't care back. 30 substantive replies to people you actually resonate with outperforms 100 generic "great post" reactions.
+- **Start with people who already engage with you.** They've shown up for your posts. They're warm. Cycle through them daily before reaching for new engagement targets.
+- **Then find peers who already engage with others.** Anyone with an active engagement footprint on other people's posts is likely to reciprocate. Anyone who only posts and never replies won't.
+- **Engage for fun. If it feels forced, you're targeting the wrong people.** Pick people whose work you genuinely want to comment on. The right list is short.
 
 ### Posting
 
@@ -297,4 +317,4 @@ Drafted 2026-05-10 — see §11 below for the full thread copy. Update §11 in p
 
 ---
 
-*Pang · DivineSide X Content Playbook · 2026-05-12*
+*Pang · DivineSide X Content Playbook · 2026-05-18*
