@@ -18,8 +18,12 @@ Recent client work:
 - Reliable Medicare — UK e-commerce, £2.23M net assets, ships to 150+ countries, \
 2,800+ Trustpilot reviews. Consulted on how AI could streamline their operations \
 and built the systems myself.
-- Cracked.ai — AI startup out of Los Angeles deploying AI agents across TikTok, \
-Instagram, and YouTube. Built their organic marketing automation system.
+- Cracked.ai: AI SaaS out of Los Angeles. Built their end-to-end AI-generated \
+content pipeline across TikTok, Instagram, and YouTube (20 posts/week, 1,300+ \
+pieces shipped).
+- OuterSignal: SaaS company. Built their end-to-end CRM automation (~10 hrs/week saved).
+- Reading Rhythms: Community brand. Built their cold-email lead generation system \
+(8% reply rate, 3% positive reply rate, 5 positive replies in 1 month).
 
 How I work:
 - Full-stack on every build myself. No handoffs, no subcontractors. You're working \
