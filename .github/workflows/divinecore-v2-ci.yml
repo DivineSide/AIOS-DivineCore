@@ -21,7 +21,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_OWNER: onebox69/aios-divinecore
+  IMAGE_OWNER: divineside/aios-divinecore
 
 jobs:
   build-and-push:

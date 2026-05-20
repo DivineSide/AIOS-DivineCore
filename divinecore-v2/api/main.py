@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from celery import Celery
 
-from branding_os.web import imagyn_router, social_perf_router
+from branding_os.web import imagyn_router, lyra_router, social_perf_router
 from sales_os.web import instantly_router, upwork_jobs_router, upwork_router
 from settings import settings
 
@@ -13,6 +13,7 @@ app.include_router(upwork_router)
 app.include_router(upwork_jobs_router)
 app.include_router(instantly_router)
 app.include_router(imagyn_router)
+app.include_router(lyra_router)
 app.include_router(social_perf_router)
 
 

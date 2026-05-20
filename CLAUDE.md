@@ -347,7 +347,30 @@ DivineSide/
 - **Writing agents load from `shared/context/`.** Any agent producing copy aimed at humans (sales emails, LinkedIn posts, YouTube scripts, DMs, follow-ups, Loom scripts) MUST pull from `shared/context/` in addition to its domain KB. Organized into three subfolders: `identity/` (business-info, voice, audience, strategy, mayank, pang), `sales-and-delivery/` (offer, guarantee, sales-playbook, sales-discovery-call, intake-form, delivery, workflow-build), `playbooks/` (linkedin-playbook, x-playbook, upwork-loom-script, swipe-file). See [shared/context/.overview.md](shared/context/.overview.md) for the full loading discipline by task. CLAUDE.md is for system architecture; `shared/context/` is for brand voice. Don't duplicate identity content into module folders — reference it.
 
 
-## 13. DIVINECORE V2 — CODE-FIRST RUNTIME (IN BUILD)
+## 13. PRE-BUILD CHECKLIST — DATABASE & EXTERNAL APIs
+
+Run through this before writing any code that touches a database or external API. Most bugs in this codebase have come from skipping these steps.
+
+**Database (Supabase)**
+- Copy-paste the exact table name from the Supabase dashboard, never type it from memory
+- Check every column name AND its type before writing an INSERT or SELECT
+- Run the query manually in the Supabase SQL editor first and confirm it works
+- Define new table schemas in SQL, commit them to the repo so the schema is documented alongside the code
+- Column types matter: `text` for plain strings, `json`/`jsonb` only when storing actual JSON objects (mixing these causes runtime errors)
+
+**External APIs (Discord, OpenAI, Anthropic, n8n, etc.)**
+- Read the actual API response before writing code that consumes it, never assume field names
+- Test with a curl command or Postman before writing the integration
+- Field name casing is exact: `channel_Id` is not `channel_id`. Copy from docs or a live response
+- Confirm the endpoint URL is reachable from wherever the code runs (VPS Docker network is not localhost)
+
+**General**
+- Never hardcode a table name, endpoint, or model name more than once, put it in a constant at the top of the file
+- After any deploy, trigger the task once manually and read the logs immediately before calling it done
+- If a log says `UndefinedTable` or `InvalidTextRepresentation`, the schema in Supabase doesn't match the code. Fix the schema first, then the code.
+
+
+## 14. DIVINECORE V2 — CODE-FIRST RUNTIME (IN BUILD)
 
 Parallel track to the n8n-orchestrated stack. `divinecore-v2/` is the **runtime only** — FastAPI app, Celery worker, Beat scheduler, Redis broker, Docker compose. Domain code (Upwork, Fathom, future module integrations) lives in the module folders (`sales_os/`, `ops_os/`, etc.) and is imported by the runtime at build time. Both Dockerfiles set context = repo root and selectively `COPY` the module folders they need.
 
@@ -471,7 +494,7 @@ n8n's `web` (HTTP) entrypoint has a global `--entrypoints.web.http.redirections.
 - **Trusted TLS cert for upwork.* subdomain.** Currently default self-signed (browser warning). Upgrade path: switch to a domain outside `hstgr.cloud`, OR retry LE periodically.
 
 
-## 14. CLAUDE CODE SLASH COMMANDS
+## 15. CLAUDE CODE SLASH COMMANDS
 
 Project-scoped slash commands live in `.claude/commands/` and are version-controlled. Each `.md` file becomes an invocable command (e.g. `prime.md` → `/prime`).
 
@@ -484,7 +507,7 @@ Project-scoped slash commands live in `.claude/commands/` and are version-contro
 When adding new commands, keep them small and composable. One command, one job — same rule as agents.
 
 
-## 15. TIERED CONTEXT CONVENTION (L0/L1/L2)
+## 16. TIERED CONTEXT CONVENTION (L0/L1/L2)
 
 Inspired by ByteDance's OpenViking pattern. Every folder in this repo carries cheap, tiered context so an agent can scan the whole tree without paying full-file token costs.
 
