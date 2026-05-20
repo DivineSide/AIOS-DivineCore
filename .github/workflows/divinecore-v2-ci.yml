@@ -80,6 +80,21 @@ jobs:
     if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - name: Prepare commit summary
+        id: summary
+        env:
+          FULL_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          # Discord embed fields are capped at 1024 chars. Use only the
+          # commit subject (first line of the message) and truncate to 500
+          # chars to stay safely under the limit even with the rest of the
+          # description text wrapped around it.
+          subject="${FULL_MESSAGE%%$'\n'*}"
+          if [ ${#subject} -gt 500 ]; then
+            subject="${subject:0:497}..."
+          fi
+          echo "subject=$subject" >> "$GITHUB_OUTPUT"
+
       - name: Post status to Discord
         uses: sarisia/actions-status-discord@v1
         with:
@@ -88,5 +103,5 @@ jobs:
           title: "divinecore-v2 build"
           description: |
             **Branch:** `${{ github.ref_name }}`
-            **Commit:** `${{ github.event.head_commit.message }}`
+            **Commit:** `${{ steps.summary.outputs.subject }}`
           username: GitHub Actions
