@@ -1,0 +1,110 @@
+{
+  "fetch_count": 100,
+  "file_name": "ecommerce-uk_small_sunbody",
+  "contact_job_title": [
+    "Founder",
+    "Co-Founder",
+    "CEO",
+    "Owner",
+    "Managing Director",
+    "Marketing Director",
+    "Head of Marketing",
+    "CMO",
+    "Director of Marketing",
+    "Marketing Manager",
+    "Ecommerce Director",
+    "Head of Ecommerce",
+    "Growth Manager",
+    "Head of Growth",
+    "Head of Paid Media",
+    "Paid Social Manager",
+    "Performance Marketing Manager",
+    "VP Marketing"
+  ],
+  "contact_not_job_title": [
+    "intern",
+    "assistant",
+    "coordinator",
+    "junior",
+    "executive assistant"
+  ],
+  "seniority_level": [
+    "founder",
+    "owner",
+    "c_suite",
+    "vp",
+    "director",
+    "manager"
+  ],
+  "contact_location": [
+    "united kingdom"
+  ],
+  "company_industry": [
+    "cosmetics",
+    "consumer goods",
+    "retail"
+  ],
+  "company_not_keywords": [
+    "salon",
+    "hair salon",
+    "nail salon",
+    "barbershop",
+    "spa chain",
+    "distributor",
+    "wholesale",
+    "manufacturer",
+    "supplier",
+    "b2b",
+    "agency",
+    "consultant",
+    "training",
+    "education",
+    "academy",
+    "retailer",
+    "marketplace",
+    "pharmacy",
+    "chemist",
+    "saas",
+    "software",
+    "dental",
+    "dentist",
+    "dentistry",
+    "orthodont",
+    "clinic",
+    "laser clinic",
+    "hair growth",
+    "scalp",
+    "nail brand",
+    "cbd",
+    "supplement",
+    "probiotic",
+    "retreat",
+    "office products",
+    "stationery",
+    "dog",
+    "pet care",
+    "veterinary",
+    "printer",
+    "printers",
+    "copier",
+    "copiers",
+    "cartridge",
+    "compatible toner",
+    "printing"
+  ],
+  "email_status": [
+    "validated"
+  ],
+  "size": [
+    "21-50",
+    "51-100"
+  ],
+  "company_keywords": [
+    "spf",
+    "sunscreen",
+    "body care",
+    "lip care",
+    "beauty brand",
+    "cosmetics"
+  ]
+}

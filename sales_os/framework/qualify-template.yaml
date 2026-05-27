@@ -74,3 +74,32 @@ disqualify:
   - <FILL_IN>   # e.g. "B2B supplier or distributor (not a service business)"
   - <FILL_IN>   # e.g. "Training academy or certification program"
   # Add more as you discover noise in your scrape results
+
+# ── FILTER RULES (machine-readable) ─────────────────────────────────────────
+# Read by filter-leads-us.py to automatically drop noise from scraped JSON.
+# Add exact substrings (lowercase) that appear in company names, descriptions,
+# or Apollo keyword tags for leads that should be dropped.
+filter_rules:
+
+  # Checked against company_name only (case-insensitive substring match).
+  # Use for franchise brands, chains, and B2B vendors.
+  name_blacklist:
+    - <FILL_IN>   # e.g. "franchise brand name"
+    - <FILL_IN>   # e.g. "competitor chain name"
+
+  # Checked against company_description (specific phrases only — avoid broad terms).
+  # Use sparingly — free text produces false positives with generic words.
+  desc_blacklist:
+    - <FILL_IN>   # e.g. "collision repair facility"
+    - <FILL_IN>   # e.g. "industrial distributor"
+
+  # Checked against Apollo's structured keyword tags — highest signal, most reliable.
+  keywords_blacklist:
+    - <FILL_IN>   # e.g. "metal stamping"
+    - <FILL_IN>   # e.g. "dealership phone training"
+
+  # At least ONE of these must appear in company_name or Apollo keywords.
+  # Leave empty [] to skip whitelist check for this ICP.
+  name_whitelist:
+    - <FILL_IN>   # e.g. "aesthetics"
+    - <FILL_IN>   # e.g. "med spa"

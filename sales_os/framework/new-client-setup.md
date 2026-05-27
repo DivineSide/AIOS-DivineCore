@@ -1,16 +1,17 @@
 # New Client Setup Guide
-## From zero to a live lead pipeline in 5 steps
+## From zero to a live lead pipeline
 
 ---
 
 ### What you're setting up
 
-A fully automated monthly pipeline that:
-1. Scrapes leads from Apollo via Apify
-2. Filters and qualifies them against your ICP rules
-3. Exports them to a Google Sheet
-4. Generates personalised cold emails per lead
-5. Runs follow-up sequences automatically via n8n
+A fully automated monthly pipeline:
+1. Scrape leads from Apollo via Apify
+2. Filter and qualify against ICP rules
+3. Export to Google Sheet
+4. Enrich each lead (website scrape + signal assignment)
+5. Generate personalised cold email copy
+6. Run follow-up sequences via n8n
 
 No manual work after setup.
 
@@ -18,9 +19,7 @@ No manual work after setup.
 
 ### Prerequisites
 
-Before you start, make sure you have:
-
-- [ ] Google Cloud project with Sheets API enabled → `credentials.json` + `token.json`
+- [ ] Google Cloud project — Sheets API enabled (`credentials.json` + `token.json`)
 - [ ] Apify account with Apollo scraper access
 - [ ] n8n instance (cloud or self-hosted)
 - [ ] `.env` file filled in (copy `.env.example`, add all keys)
@@ -34,13 +33,15 @@ clients/
 └── your-client-name/
     ├── icps/
     │   └── your-icp-name/
-    │       ├── scrape.yaml      ← copy from framework/scrape-template.yaml
-    │       └── qualify.yaml     ← copy from framework/qualify-template.yaml
-    └── templates/
-        └── your-icp-email.yaml ← copy from framework/email-template.yaml
+    │       ├── scrape.yaml        ← copy from framework/scrape-template.yaml
+    │       └── qualify.yaml       ← copy from framework/qualify-template.yaml
+    ├── templates/
+    │   └── your-icp-email.yaml   ← copy from framework/email-template.yaml
+    └── triggers/
+        └── trigger-library.yaml  ← copy from framework/trigger-library-template.yaml
 ```
 
-Fill in every `<FILL_IN>` placeholder in all three files.
+Fill every `<FILL_IN>` in all four files.
 
 ---
 
@@ -50,120 +51,130 @@ Copy `framework/client-config.yaml` to `clients/your-client-name/config.yaml`.
 
 Fill in:
 - `client_name`, `region`, `language`
-- `sender_name`, `sender_company` (goes in email sign-off)
-- For each ICP: `sheet_id`, paths to your scrape/qualify/email files
-- The 4 `pain_questions` — rewrite these in your product's language
+- `sender_name`, `sender_company`
+- For each ICP: `sheet_id`, paths to scrape/qualify/email/trigger files
+- The 4 `pain_questions` — rewrite in your product's language
 
 ---
 
-## Step 3 — Create the Google Sheet
+## Step 3 — Write the trigger library
+
+Copy `framework/trigger-library-template.yaml` to `clients/your-client-name/triggers/trigger-library.yaml`.
+
+Write 4-6 seasonal/industry triggers for each ICP. These become the email opener for leads where no specific signal is detected.
+
+**Rules:**
+- Must be timely — reference something happening NOW
+- Must lead naturally into the pain you're solving
+- No explicit research claims ("I looked at your site", "I saw you're running ads")
+- No em-dashes
+- Update every 4-6 weeks as seasons change
+
+---
+
+## Step 4 — Create the Google Sheet
 
 ```bash
 python execution/export/create-sheet-us.py --client your-client-name --icp your-icp-name
-# or for DACH:
-python execution/export/create-sheet.py --client your-client-name --icp your-icp-name
 ```
 
-This creates the sheet with the correct column schema. Copy the Sheet ID from the URL into your `client-config.yaml`.
+Copy the Sheet ID from the URL into your `client-config.yaml`.
 
 ---
 
-## Step 4 — Run a test scrape (10 leads)
+## Step 5 — Run a test scrape (10 leads)
 
 ```bash
 python execution/scrape/apify-scrape.py \
-  --client your-client-name \
-  --icp your-icp-name \
-  --limit 10
+  --client your-client-name --icp your-icp-name --limit 10
 ```
 
-Review the raw JSON output. Check:
-- Are the companies actually your ICP?
-- Are the job titles decision-makers?
-- Any obvious noise to add to `scrape.yaml` exclusions?
-
+Review the raw JSON. Are the companies actually your ICP? Are the job titles decision-makers?
 If quality looks good, run the full scrape (50 leads).
 
 ---
 
-## Step 5 — Filter, export, and generate copy
+## Step 6 — Filter and export
 
 ```bash
-# Filter raw leads
-python execution/scrape/filter-leads-us.py \
-  --client your-client-name \
-  --icp your-icp-name
-
-# Export to Google Sheet
-python execution/export/sheets-export-us.py \
-  --client your-client-name \
-  --icp your-icp-name
-
-# Research leads (Phase 2a/2b) — assign signal type + phrase to each lead
-# Currently manual or semi-automated (see research workflow)
-
-# Generate copy once signals are in columns U + V
-python scripts/generate-copy-us.py \
-  --icp your-icp-name \
-  --rows 2-50
+python execution/scrape/filter-leads-us.py --client your-client-name --icp your-icp-name
+python execution/export/sheets-export-us.py --client your-client-name --icp your-icp-name
 ```
 
 ---
 
-## Step 6 — Import n8n workflows
+## Step 7 — Enrich leads (signal assignment)
 
-Import these 4 workflow JSONs into your n8n instance:
+```bash
+python execution/enrich/enrich-leads-us.py --icp your-icp-name --all-empty
+```
 
-| File | What it does |
-|------|-------------|
-| `n8n/workflows/positive-reply-research-v1.json` | Classifies inbound replies, notifies via Slack |
-| `n8n/workflows/follow-up-pings-v1.json` | 5-stage auto follow-up (day 3/7/14/25/40) |
-| `n8n/workflows/stage-auto-promote-v1.json` | Promotes lead stage when outbound is sent |
-| `n8n/workflows/stalled-lead-reminder-v1.json` | Daily digest for exhausted leads |
+This scrapes each lead's website, detects signals (booking widget, ad pixels, service menu),
+and writes signal type (col U) + opener phrase (col V) to the sheet.
 
-After importing:
-1. Update all credential references (Gmail, GHL, Instantly, Sheets, Slack)
-2. Update any hardcoded Sheet IDs to your client's Sheet IDs
-3. Read `n8n/conventions.md` before activating
-4. Test each workflow with the sample payloads in `test-events/` before going live
+**What the enrichment does:**
+- Detects signal type: reception, reactivation, speed, upsell
+- Assigns a seasonal trigger as the opener (from trigger library, rotating per lead)
+- Falls back to reactivation if site is blocked
+- Stores extracted services in research notes (col T)
+
+**Do NOT use:**
+- Website taglines as openers — they create non-sequiturs
+- "Running since YEAR" — removed from all openers
+- Platform-specific ad claims ("your Facebook ads") — can't verify
 
 ---
 
-## Folder structure after setup
+## Step 8 — Generate copy
 
+```bash
+python scripts/generate-copy-us.py --icp your-icp-name --rows 2-50
 ```
-clients/
-└── your-client-name/
-    ├── config.yaml
-    ├── icps/
-    │   └── your-icp-name/
-    │       ├── scrape.yaml
-    │       └── qualify.yaml
-    └── templates/
-        └── your-icp-email.yaml
 
-data/
-└── your-icp-name-YYYY-MM-DD.json           ← raw scrape output
-└── your-icp-name-filtered-YYYY-MM-DD.json  ← post-filter output
-```
+Reads U+V, fills email template, writes subject + body to cols W-Z.
+
+**Quality gate:** 150-200 words. No em-dashes. Skips empty rows.
+
+---
+
+## Step 9 — Review before sending
+
+Before loading into Instantly:
+- [ ] Spot-check 5-10 emails manually
+- [ ] Confirm opener line flows naturally into the pain
+- [ ] No em-dashes, no explicit research claims
+- [ ] Authority line is niche-specific and descriptive
+- [ ] CTA is one clear ask
+
+---
+
+## Step 10 — Import n8n workflows
+
+Import the 4 workflow JSONs from `n8n/workflows/`:
+- `positive-reply-research-v1.json` — reply classifier + Slack routing
+- `follow-up-pings-v1.json` — 5-stage auto follow-up
+- `stage-auto-promote-v1.json` — lead stage progression
+- `stalled-lead-reminder-v1.json` — daily digest for exhausted leads
+
+Update all credential references and Sheet IDs. Read `n8n/conventions.md` before activating.
 
 ---
 
 ## Monthly run checklist
 
-- [ ] Trigger scrape (or let n8n cron fire automatically)
-- [ ] Review filter output — any new noise to exclude?
-- [ ] Run Phase 2a/2b research (assign signals to leads)
-- [ ] Run generate-copy
-- [ ] Review a sample of 5 emails before activating sequences
-- [ ] Activate Instantly sequence with Sheet leads
-- [ ] Monitor Slack for reply notifications
+- [ ] Run scrape for each ICP
+- [ ] Filter + export to sheet
+- [ ] Run enrichment (`--all-empty`)
+- [ ] Run copy generation
+- [ ] Spot-check 5 emails before activating Instantly sequences
+- [ ] Update trigger library if season has changed
 
 ---
 
-## Key rules (do not skip)
+## Key rules
 
-1. **Never send automated emails without client approval** — show copy first
-2. **No hardcoded credentials** — everything via `.env` or n8n credential dropdowns
-3. **Nothing goes live without testing** — run against 5 leads manually before full batch
-4. **Read `n8n/conventions.md`** before touching any workflow
+1. Never send emails without client sign-off
+2. No hardcoded credentials — everything via `.env`
+3. Test on 5 leads manually before full batch
+4. Read `n8n/conventions.md` before touching any workflow
+5. Update trigger library every 4-6 weeks

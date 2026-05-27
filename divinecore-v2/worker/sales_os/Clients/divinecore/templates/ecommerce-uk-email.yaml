@@ -1,0 +1,256 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EMAIL TEMPLATE — DivineSide / Marketing OS / UK Ecommerce
+# Framework: Mendoza 4-Question (Q1 opener, Q3 pain, Q2 authority, Q4 CTA)
+# Product: Marketing OS — Meta ads intelligence for DTC beauty brands
+#
+# PAIN THIS PRODUCT SOLVES:
+#   - Spending on Meta with no system telling you what is wasting budget
+#   - Campaigns bleeding spend with clicks and zero conversions, invisible in Ads Manager
+#   - Creative fatigue silently killing ROAS (frequency 10x+ with no alert)
+#   - Budget misallocated away from the campaigns that are actually converting
+#   - Scaling blind — no clear picture of what deserves more budget today
+#
+# PROOF: Reliable Medicare 365 — £14,879 dead spend caught, 112 issues found, first scan
+#
+# SIGNAL MAPPING:
+#   new_product_launch   — recent launch detected on site or blog
+#   active_meta_spender  — Meta or Google ad pixel found on site
+#   mature_ad_account    — brand has been running for 2+ years
+#   complex_ad_account   — broad product range, multiple campaign lines
+#   fallback             — seasonal trigger, no specific signal detected
+#
+# RULES:
+#   - No em-dashes anywhere in the copy
+#   - No "your site says X" or "just looked at your site"
+#   - Pain lines use "you could have..." not "most brands have..."
+#   - Word count: 120-150 words first touch, under 80 second touch
+#   - Proof point numbers are always: £14,879 and 112 issues
+# ─────────────────────────────────────────────────────────────────────────────
+
+---
+
+signal_type: new_product_launch
+
+first_touch:
+  subject: "thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    Most beauty brands scaling spend behind a new launch are running it
+    through a Meta account that has never been properly audited. You could have
+    campaigns generating clicks with no conversions, creative fatigue across
+    existing ad sets, and budget sitting in places that stopped working months
+    ago. None of it shows up clearly until the numbers look wrong at the end
+    of the month.
+
+    We built a Marketing OS for beauty brands that connects to your Meta
+    account, scans every campaign and ad set automatically, and gives you a
+    prioritised list of what to pause, what to scale, and what is wasting
+    budget. Most tools show you what happened. This tells you what to do today.
+
+    Reliable Medicare had £14,879 in dead campaigns and 112 issues their team
+    had no visibility on. The scan found it in five minutes.
+
+    Worth a quick 15-min call this week?
+
+    Mayank
+    DivineSide
+
+second_touch:
+  subject: "Re: thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    The spend you push behind a launch is only as good as the account it runs
+    through. If existing campaigns have creative fatigue or audiences have been
+    overexposed, the new budget goes into an already-broken structure.
+
+    Worth a quick 10 min?
+
+    Mayank
+
+---
+
+signal_type: active_meta_spender
+
+first_touch:
+  subject: "thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    You could have between £3k and £15k sitting in campaigns generating clicks
+    with no conversions. Creative fatigue builds quietly across ad sets where
+    audiences have seen the same creative 10, 15, 20 times. Standard Ads
+    Manager reporting does not surface any of it until your monthly numbers
+    start looking wrong.
+
+    We built a Marketing OS for beauty brands that connects to your Meta
+    account, runs an automated scan across every campaign and ad set, and gives
+    you a prioritised list of what to fix, what to pause, and what to scale.
+    Most tools show you what happened. This tells you what to do today.
+
+    Reliable Medicare had £14,879 in dead campaigns and 112 issues their team
+    had no visibility on. The scan found it in five minutes.
+
+    Worth a quick 15-min call this week?
+
+    Mayank
+    DivineSide
+
+second_touch:
+  subject: "Re: thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    The other thing most brands miss is frequency. When an audience has seen
+    the same ad 8 to 10 times, CTR collapses and ROAS declines quietly week
+    on week. Ads Manager shows the numbers but never tells you that is the
+    reason.
+
+    Worth a quick 10 min?
+
+    Mayank
+
+---
+
+signal_type: mature_ad_account
+
+first_touch:
+  subject: "thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    The longer a Meta account runs, the more issues accumulate invisibly. You
+    could have creative fatigue across ad sets that once performed well,
+    audiences that have been shown the same ads far too many times, and
+    campaigns that stopped converting months ago but are still spending. None
+    of it shows up as a clear alert. You find out when ROAS starts declining
+    with no obvious reason.
+
+    We built a Marketing OS for beauty brands that scans your entire Meta
+    account automatically and gives you a prioritised action list: what to
+    pause today, what to scale, and what is draining budget. Most tools report
+    what happened. This tells you what to do about it.
+
+    Reliable Medicare had £14,879 in dead campaigns and 112 issues their team
+    had no visibility on. The scan found it in five minutes.
+
+    Worth a quick 15-min call this week?
+
+    Mayank
+    DivineSide
+
+second_touch:
+  subject: "Re: thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    Beyond the waste piece, the scan also shows which campaigns are driving
+    profitable revenue versus which look active but are not contributing to
+    actual purchases. Easy to miss when you are looking at ROAS at the campaign
+    level without deeper ad set visibility.
+
+    Worth a quick 10 min?
+
+    Mayank
+
+---
+
+signal_type: complex_ad_account
+
+first_touch:
+  subject: "thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    With multiple product lines running across Meta, budget tends to spread
+    into campaigns that look active but are not converting. You could have your
+    best performing ad sets underfunded while dead campaigns consume the
+    majority of spend. And across a complex account, creative fatigue hits
+    differently across audiences. None of it surfaces clearly without a system
+    built to find it.
+
+    We built a Marketing OS for beauty brands that gives you a unified view
+    across every campaign and ad set: spend, ROAS, creative performance, and a
+    prioritised action list that tells you exactly where to move budget today.
+    Most tools report what happened. This tells you what to do about it.
+
+    Reliable Medicare had £14,879 in dead campaigns and 112 issues their team
+    had no visibility on. The scan found it in five minutes.
+
+    Worth a quick 15-min call this week?
+
+    Mayank
+    DivineSide
+
+second_touch:
+  subject: "Re: thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    The scan also catches frequency issues at the ad set level. Which audiences
+    are overexposed and quietly killing ROAS across different product lines.
+    Hard to catch manually when you are managing multiple campaigns at once.
+
+    Worth a quick 10 min?
+
+    Mayank
+
+---
+
+signal_type: fallback
+
+first_touch:
+  subject: "thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    You could have campaigns generating clicks with no conversions, creative
+    fatigue building across your best audiences, and budget misallocated away
+    from what is actually working. Standard Ads Manager reporting does not
+    surface any of it.
+
+    We built a Marketing OS for beauty brands that connects to your Meta
+    account, scans every campaign and ad set automatically, and gives you a
+    prioritised list: what to fix, what to pause, and what to scale. Most tools
+    show you what happened. This tells you what to do today.
+
+    Reliable Medicare had £14,879 in dead campaigns and 112 issues their team
+    had no visibility on. The scan found it in five minutes.
+
+    Worth a quick 15-min call this week?
+
+    Mayank
+    DivineSide
+
+second_touch:
+  subject: "Re: thoughts {{first_name}} from {{company_name}}, on a marketing OS?"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    Happy to run a quick scan on your account and show you what it surfaces
+    before you commit to anything.
+
+    Worth a quick 10 min?
+
+    Mayank

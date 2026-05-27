@@ -1,15 +1,15 @@
 """
-Lead Copy Generator — US ICPs only.
+Lead Copy Generator — US ICPs.
 
 Reads leads from Google Sheet, uses Style column (U) + Phrase column (V) +
 lead data (A-R) to generate copy. Writes copy to columns S-Z.
 
 Usage:
-    python scripts/generate-copy-us.py --icp aesthetic-clinic-us --rows 2,3,4
-    python scripts/generate-copy-us.py --icp real-estate-broker-us --all-signaled
-    python scripts/generate-copy-us.py --icp car-dealership-us --rows 2-9 --dry-run
+    python scripts/generate-copy-us.py --client <client> --icp <icp> --rows 2,3,4
+    python scripts/generate-copy-us.py --client <client> --icp <icp> --all-signaled
+    python scripts/generate-copy-us.py --client <client> --icp <icp> --rows 2-9 --dry-run
 
-Prerequisite: Columns U + V already filled (by Phase 2a + 2b).
+Prerequisite: Columns U + V already filled (by enrich step).
 """
 
 import argparse
@@ -21,29 +21,29 @@ import yaml
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import AuthorizedSession, Request
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-TEMPLATES_DIR = ROOT / "templates" / "us"
 BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets"
 
-SHEET_IDS = {
-    "aesthetic-clinic-us": "1Y-6-6Alg9USNuIvERx18k8cJ_cN1-2BxgqjAUn5p9ng",
-    "real-estate-broker-us": "1wGd3qr2cJ4NllU5PlZ3SSvB5R-bxWbpct_lxsF6yNpk",
-    "car-dealership-us": "17CDOLo_jnm5ffpYVkYEGF4xOZnZxxprKbCeesKXJeuE",
-}
 
-PAIN_QUESTION = {
-    "pain_fwd_reactivation": "Quick question — how are you currently staying in touch with customers from 1-2 years ago?",
-    "pain_fwd_reception": "Quick question — how do you handle inquiries that come in evenings or weekends?",
-    "pain_fwd_speed": "Quick question — what happens to inquiries when no one's available to respond right away?",
-    "pain_fwd_upsell": "Quick question — how are you currently approaching existing customers about additional services?",
-}
-
-MASTER_TAB = "All Leads"
+def load_client_config(client: str) -> dict:
+    path = ROOT / "clients" / client / "config.yaml"
+    if not path.exists():
+        print(f"ERROR: client config not found at {path}")
+        sys.exit(1)
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def load_templates(icp: str) -> dict:
-    path = TEMPLATES_DIR / f"{icp}-email.yaml"
+def get_icp_config(client_cfg: dict, icp: str) -> dict:
+    for entry in client_cfg.get("icps", []):
+        if entry["name"] == icp:
+            return entry
+    print(f"ERROR: ICP '{icp}' not found in client config.")
+    sys.exit(1)
+
+
+def load_templates(client: str, icp_cfg: dict) -> dict:
+    path = ROOT / "clients" / client / icp_cfg["email_template"]
     text = path.read_text(encoding="utf-8")
     templates = {}
     for doc in yaml.safe_load_all(text):
@@ -63,10 +63,18 @@ def get_session() -> AuthorizedSession:
 
 
 def sheets_get(session: AuthorizedSession, sid: str, range_: str) -> dict:
+    import time as _time
     url = f"{BASE_URL}/{sid}/values/{quote(range_, safe='')}"
-    r = session.get(url, timeout=30)
+    for attempt in range(5):
+        r = session.get(url, timeout=30)
+        if r.status_code == 429:
+            wait = 2 ** attempt
+            print(f"    429 — waiting {wait}s...")
+            _time.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r.json()
     r.raise_for_status()
-    return r.json()
 
 
 def sheets_update(session: AuthorizedSession, sid: str, range_: str, values: list):
@@ -88,12 +96,10 @@ def find_scrape_tab(session: AuthorizedSession, sid: str) -> str | None:
     return sorted(scrape_tabs)[-1] if scrape_tabs else None
 
 
-def parse_style(style_cell):
+def parse_style(style_cell: str, pain_questions: dict) -> tuple[str | None, str]:
     s = style_cell.strip()
-    for variant in [
-        "pain_fwd_reactivation", "pain_fwd_reception", "pain_fwd_speed",
-        "pain_fwd_upsell", "fallback",
-    ]:
+    known_variants = list(pain_questions.keys()) + ["fallback"]
+    for variant in known_variants:
         if s.startswith(variant):
             path = "fallback" if "(fallback)" in s else "primary"
             return variant, path
@@ -101,19 +107,15 @@ def parse_style(style_cell):
 
 
 def determine_salutation(first_name, last_name):
-    """US norm: first name only."""
     fn = (first_name or "").strip()
     ln = (last_name or "").strip()
     return fn or ln
 
 
 def build_opener_line(variant, path, phrase_or_observation):
-    pain_q = PAIN_QUESTION[variant]
     if path == "primary":
-        phrase = phrase_or_observation.strip('"').strip('„').strip('"').strip()
-        return f'your site says "{phrase}" — {pain_q}'
-    else:
-        return f"just looked at your site — {phrase_or_observation}. {pain_q}"
+        return phrase_or_observation.strip('"').strip('„').strip('"').strip()
+    return phrase_or_observation
 
 
 def generate_copy(templates, variant, first_name, opener_line, company_name, founded_year):
@@ -138,16 +140,18 @@ def generate_copy(templates, variant, first_name, opener_line, company_name, fou
         st_subject = st_subject.replace(old, new)
         st_body = st_body.replace(old, new)
 
+    import re as _re
+    ft_body = _re.sub(r'\n{3,}', '\n\n', ft_body)
+    st_body = _re.sub(r'\n{3,}', '\n\n', st_body)
+
     return ft_subject.strip(), ft_body.strip(), st_subject.strip(), st_body.strip()
 
 
-def pflicht_check(first_touch):
+def pflicht_check(first_touch: str, quality_gate: dict) -> tuple[bool, dict, int]:
     word_count = len(first_touch.split())
-    body_no_sig = first_touch.replace("MOIC AI", "")
-    has_ki = " AI " in body_no_sig
+    max_words = quality_gate.get("max_words", 200)
     checks = {
-        "under_150_words": word_count < 150,
-        "no_AI_mention": not has_ki,
+        f"under_{max_words}_words": word_count < max_words,
     }
     return all(checks.values()), checks, word_count
 
@@ -166,15 +170,22 @@ def parse_rows_arg(rows_str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--icp", required=True, choices=list(SHEET_IDS.keys()))
+    parser.add_argument("--client", required=True, help="Client folder name, e.g. acme-corp")
+    parser.add_argument("--icp", required=True)
     parser.add_argument("--rows", help="Row numbers, e.g. 2,3,4 or 2-9")
     parser.add_argument("--all-signaled", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    sid = SHEET_IDS[args.icp]
-    templates = load_templates(args.icp)
-    print(f"ICP: {args.icp} | Sheet: {sid[:12]}... | Templates: {list(templates.keys())}")
+    client_cfg = load_client_config(args.client)
+    icp_cfg = get_icp_config(client_cfg, args.icp)
+    pain_questions = client_cfg.get("pain_questions", {})
+    quality_gate = client_cfg.get("quality_gate", {})
+    sid = icp_cfg["sheet_id"]
+    master_tab = icp_cfg.get("master_tab", "All Leads")
+
+    templates = load_templates(args.client, icp_cfg)
+    print(f"Client: {args.client} | ICP: {args.icp} | Sheet: {sid[:12]}... | Templates: {list(templates.keys())}")
 
     session = get_session()
     scrape_tab = find_scrape_tab(session, sid)
@@ -183,7 +194,7 @@ def main():
     if args.rows:
         target_rows = parse_rows_arg(args.rows)
     elif args.all_signaled:
-        r = sheets_get(session, sid, f"'{MASTER_TAB}'!S2:S200")
+        r = sheets_get(session, sid, f"'{master_tab}'!S2:S200")
         stages = r.get("values", [])
         target_rows = [i + 2 for i, s in enumerate(stages) if s and s[0] == "signaled"]
     else:
@@ -193,7 +204,7 @@ def main():
     print(f"Rows: {target_rows}\n")
 
     for row in target_rows:
-        r = sheets_get(session, sid, f"'{MASTER_TAB}'!A{row}:V{row}")
+        r = sheets_get(session, sid, f"'{master_tab}'!A{row}:V{row}")
         data = r.get("values", [[]])[0]
         while len(data) < 22:
             data.append("")
@@ -204,11 +215,15 @@ def main():
         style_cell = data[20]
         phrase_or_obs = data[21]
 
+        if not company or not first_name:
+            print(f"  Row {row} | EMPTY LEAD -> skip")
+            continue
+
         if not style_cell:
             print(f"  Row {row} | {company} | NO STYLE -> skip")
             continue
 
-        variant, path = parse_style(style_cell)
+        variant, path = parse_style(style_cell, pain_questions)
         if not variant:
             print(f"  Row {row} | {company} | UNKNOWN STYLE: {style_cell} -> skip")
             continue
@@ -216,7 +231,7 @@ def main():
         first_name_clean = determine_salutation(first_name, last_name)
 
         opener_line = ""
-        if variant.startswith("pain_fwd_"):
+        if variant in pain_questions:
             opener_line = build_opener_line(variant, path, phrase_or_obs)
 
         ft_subj, ft_body, st_subj, st_body = generate_copy(
@@ -227,7 +242,7 @@ def main():
             print(f"  Row {row} | {company} | Template '{variant}' not found -> skip")
             continue
 
-        ok, checks, wc = pflicht_check(ft_body)
+        ok, checks, wc = pflicht_check(ft_body, quality_gate)
         status = "PASS" if ok else "FAIL"
         print(f"  Row {row:3} | {company[:30]:30} | {variant} ({path}) | {wc}W | {status}")
 
@@ -240,12 +255,12 @@ def main():
         if args.dry_run:
             continue
 
-        r_t = sheets_get(session, sid, f"'{MASTER_TAB}'!T{row}")
+        r_t = sheets_get(session, sid, f"'{master_tab}'!T{row}")
         research = r_t.get("values", [[""]])[0][0] if r_t.get("values") else ""
 
         values = [["copy_done", research, style_cell, phrase_or_obs, ft_subj, ft_body, st_subj, st_body]]
 
-        for tab in [MASTER_TAB] + ([scrape_tab] if scrape_tab else []):
+        for tab in [master_tab] + ([scrape_tab] if scrape_tab else []):
             try:
                 sheets_update(session, sid, f"'{tab}'!S{row}:Z{row}", values)
             except Exception as e:

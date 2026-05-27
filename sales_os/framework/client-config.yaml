@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # CLIENT CONFIG — One file per client deployment
-# This is the single place where all client-specific settings live.
-# The pipeline scripts read this instead of having IDs hardcoded.
+# Copy this to clients/<client-name>/config.yaml and fill in every <FILL_IN>.
+# The pipeline scripts read from here — nothing is hardcoded in the engine.
 # ─────────────────────────────────────────────────────────────────────────────
 
 client_name: <FILL_IN>        # e.g. "acme-corp" — lowercase, hyphens only
@@ -12,28 +12,23 @@ sender_company: <FILL_IN>     # e.g. "Acme AI" — appears in email sign-off
 
 # ── ICPs ─────────────────────────────────────────────────────────────────────
 # Add one entry per ICP this client is targeting.
-# Each ICP needs its own scrape config, qualify config, email template, and Sheet.
 icps:
   - name: <FILL_IN>                           # e.g. "plumbing-us"
     sheet_id: <FILL_IN>                       # Google Sheet ID (from the URL)
     scrape_config: icps/<FILL_IN>/scrape.yaml
     qualify_config: icps/<FILL_IN>/qualify.yaml
     email_template: templates/<FILL_IN>-email.yaml
-    master_tab: <FILL_IN>                     # Sheet tab name, e.g. "All Leads"
-    scrape_client: <FILL_IN>                  # Apify client label, e.g. "acme-plumbing"
+    master_tab: All Leads
+    scrape_client: <FILL_IN>                  # label for Apify run naming
 
   # Add more ICPs:
   # - name: <FILL_IN>
   #   sheet_id: <FILL_IN>
-  #   scrape_config: icps/<FILL_IN>/scrape.yaml
-  #   qualify_config: icps/<FILL_IN>/qualify.yaml
-  #   email_template: templates/<FILL_IN>-email.yaml
-  #   master_tab: All Leads
-  #   scrape_client: <FILL_IN>
+  #   ...
 
 # ── PAIN QUESTIONS ───────────────────────────────────────────────────────────
 # The question appended to the opener line per signal type.
-# Rewrite these to match your product offering and your ICP's language.
+# Rewrite these entirely to match this client's product and their ICP's language.
 pain_questions:
   pain_fwd_reception: >
     <FILL_IN>
@@ -45,16 +40,34 @@ pain_questions:
 
   pain_fwd_speed: >
     <FILL_IN>
-    # e.g. "Quick question — what happens to new inquiries when no one's available to respond right away?"
+    # e.g. "Quick question — what happens to new inquiries when no one's available to respond?"
 
   pain_fwd_upsell: >
     <FILL_IN>
     # e.g. "Quick question — how are you currently approaching existing customers about additional services?"
 
+# ── SIGNAL FALLBACK PHRASES ──────────────────────────────────────────────────
+# Used by the enrich script when no primary phrase can be constructed from the lead's website.
+# Write these in terms of the lead's situation — not your product.
+signal_fallbacks:
+  reception: >
+    <FILL_IN>
+    # e.g. "no chat or instant response for inquiries after hours"
+
+  reactivation: >
+    <FILL_IN>
+    # e.g. "you have a customer base worth re-engaging"
+
+  speed: >
+    <FILL_IN>
+    # e.g. "running ads but no instant response for new leads"
+
+  upsell: >
+    <FILL_IN>
+    # e.g. "broad offering with no visible cross-sell system"
+
 # ── COPY QUALITY GATE ────────────────────────────────────────────────────────
 # The copy generation script runs these checks before writing to the Sheet.
-# Emails that fail are logged as FAIL and skipped.
 quality_gate:
   max_words: 150              # first_touch body word limit
   no_ai_mention: true         # block any email mentioning "AI" (except sender company name)
-  # Add your own checks here if needed
