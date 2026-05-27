@@ -40,6 +40,7 @@ ICP_TITLES = {
     "aesthetic-clinic-us": "Aesthetic Clinics US — Lead Pipeline",
     "real-estate-broker-us": "Real Estate Brokers US — Lead Pipeline",
     "car-dealership-us": "Car Dealerships US — Lead Pipeline",
+    "ecommerce-uk": "UK Skincare & Beauty Brands — Lead Pipeline",
 }
 
 
