@@ -1,5 +1,7 @@
 # Workflow Build — DivineSide
 
+> **IN REVIEW until 2026-06-05.** This is Phase 3 of the **destination** 8-week pilot ([`delivery.md`](delivery.md)). The engineering-side guidance (n8n vs divinecore-v2 decision, 6-step build flow, where things commit) **remains live and applies to current Phase 1 custom builds.** What's destination-specific and in review: the strict 2-week timing, the prereq that requires a validated 8-category brain (current Phase 1 builds may use a tighter context surface), and the framing as "the pilot workflow build" rather than "a custom workflow build." Treat engineering content as live; treat pilot-framing as in-review. See [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc.
+
 > **The internal SOP for building a pilot workflow** — Phase 3 of [`delivery.md`](delivery.md). What to check before starting, where the code lives, how to ship.
 >
 > Starter doc. Grows with each pilot — patterns become templates after 3-5 builds.

@@ -1,6 +1,16 @@
 # AI Audit — DivineSide
 
-> **The 2-week diagnostic engagement.** Interview the team, map the workflows, quantify the bottlenecks, package the report with an ROI-anchored roadmap. The audit produces a pipeline of build candidates each priced as its own engagement.
+> ⚠️ **DEFERRED, to be discussed further.** Status as of 2026-05-22, re-confirmed 2026-05-25.
+>
+> AI audit as a paid £2,500 product was killed: no buyer will pay £2,500 for just a diagnostic when the actual offer is "we run your systems as a managed service." Running 10+ free interviews per prospect is also not viable at scale.
+>
+> **The methodology in this doc is genuinely useful.** The workflow drill, the AI-fit test, the opportunity matrix, the "yesterday morning" interview technique — all real. They feed the **Phase 1 customer-discovery sprint** per [`../../../CLAUDE.md` §2](../../../CLAUDE.md) (the JP-model arc) and may yet reappear as part of a different product shape after the 2026-06-05 lock.
+>
+> **Do not pitch this as a paid product to clients.** Treat as a methodology reference until the productization decision at 2026-06-05.
+
+---
+
+> **Original framing (preserved below for reference).** The 2-week diagnostic engagement. Interview the team, map the workflows, quantify the bottlenecks, package the report with an ROI-anchored roadmap. The audit produces a pipeline of build candidates each priced as its own engagement.
 >
 > **Notion mirror:** *[paste link here after uploading to Notion]*
 >
@@ -11,7 +21,7 @@
 > 4. The persona file ([`../identity/pang.md`](../identity/pang.md)) — for whoever runs the calls
 > 5. **This file** — the audit SOP
 
-Last updated: 2026-05-18
+Last updated: 2026-05-18 (deferred 2026-05-22)
 
 Built on Monk AI Group's 5-step framework + their worksheet PDF + the "yesterday morning" interview technique.
 

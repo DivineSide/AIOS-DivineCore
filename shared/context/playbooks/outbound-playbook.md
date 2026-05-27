@@ -1,5 +1,7 @@
 # Outbound Copywriting Playbook
 
+> **IN REVIEW until 2026-06-05.** The general outbound copywriting principles in this file (Seven Principles of Yes, four-step framework, offer formula, channel-specific optimization, subject lines, iteration discipline) are channel-agnostic and **remain valid as-is.** What's in review: **§15 "Outbound for DivineSide Specifically"** references the destination offer (0% upfront + $500 penalty, 8-week pilot template). **Current state during the sprint (Phase 1 of the JP-model arc):** Instantly cold email is paused while we re-evaluate, Upwork outbound continues, the DivineSide-specific offer template in §15 should be adapted to current pricing (£1k–£2.5k workflow build + £350/mo retainer) rather than the destination 8-week pilot. See [`../sales-and-delivery/offer.md` §00](../sales-and-delivery/offer.md) for current operating state and [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc.
+
 > **Cross-channel tactical playbook for cold outbound copy.** Cold email, LinkedIn DM, Instagram DM, X DM, SMS, even cold call openers. The principles are the same: convince a stranger with zero pre-established trust to take an action.
 >
 > **Why outbound is different from other copywriting:** every other discipline assumes opt-in (newsletter signup, form fill, warm intro). Outbound has none of that. The reader did not ask for the message. So every line has to do work that opt-in copy gets for free.

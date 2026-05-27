@@ -1,5 +1,7 @@
 # Upwork Loom Script
 
+> **IN REVIEW until 2026-06-05.** The Loom script references the **destination** offer (0% upfront + $500 personal-penalty guarantee, fixed 8-week pilot, the full 3-layer AIOS framing with multiple workflows across departments). **Current state during the sprint:** the Upwork channel is still live (per [`outbound-playbook.md`](outbound-playbook.md)), but the [1:30–2:15] OFFER + GUARANTEE section and the [3:25–5:10] RM AIOS DEMO need to be adapted per-job to reflect current build pricing (£1k–£2.5k per workflow + £350/mo retainer) and the fact that current builds are single workflows, not the full 3-layer system yet. Voice rules and structural beats remain valid. See [`../sales-and-delivery/offer.md` §00](../sales-and-delivery/offer.md) for current operating state and [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc.
+
 > The standardized Loom video Pang records and attaches to every Upwork application. Replaces per-job sales-script generation — same shape, different specifics, every time.
 >
 > Pairs with [guarantee.md](../sales-and-delivery/guarantee.md) (the guarantee terms referenced in §05 below) and [pang.md](../identity/pang.md) (persona / voice).

@@ -1,5 +1,7 @@
 # Client Intake Form — DivineSide
 
+> **IN REVIEW until 2026-06-05.** This 10-question form is sent in Phase 0 of the **destination** 8-week pilot delivery flow ([`delivery.md`](delivery.md)). **Current state during the sprint (Phase 1 of the JP-model arc):** custom workflow builds may use a tighter or different intake depending on per-client scope; this form is reference for the productized pilot we relaunch after the 2026-06-05 lock. Use what's helpful here for current custom builds (Q1, Q4, Q6, Q7, Q8 are likely still useful), but don't treat as the locked intake yet. See [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc.
+
 > **The 10-question intake form sent in Phase 0 of the pilot delivery flow.** Fits Typeform's free tier (10 questions max). Captures the easy facts async; the deeper material (voice, decisions, strategy nuance) gets pulled out in the kickoff call.
 >
 > **Notion mirror:** *[paste link here after uploading to Notion]*

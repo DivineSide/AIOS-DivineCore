@@ -1,5 +1,7 @@
 # Guarantee — DivineSide
 
+> **IN REVIEW until 2026-06-05.** TYPE A / TYPE B guarantee variants with the $500 personal penalty are the **destination** guarantee mechanic. **Current state during the sprint (Phase 1 of the JP-model arc):** custom workflow builds are scoped per-client at kickoff with a written deliverable; the $500-penalty guarantee may or may not survive the productization lock. **Verbatim guarantee paragraphs in this file should NOT be pasted into proposals, Looms, or sales calls until re-validated.** See [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc, [`offer.md` §00](offer.md) for current operating state, and [`../../../.claude/alignment-2026-05-22.md`](../../../.claude/alignment-2026-05-22.md) for the sprint structure.
+
 > The standardized guarantee that applies to **every channel** Pang/DivineSide sells through: cold email, Upwork, LinkedIn, inbound, warm intro. Attached as a section in every proposal Google Doc, referenced verbally in the Loom and on discovery calls, and formalized inside the SOW.
 >
 > **Two variants** — TYPE A (hours-saved) and TYPE B (functions-delivered, **default**). Choose based on the JD or prospect; the live classification logic for Upwork specifically lives in [sales_os/integrations/upwork/prompts.py](../../../sales_os/integrations/upwork/prompts.py) and applies the same way for other channels. See §02 for what triggers each.

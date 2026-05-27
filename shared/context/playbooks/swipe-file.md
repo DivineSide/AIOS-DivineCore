@@ -8,7 +8,7 @@
 >
 > **Update discipline**: when you screenshot, save, or scroll past something that hits — paste it in here within 24 hours. It rots otherwise.
 
-Last updated: 2026-05-13
+Last updated: 2026-05-20
 
 ---
 
@@ -32,7 +32,7 @@ Any writing agent (LinkedIn / X / YouTube / sales email) can load this file as o
 ### Example 1 — Auditing autonomous AI agents
 
 > **Source / author:** *(unattributed; fill in when re-encountered)*
-> **Posted / logged:** 2026-05-13
+> **Posted / logged:** 2026-05-20
 > **Topic intent:** Pang wants to write his own version of this topic. Highly relevant to DivineSide because we ship autonomous agents for clients. Angles: permissions audits, decision logs, the human-in-loop tradeoff (our "humans supervise" framing per [`../../CLAUDE.md`](../../../CLAUDE.md) §1), and how client trust scales with audit-ability as AI OS deployments expand.
 >
 > ---
@@ -74,9 +74,16 @@ Any writing agent (LinkedIn / X / YouTube / sales email) can load this file as o
 >
 > **Transfers to:** LinkedIn (native fit), X (would adapt as a 6–8 tweet thread with the paradox in T1 and the ACE term as the surprise mid-thread payoff), YouTube short (the *"there's no clean middle ground yet"* line is a strong cold-open hook).
 
-### Example 2
+### Example 2 — Birthday celebration automation (topic only, no source captured yet)
 
-> *(empty — paste when you find one)*
+> **Source / author:** *(TBD; Pang flagged this 2026-05-20, source not captured at the time)*
+> **Posted / logged:** 2026-05-20
+> **Topic intent:** Pang called this *"the most unique thing I've ever seen"* and wants to use it as a future post topic. Likely angle: a "non-obvious AI workflow" example for e-com brands (birthday emails are standard, so whatever was unique here is the angle worth digging up). Could fit a LinkedIn post about uncommon AI workflows worth building, or as a single-tweet curiosity hook on X.
+>
+> **Action before this can be drafted:** Pang to fill in what specifically he saw. Without that, the saved phrase has no usable substance. Search prompts to jog memory: *"birthday celebration automation"* + recent LinkedIn / X / YouTube history.
+>
+> **What works:** *(TBD until source is captured)*
+> **Transfers to:** LinkedIn (likely primary), X (single-tweet curiosity hook).
 
 (Add more as you find them.)
 
@@ -147,4 +154,4 @@ For *moves* that aren't tied to one platform — abstract patterns you can name.
 
 ---
 
-*DivineSide Cross-Channel Swipe File · 2026-05-13*
+*DivineSide Cross-Channel Swipe File · 2026-05-20*

@@ -2,6 +2,16 @@
 
 This file gives Claude Code full context on DivineSide, DivineCore, the team, the tech stack, the business model, and the current state of the build. Read this before touching anything.
 
+> **IN REVIEW until 2026-06-05.** Some commercial details in this file are being re-validated through a 2-week customer-discovery sprint with UK DTC ecom founders.
+>
+> **Locked, will not change:** the niche (UK ecommerce, consumer health and beauty DTC, £1M-£5M ARR, on Shopify, on 3PL), the bucket-with-holes positioning, managed-service as the eventual destination model, RM365 as anchor case study, brand identity, all infrastructure / repo conventions. Audit-first now, productize after pilot 5-10.
+>
+> **Current working state (NOT the destination):** custom workflow builds at £1k-£2.5k per workflow + £350/mo retainer (monitoring, docs, workflow discounts, priority queue, monthly strategy call). We are actively selling and delivering custom work during the sprint, not running pure research. Each build teaches us what to productize.
+>
+> **In review, may shift on 2026-06-05:** §1 and §2 "niche-agnostic" language (superseded by the locked niche above), §14 Instantly positioning copy (and whether to keep Instantly running at all is still being decided), specific offer mechanics and productized pricing in [shared/context/sales-and-delivery/offer.md](shared/context/sales-and-delivery/offer.md), and message-level positioning in [shared/context/identity/strategy.md](shared/context/identity/strategy.md).
+>
+> See [.claude/alignment-2026-05-22.md](.claude/alignment-2026-05-22.md) for the discovery sprint structure and the lock criteria.
+
 
 ## 1. COMPANY OVERVIEW
 
@@ -20,15 +30,40 @@ DivineSide is not an automation agency. We do not build chatbots and call them A
 
 ## 2. BUSINESS MODEL
 
-**Stage 1 — Custom AI OS Builds (Current)**  
-We build fully autonomous operating systems for client businesses. Each build runs an entire department or business function. Niche-agnostic for now — experimenting across industries to find patterns. Each build = cash flow + R&D simultaneously.
+We are replicating **JP Middleton's path**, compressed for one specific niche. The model is sequential. Each phase has to be completed before the next becomes possible.
 
-Running in parallel: commoditised solutions (chatbots, simple automations, SMS flows, lead capture) that feed the startup financially while deeper AI OS work develops.
+### Phase 1: Learn the niche through custom delivery (CURRENT)
 
-**Stage 2 — GaaS: Agentic as a Service (Future)**  
-After enough custom builds and niche discovery, we productise. Autonomous OS delivered as a subscription. What SaaS was 15 years ago — except instead of a tool, the client gets a system that runs a business function entirely. Product name not yet finalised. We earn our way here one build at a time.
+Pick a niche, work in it, get good at it through real client work. We are here.
 
-DivineCore is the name for DivineSide's internal system only. The external product name is TBD.
+- **Niche:** UK ecom consumer health & beauty DTC, £1M–£5M ARR, on Shopify, on 3PL.
+- **What we sell:** custom workflow builds at **£1k–£2.5k per workflow + £350/mo retainer.** Audit-first delivery (1–2 weeks of diagnostic, then scoped build). One workflow per engagement.
+- **What we are doing during Phase 1:** running discovery conversations, taking on paid custom builds, **fixing one bucket hole at a time per client.** Each build teaches us which workflows actually move revenue for which kinds of brands in this niche, what pricing the niche supports, and what language founders use to describe their pain.
+- **What Phase 1 is NOT:** we are NOT trying to plug every hole in a client's bucket yet. We are NOT selling a productized system. We are NOT taking clients outside the locked niche. We deliberately stay narrow and deep.
+
+See [shared/context/sales-and-delivery/offer.md §00](shared/context/sales-and-delivery/offer.md) for current-state offer mechanics, and [.claude/alignment-2026-05-22.md](.claude/alignment-2026-05-22.md) for the active discovery sprint structure.
+
+### Phase 2: Identify the highest-revenue workflows from real delivery (BRIDGE, after 5–10 paid builds)
+
+Once we've delivered enough custom builds, patterns emerge. Some workflows will keep showing up as the ones that produced the biggest revenue lift, the cleanest attribution, the most repeatable build process. **Those workflows become the v1 menu of the productized system.**
+
+The lock meeting on 2026-06-05 is the **first checkpoint** toward Phase 2. It uses the first ~10 discovery conversations plus any initial paid builds to commit to which workflows we keep building during the next batch of pilots. The full Phase 2 transition (productizing the winners) comes after ~5–10 paid builds, not after 10 conversations alone.
+
+### Phase 3: Sell the system, not the workflows (DESTINATION)
+
+The productized AI Operating System: **2–3 of the highest-revenue workflows bundled, sold as a managed service** that plugs the biggest holes in a brand's bucket **simultaneously.** Custom workflow builds fix one hole at a time. The system fixes the biggest holes at once. **That is the difference between Phase 1 (current) and Phase 3 (destination).**
+
+This is what JP Middleton sells today for gyms. This is what we're building toward for UK ecom health & beauty DTC. We earn our way here one paid build at a time.
+
+### Why this order matters (the JP lesson)
+
+You cannot productize what you haven't validated through real client work. JP didn't design his gym system from a chair. He built it through years of custom client builds, watching which workflows kept showing up as the ones that moved money. Then he productized.
+
+**Custom builds during Phase 1 are not a detour from the system. They are the only path to it.** The data from real delivery is what makes Phase 3 possible. JP took 7 years. We're compressing it to ~6 months for one niche, but we cannot skip it.
+
+### Stage labels (legacy framing, being retired)
+
+The "Stage 1 / Stage 2 / GaaS" framing previously used in this section conflated phase of the business (Phase 1 above) with phase of the eventual product. After 2026-06-05 lock, we standardize on the Phase 1/2/3 framing. DivineCore is the internal system name; the external product name is TBD.
 
 
 ## 3. DIVINECORE — INTERNAL BUSINESS OS
