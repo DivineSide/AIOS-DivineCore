@@ -1,0 +1,278 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EMAIL TEMPLATE — Fill in for any ICP
+# Based on: Mendoza 4-Question Framework
+# Used by: scripts/generate-copy-us.py and scripts/generate-copy-dach.py
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# HOW THE COPY ENGINE WORKS
+#   1. Enrichment script scrapes each lead's website → assigns signal (col U) + phrase (col V)
+#   2. generate-copy script reads U + V, builds opener_line, fills this template
+#   3. Finished email written to sheet columns W (subject) X (body) Y (subject2) Z (body2)
+#
+# THE 4-PART STRUCTURE (Mendoza framework)
+#   Q1 OPENER:     {{opener_line}} — seasonal trigger or site-specific signal. NO "your site says".
+#                  The enrichment script builds this from col V. Never write it manually.
+#   Q3 PAIN/VALUE: State the pain directly about THEM ("you could be losing..."), add stat if relevant
+#   Q2 AUTHORITY:  Descriptive — name what you build, for which niche, what it does
+#   Q4 CTA:        One low-friction ask. Keep it locked — don't get creative here.
+#
+# RULES (non-negotiable)
+#   - Word count: 150-200 words (first_touch body)
+#   - No em-dashes (—) anywhere in the copy
+#   - No "your site says X" / "just looked at your site" / "running since YEAR"
+#   - No "No one in your market" → use "No one ELSE in your market"
+#   - Pain lines must say "you could be..." not "most [ICPs]..."
+#   - Subject line: clear about what you sell, not "Quick question"
+#   - Second touch: add a NEW angle, not just "did you get my email?"
+#
+# AVAILABLE PLACEHOLDERS
+#   {{first_name}}     — lead's first name
+#   {{opener_line}}    — built automatically from col V by the enrichment script
+#   {{company_name}}   — lead's company name
+#   {{founded_year}}   — year company was founded (from Apollo scrape data)
+#
+# SIGNAL TYPES — use exactly these names:
+#   pain_fwd_reception    — no instant response / no booking widget
+#   pain_fwd_reactivation — past customers sitting cold in database
+#   pain_fwd_speed        — running ads but slow to respond
+#   pain_fwd_upsell       — broad offering but no automated cross-sell
+#   fallback              — no specific signal found
+#
+# PAIN COMBOS (enrichment picks the best 2 of 3 per lead)
+#   reception → pair with reactivation
+#   reactivation → pair with upsell
+#   speed → pair with reactivation
+#   upsell → pair with reactivation
+#   fallback → speed + reactivation (most universal)
+# ─────────────────────────────────────────────────────────────────────────────
+
+---
+
+signal_type: pain_fwd_reception
+
+first_touch:
+  subject: "<FILL_IN — specific to pain, e.g. 'missed inquiries, {{first_name}}'>"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    <PAIN LINE 1 — speed to lead>
+    You could be losing [ICP-specific] inquiries every time your team is unavailable. Data shows
+    businesses that respond within 5 minutes are 391% more likely to close them.
+
+    <PAIN LINE 2 — reactivation>
+    On top of that, the [customers/patients/clients] who [visited/closed/bought] 6-12 months ago
+    and never heard back? That is 40-80% of your [ICP] base sitting cold in the database right now.
+
+    <AUTHORITY — descriptive, niche-specific>
+    We build two systems for [ICP niche] across the [region]: an AI response engine that contacts
+    every new inquiry within minutes before they go elsewhere, and a reactivation engine that
+    automatically re-engages past [customers/patients/clients], turning dormant contacts back into
+    [booked appointments/closed deals/revenue].
+
+    No one else in your market is running this yet.
+
+    <CTA>
+    Worth a quick 15-min call this week?
+
+    <YOUR_NAME>
+    <YOUR_COMPANY>
+
+second_touch:
+  subject: "Re: <SAME AS first_touch subject>"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    <NEW ANGLE — mention the second pain point not covered in email 1>
+
+    Worth a quick 10 min?
+
+    <YOUR_NAME>
+
+---
+
+signal_type: pain_fwd_reactivation
+
+first_touch:
+  subject: "<FILL_IN — e.g. 'past [patients/clients/customers], {{first_name}}'>"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    <PAIN LINE 1 — reactivation>
+    40-80% of [customers/patients/clients] who [visited/bought/closed] haven't heard from you
+    since. That is a lot of repeat business sitting there.
+
+    <PAIN LINE 2 — upsell>
+    At the same time, [existing customers/patients/clients] are the easiest source of new revenue.
+    You could be leaving money on the table every time they [leave/close/buy] without knowing
+    what else you offer.
+
+    <AUTHORITY — descriptive, niche-specific>
+    We build two systems for [ICP niche] across the [region]: a reactivation engine that
+    automatically reaches out to past [customers] who have not been contacted in months or years,
+    and an upsell engine that suggests relevant [services/products/offerings] at exactly the
+    right time, turning the database into a recurring revenue channel.
+
+    No one else in your market is running this yet.
+
+    Worth a quick 15-min call this week?
+
+    <YOUR_NAME>
+    <YOUR_COMPANY>
+
+second_touch:
+  subject: "Re: <SAME AS first_touch subject>"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    Most [ICPs] we speak to are surprised how much revenue is sitting in their existing [customer]
+    base once they start reaching out consistently. Happy to show you what that looks like.
+
+    Worth a quick 10 min?
+
+    <YOUR_NAME>
+
+---
+
+signal_type: pain_fwd_speed
+
+first_touch:
+  subject: "<FILL_IN — e.g. 'response time, {{first_name}}'>"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    <PAIN LINE 1 — speed to lead (use 391% stat)>
+    You could be losing [ICP-specific] leads to competitors every time someone enquires and
+    waits. Data shows businesses that respond within 5 minutes are 391% more likely to close them.
+
+    <PAIN LINE 2 — reactivation>
+    And those are just the new leads. The [customers] who [bought/visited/closed] and never heard
+    back are 40-80% of your [ICP] base, sitting cold right now.
+
+    <AUTHORITY — descriptive, niche-specific>
+    We build two systems for [ICP niche] across the [region]: an AI response engine that contacts
+    every new inquiry within minutes including evenings and weekends, and a reactivation engine
+    that re-engages past [customers] automatically, turning them back into [revenue].
+
+    No one else in your market is running this yet.
+
+    Worth a quick 15-min call this week?
+
+    <YOUR_NAME>
+    <YOUR_COMPANY>
+
+second_touch:
+  subject: "Re: <SAME AS first_touch subject>"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    Beyond the response time piece, the past [customers] who [bought/visited] and never heard back
+    are still reachable. We automate that outreach too.
+
+    Worth a quick 10 min?
+
+    <YOUR_NAME>
+
+---
+
+signal_type: pain_fwd_upsell
+
+first_touch:
+  subject: "<FILL_IN — e.g. 'existing [customers/patients], {{first_name}}'>"
+  body: |
+    Hey {{first_name}},
+
+    {{opener_line}}
+
+    <PAIN LINE 1 — upsell>
+    You could be leaving revenue on the table every time a [customer/patient/client] [leaves/buys/
+    closes] without knowing what else you offer. Most [ICPs] have no automated system to suggest
+    relevant follow-up [services/products] at the right moment.
+
+    <PAIN LINE 2 — reactivation>
+    At the same time, the [customers] who [visited/bought] and never heard back are 40-80% of
+    your [ICP] base, sitting cold in the database right now.
+
+    <AUTHORITY — descriptive, niche-specific>
+    We build two systems for [ICP niche] across the [region]: an upsell engine that suggests
+    relevant [services/products] to existing [customers] automatically based on their history,
+    and a reactivation engine that re-engages past [customers] who have not been contacted
+    in months or years.
+
+    No one else in your market is running this yet.
+
+    Worth a quick 15-min call this week?
+
+    <YOUR_NAME>
+    <YOUR_COMPANY>
+
+second_touch:
+  subject: "Re: <SAME AS first_touch subject>"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    Most [ICPs] we speak to are surprised how much revenue is sitting in their existing [customer]
+    base once they start engaging it consistently. Happy to show you what that looks like.
+
+    Worth a quick 10 min?
+
+    <YOUR_NAME>
+
+---
+
+signal_type: fallback
+
+first_touch:
+  subject: "<FILL_IN — e.g. '[customer] follow-up, {{first_name}}'>"
+  body: |
+    Hey {{first_name}},
+
+    two quick questions before I move on.
+
+    <DIAGNOSTIC QUESTION 1 — speed/reception>
+    Are new [customer/patient/client] inquiries slipping through after hours?
+
+    <DIAGNOSTIC QUESTION 2 — reactivation>
+    And when did you last reach out to [customers] who have not [visited/bought/closed] in
+    over a year?
+
+    <STAT + PAIN>
+    Data shows businesses that respond within 5 minutes are 391% more likely to close new
+    inquiries. And [customers] sitting cold in the database right now are 40-80% of a [ICP]'s
+    best source of repeat and referral [revenue/business].
+
+    <AUTHORITY — descriptive, niche-specific>
+    We build two systems for [ICP niche] across the [region] that solve both: an AI response
+    engine that contacts every new inquiry within minutes, and a reactivation engine that
+    automatically re-engages past [customers].
+
+    No one else in your market is running this yet.
+
+    Worth a quick 15-min call this week?
+
+    <YOUR_NAME>
+    <YOUR_COMPANY>
+
+second_touch:
+  subject: "Re: <SAME AS first_touch subject>"
+  body: |
+    Hey {{first_name}},
+
+    just following up. Last note from me.
+
+    Worth a quick 10 min?
+
+    <YOUR_NAME>

@@ -1,0 +1,284 @@
+{
+  "name": "[DRAFT] Workflow D — Stalled Lead Reminder",
+  "nodes": [
+    {
+      "id": "node-schedule",
+      "name": "Schedule: Weekdays 14:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 304],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 14 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-ghl-get-opps",
+      "name": "GHL: Get Opportunities (AWAITING_PROSPECT)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [464, 304],
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/opportunities/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "location_id", "value": "vBGfwhaDbMUIhHW1sYSI" },
+            { "name": "pipeline_id", "value": "a1KKsI21F7JknQZAbNXA" },
+            { "name": "pipeline_stage_id", "value": "abe88380-e2b2-4fbd-a672-d0c61c9d4d4f" },
+            { "name": "status", "value": "open" },
+            { "name": "limit", "value": "100" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pit-d2b7e397-0a06-4041-a9fe-5ffee04a3948" },
+            { "name": "Version", "value": "2021-07-28" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-extract-opps",
+      "name": "Extract Opportunities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [688, 304],
+      "parameters": {
+        "jsCode": "const opps = $input.first().json.opportunities || [];\nreturn opps.map(o => ({ json: o }));"
+      }
+    },
+    {
+      "id": "node-ghl-get-contact",
+      "name": "GHL: Get Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [912, 304],
+      "parameters": {
+        "url": "=https://services.leadconnectorhq.com/contacts/{{ $json.contactId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pit-d2b7e397-0a06-4041-a9fe-5ffee04a3948" },
+            { "name": "Version", "value": "2021-07-28" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-check-stalled",
+      "name": "Check Stalled",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1136, 304],
+      "parameters": {
+        "jsCode": "const c = $input.first().json.contact;\nconst cf = (c.customFields || []).reduce((acc, f) => { acc[f.id] = f.value; return acc; }, {});\n\nconst FIELD_FOLLOW_UP_COUNT = '8AZ4Ww7zK6EdI05jpZpx';\nconst FIELD_LAST_FOLLOWUP_AT = 'PRvHAhpyqNvxvHU8O43f';\n\nconst followUpCount = parseInt(cf[FIELD_FOLLOW_UP_COUNT] || '0');\nconst lastFollowupAt = cf[FIELD_LAST_FOLLOWUP_AT] || null;\n\nconst isStalled = followUpCount >= 5;\n\nif (!isStalled) {\n  return [{ json: { skip: true, reason: 'not_stalled', follow_up_count: followUpCount } }];\n}\n\nlet daysSince = 0;\nif (lastFollowupAt) {\n  const lastDate = new Date(lastFollowupAt);\n  const ageMs = Date.now() - lastDate.getTime();\n  daysSince = Math.floor(ageMs / (24 * 60 * 60 * 1000));\n}\n\nreturn [{\n  json: {\n    skip: false,\n    contact_id: c.id,\n    email: c.email,\n    first_name: c.firstName || '',\n    last_name: c.lastName || '',\n    company: c.companyName || '',\n    follow_up_count: followUpCount,\n    last_followup_at: lastFollowupAt,\n    days_since_last: daysSince\n  }\n}];"
+      }
+    },
+    {
+      "id": "node-if-stalled",
+      "name": "IF: Is Stalled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1360, 304],
+      "parameters": {
+        "options": {
+          "caseSensitive": true,
+          "typeValidation": "strict"
+        },
+        "combinator": "and",
+        "conditions": [
+          {
+            "id": "c1",
+            "leftValue": "={{ $json.skip }}",
+            "rightValue": false,
+            "operator": {
+              "type": "boolean",
+              "operation": "equals"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-ghl-task",
+      "name": "GHL: Append Reminder Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1584, 192],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://services.leadconnectorhq.com/contacts/{{ $json.contact_id }}/tasks",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pit-d2b7e397-0a06-4041-a9fe-5ffee04a3948" },
+            { "name": "Version", "value": "2021-07-28" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"Stage decision needed — stalled at count=5 for {{ $json.days_since_last }}d\",\n  \"body\": \"Lead has completed the full 5-touch follow-up sequence and is sitting in AWAITING_PROSPECT. Decide whether to move to NURTURE or CLOSED_LOST.\",\n  \"dueDate\": \"{{ $now.plus({ days: 1 }).toISO() }}\",\n  \"completed\": false\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "node-aggregate",
+      "name": "Build Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1584, 416],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all().map(it => it.json).filter(d => !d.skip);\n\nif (items.length === 0) {\n  return [{ json: { skip: true, count: 0 } }];\n}\n\nconst LOCATION_ID = 'vBGfwhaDbMUIhHW1sYSI';\n\nconst slackLines = items.map(s => {\n  const name = (s.first_name + ' ' + s.last_name).trim() || s.email;\n  const company = s.company ? ' (' + s.company + ')' : '';\n  const ghlUrl = 'https://app.gohighlevel.com/v2/location/' + LOCATION_ID + '/contacts/detail/' + s.contact_id;\n  return '• *' + s.email + '* — ' + name + company + ' — ' + s.days_since_last + 'd since last touch\\n  ' + ghlUrl;\n}).join('\\n\\n');\n\nconst slackText = ':warning: *Stalled Leads — Action Needed* (' + items.length + ')\\n\\n' +\n  'These leads have completed the 5-touch follow-up sequence and are sitting in AWAITING_PROSPECT.\\n' +\n  'Move stage to NURTURE or CLOSED_LOST when you have decided.\\n\\n' + slackLines;\n\nconst emailRows = items.map(s => {\n  const name = (s.first_name + ' ' + s.last_name).trim() || '—';\n  const ghlUrl = 'https://app.gohighlevel.com/v2/location/' + LOCATION_ID + '/contacts/detail/' + s.contact_id;\n  return '<tr><td>' + s.email + '</td><td>' + name + '</td><td>' + (s.company || '—') + '</td><td>' + s.days_since_last + 'd</td><td><a href=\"' + ghlUrl + '\">Open in GHL</a></td></tr>';\n}).join('');\n\nconst emailHtml = '<div style=\"font-family: -apple-system, sans-serif; max-width: 720px;\">' +\n  '<h2 style=\"color: #c2410c;\">⚠ Stalled Leads — ' + items.length + ' decision' + (items.length === 1 ? '' : 's') + ' needed</h2>' +\n  '<p>These leads have completed the full 5-touch follow-up sequence and are sitting in <code>AWAITING_PROSPECT</code>.</p>' +\n  '<p>Decide: <strong>NURTURE</strong> (revisit later) or <strong>CLOSED_LOST</strong> (give up).</p>' +\n  '<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse: collapse; width: 100%; margin-top: 16px;\">' +\n  '<thead style=\"background: #f3f4f6;\"><tr><th align=\"left\">Email</th><th align=\"left\">Name</th><th align=\"left\">Company</th><th align=\"left\">Stalled</th><th align=\"left\">Action</th></tr></thead>' +\n  '<tbody>' + emailRows + '</tbody>' +\n  '</table>' +\n  '<p style=\"color: #6b7280; font-size: 12px; margin-top: 24px;\">Generated by Workflow D (Stalled Lead Reminder) — runs weekdays at 14:00.</p>' +\n  '</div>';\n\nreturn [{\n  json: {\n    skip: false,\n    count: items.length,\n    slack_text: slackText,\n    email_html: emailHtml,\n    email_subject: '[MOIC] ' + items.length + ' Stalled Lead' + (items.length === 1 ? '' : 's') + ' — Stage Decision Needed'\n  }\n}];"
+      }
+    },
+    {
+      "id": "node-if-has-stalled",
+      "name": "IF: Has Stalled Leads",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1808, 416],
+      "parameters": {
+        "options": {
+          "caseSensitive": true,
+          "typeValidation": "strict"
+        },
+        "combinator": "and",
+        "conditions": [
+          {
+            "id": "c1",
+            "leftValue": "={{ $json.skip }}",
+            "rightValue": false,
+            "operator": {
+              "type": "boolean",
+              "operation": "equals"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-slack",
+      "name": "Slack: Stalled Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2032, 320],
+      "parameters": {
+        "method": "POST",
+        "url": "SLACK_WEBHOOK_URL_PLACEHOLDER",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.slack_text) }}\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-gmail-digest",
+      "name": "Gmail: Send Digest to Patrick",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2032, 512],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "patrick@moic-automation.de",
+        "subject": "={{ $json.email_subject }}",
+        "emailType": "html",
+        "message": "={{ $json.email_html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "webhookId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmDZw9VlKkE70Gut",
+          "name": "Gmail account 6"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule: Weekdays 14:00": {
+      "main": [
+        [{ "node": "GHL: Get Opportunities (AWAITING_PROSPECT)", "type": "main", "index": 0 }]
+      ]
+    },
+    "GHL: Get Opportunities (AWAITING_PROSPECT)": {
+      "main": [
+        [{ "node": "Extract Opportunities", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Opportunities": {
+      "main": [
+        [{ "node": "GHL: Get Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "GHL: Get Contact": {
+      "main": [
+        [{ "node": "Check Stalled", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Stalled": {
+      "main": [
+        [{ "node": "IF: Is Stalled?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF: Is Stalled?": {
+      "main": [
+        [
+          { "node": "GHL: Append Reminder Task", "type": "main", "index": 0 },
+          { "node": "Build Digest", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Build Digest": {
+      "main": [
+        [{ "node": "IF: Has Stalled Leads", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF: Has Stalled Leads": {
+      "main": [
+        [
+          { "node": "Slack: Stalled Digest", "type": "main", "index": 0 },
+          { "node": "Gmail: Send Digest to Patrick", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  }
+}
