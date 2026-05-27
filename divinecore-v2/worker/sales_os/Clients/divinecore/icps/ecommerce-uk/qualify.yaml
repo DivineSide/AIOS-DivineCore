@@ -1,0 +1,133 @@
+name: UK DTC Skincare and Beauty Brands
+description: >
+  Any DTC skincare or beauty brand based in the UK with an own product line, own branded
+  website, and running Meta or Google ads. NOT a marketplace, reseller, B2B
+  supplier, salon, agency, chain retailer, or non-beauty brand.
+
+affordability_indicators:
+  min_required: 2
+  checks:
+    - own_branded_website_with_ecommerce
+    - running_meta_or_google_ads
+    - active_social_presence
+    - own_product_line_not_reseller
+
+buy_signals:
+  - signal: meta_pixel_or_ad_tags_on_website
+    your_product: Marketing OS — finds wasted spend and scaling opportunities in their Meta account
+
+  - signal: multiple_product_skus_visible
+    your_product: Marketing OS — unified campaign intelligence across product lines
+
+  - signal: brand_established_2_or_more_years
+    your_product: Marketing OS — accumulated creative fatigue and campaign drift common in mature accounts
+
+  - signal: running_ads_no_analytics_tool_visible
+    your_product: Marketing OS — no existing intelligence layer is a clear gap
+
+disqualify:
+  - Retail chain or multi-brand retailer
+  - B2B supplier, manufacturer, or wholesale distributor
+  - Hair salon, nail salon, beauty salon, or spa (service business, not DTC brand)
+  - Beauty or marketing agency
+  - Training academy or education provider
+  - No own product line (resells other brands only)
+  - Fewer than 5 employees
+  - No own website or sells only on Amazon or marketplace
+  - SaaS or software company
+  - Not a skincare or beauty brand (clothing, food, supplement, gym, tech, pet)
+
+filter_rules:
+  name_blacklist:
+    - boots
+    - superdrug
+    - lookfantastic
+    - look fantastic
+    - feelunique
+    - feel unique
+    - cult beauty
+    - space nk
+    - spacenk
+    - john lewis
+    - marks and spencer
+    - selfridges
+    - harrods
+    - liberty london
+    - asos beauty
+    - next beauty
+    - tesco
+    - sainsburys
+    - waitrose
+    - argos
+    - salon
+    - hair salon
+    - nail salon
+    - barbershop
+    - beauty school
+    - beauty academy
+    - aesthetics academy
+    - training academy
+    - distributor
+    - wholesale
+    - beauty agency
+    - marketing agency
+    - pr agency
+    - marketplace
+    - aesthetics
+    - aesthetic clinic
+    - skin coach
+    - grooming clinic
+    - fine art
+    - copiers
+    - printers
+    - compatible toner
+    - systems
+    - instruments
+
+  desc_blacklist:
+    - wholesale supplier
+    - beauty distributor
+    - salon chain
+    - hair and beauty salon
+    - training provider
+    - aesthetics training
+    - reseller of
+    - b2b supplier
+    - marketplace seller
+    - clothing brand
+    - fashion brand
+    - activewear
+    - footwear
+    - supplement company
+    - pet care
+    - gym wear
+
+  keywords_blacklist:
+    - hair salon
+    - nail salon
+    - beauty salon
+    - wholesale
+    - beauty distributor
+    - salon software
+    - aesthetics training
+    - beauty school
+    - b2b ecommerce
+    - marketplace
+    - clothing brand
+    - fashion brand
+    - activewear brand
+    - footwear brand
+    - supplement brand
+    - pet care brand
+    - food brand
+    - beverage brand
+    - gym
+    - printer
+    - copier
+    - toner cartridge
+    - office supplies
+    - aesthetic clinic
+    - cosmetic clinic
+    - aesthetic treatments
+
+  name_whitelist: []

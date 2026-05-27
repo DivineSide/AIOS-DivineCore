@@ -1,0 +1,94 @@
+name: US DTC Ecommerce Brands
+description: >
+  Any DTC ecommerce brand based in the US with an own product line, own branded
+  website, and running Meta or Google ads. NOT a marketplace, reseller, B2B
+  supplier, salon, agency, or chain retailer.
+
+affordability_indicators:
+  min_required: 2
+  checks:
+    - own_branded_website_with_ecommerce
+    - running_meta_or_google_ads
+    - active_social_presence
+    - own_product_line_not_reseller
+
+buy_signals:
+  - signal: meta_pixel_or_ad_tags_on_website
+    your_product: Marketing OS — finds wasted spend and scaling opportunities in their Meta account
+
+  - signal: multiple_product_skus_visible
+    your_product: Marketing OS — unified campaign intelligence across product lines
+
+  - signal: brand_established_2_or_more_years
+    your_product: Marketing OS — accumulated creative fatigue and campaign drift common in mature accounts
+
+  - signal: running_ads_no_analytics_tool_visible
+    your_product: Marketing OS — no existing intelligence layer is a clear gap
+
+disqualify:
+  - Retail chain or multi-brand retailer
+  - B2B supplier, manufacturer, or wholesale distributor
+  - Hair salon, nail salon, beauty salon, or spa (service business, not DTC brand)
+  - Beauty or marketing agency
+  - Training academy or education provider
+  - No own product line (resells other brands only)
+  - Fewer than 5 employees
+  - No own website or sells only on Amazon or marketplace
+  - SaaS or software company
+
+filter_rules:
+  name_blacklist:
+    - walmart
+    - target
+    - best buy
+    - wayfair
+    - nordstrom
+    - macys
+    - amazon
+    - ulta beauty
+    - sephora
+    - cvs
+    - walgreens
+    - costco
+    - tj maxx
+    - marshalls
+    - kohls
+    - asos
+    - revolve
+    - zappos
+    - salon
+    - hair salon
+    - nail salon
+    - barbershop
+    - beauty school
+    - beauty academy
+    - training academy
+    - distributor
+    - wholesale
+    - beauty agency
+    - marketing agency
+    - pr agency
+    - marketplace
+
+  desc_blacklist:
+    - wholesale supplier
+    - beauty distributor
+    - salon chain
+    - hair and beauty salon
+    - training provider
+    - reseller of
+    - b2b supplier
+    - marketplace seller
+
+  keywords_blacklist:
+    - hair salon
+    - nail salon
+    - beauty salon
+    - wholesale
+    - beauty distributor
+    - salon software
+    - beauty school
+    - b2b ecommerce
+    - marketplace
+
+  name_whitelist: []

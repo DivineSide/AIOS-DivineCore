@@ -7,3 +7,7 @@ AGENTS.md
 # Celery Beat schedule state file (runtime, not source)
 celerybeat-schedule
 celerybeat-schedule.*
+
+# Google OAuth secrets (never commit)
+credentials.json
+token.json
