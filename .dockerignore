@@ -24,8 +24,10 @@ venv
 # Knowledge base + workflow assets — not used at runtime by the API/worker.
 **/knowledge-base/
 **/workflows/
-shared/
 infrastructure/
+# shared/ IS included in the worker build context as of 2026-05-28 — the
+# Instantly reply drafter loads shared/context/identity/pang.md at runtime.
+# The api Dockerfile does not COPY it, so it stays out of the api image.
 
 # Build artefacts
 **/celerybeat-schedule
