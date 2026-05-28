@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Outreach Campaigns — DivineCore</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 20px; color: #111; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    p.lede { color: #555; margin-top: 0; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+    th { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pos { display: inline-block; padding: 3px 10px; border-radius: 12px; background: #eef6ff; color: #1d4ed8; font-size: 12px; font-weight: 600; }
+    .pos.unset { background: #fff4e5; color: #b45309; }
+    .status { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+    a.row-link { color: #111; text-decoration: none; }
+    a.row-link:hover { text-decoration: underline; }
+    .error { background: #fff1f1; border: 1px solid #f5b5b5; color: #7a1f1f; padding: 14px 16px; border-radius: 6px; margin: 20px 0; }
+    .empty { color: #888; padding: 40px 0; text-align: center; }
+    .pct { color: #16a34a; font-weight: 600; }
+    .pct.zero { color: #999; font-weight: 400; }
+  </style>
+</head>
+<body>
+  <h1>Outreach Campaigns</h1>
+  <p class="lede">Cold-email pipeline (Instantly). Click a campaign for per-step metrics and recent replies.</p>
+
+  {% if error %}
+    <div class="error">Failed to load campaigns: {{ error }}</div>
+  {% endif %}
+
+  {% if not campaigns %}
+    <div class="empty">No campaigns yet. The daily poller (00:30 UTC) will populate this view after the first run.</div>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Campaign</th>
+          <th>Positioning</th>
+          <th>Status</th>
+          <th class="num">Sent</th>
+          <th class="num">Replies</th>
+          <th class="num">Reply rate</th>
+          <th class="num">Unsubs</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns %}
+          <tr>
+            <td><a class="row-link" href="/outreach/{{ c.id }}">{{ c.name }}</a></td>
+            <td>
+              {% if c.positioning %}
+                <span class="pos">{{ c.positioning }}</span>
+              {% else %}
+                <span class="pos unset">(unset)</span>
+              {% endif %}
+            </td>
+            <td><span class="status">{{ c.status or '—' }}</span></td>
+            <td class="num">{{ '{:,}'.format(c.emails_sent) }}</td>
+            <td class="num">{{ '{:,}'.format(c.replies) }}</td>
+            <td class="num">
+              {% if c.reply_rate > 0 %}
+                <span class="pct">{{ '%.1f%%' % (c.reply_rate * 100) }}</span>
+              {% else %}
+                <span class="pct zero">0%</span>
+              {% endif %}
+            </td>
+            <td class="num">{{ '{:,}'.format(c.unsubscribes) }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</body>
+</html>

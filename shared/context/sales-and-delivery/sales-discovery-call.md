@@ -1,5 +1,7 @@
 # Sales Discovery Call — DivineSide
 
+> **IN REVIEW until 2026-06-05.** The 45-minute discovery call playbook in this file (rapport → decision authority → diagnosis → offer framing with £2.5k pilot + £2.5k/mo retainer + TYPE A/B guarantee) is the **destination** sales process. **Current state during the sprint (Phase 1 of the JP-model arc):** discovery calls follow the 5-question script in [`../../../.claude/alignment-2026-05-22.md`](../../../.claude/alignment-2026-05-22.md) for the first 15–20 min, then transition to a **custom-build pitch at £1k–£2.5k per workflow + £350/mo retainer** if fit exists. Structural framework in this file (why-triad, decision-authority branches, temperature checks, "consult don't pitch") is still useful as reference. **The specific offer-framing scripts in the 30–37 min section are destination state and should NOT be pitched verbatim.** See [`offer.md` §00](offer.md) for current operating state and [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc.
+
 > **The 45-minute playbook for running a DivineSide discovery call.** Call structure, scripts, decision-authority branches, objection responses, risk-reversal language.
 >
 > **Notion mirror:** *[paste link here after uploading to Notion]*

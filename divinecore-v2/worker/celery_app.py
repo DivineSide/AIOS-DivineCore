@@ -34,6 +34,13 @@ app.conf.beat_schedule = {
         "task": "tasks.poll_instantly_campaigns",
         "schedule": crontab(hour=0, minute=30),
     },
+    "ping-instantly-followups-daily": {
+        # 00:00 UTC = 08:00 MYT. Scans positive replies (intent NOT in OOO/OptOut)
+        # that need a follow-up reminder ping (day +1, +2, +3 after replied_at,
+        # capped at DIVINESIDE_FOLLOWUP_MAX_PINGS). No-op if no replies due.
+        "task": "tasks.ping_pending_followups",
+        "schedule": crontab(hour=0, minute=0),
+    },
     "poll-upwork-jobs-daily": {
         # 21:40 UTC = 05:40 MYT every day. Scrapes UPWORK_SEARCH_URL via
         # Apify and upserts new jobs into the upwork_jobs Supabase table.

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Upwork Proposal — Result</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; color: #111; }
+    h1 { font-size: 22px; margin-bottom: 16px; }
+    h2 { font-size: 16px; margin-top: 28px; margin-bottom: 8px; }
+    .body { white-space: pre-wrap; background: #f7f7f8; padding: 16px; border-radius: 6px; border: 1px solid #e2e2e6; font: 14px/1.55 ui-monospace, monospace; }
+    .links { background: #fafafa; padding: 12px 16px; border-radius: 6px; border: 1px solid #eee; }
+    .links a { display: block; margin: 4px 0; }
+    .error { background: #fff1f1; border: 1px solid #f5b5b5; color: #7a1f1f; padding: 14px 16px; border-radius: 6px; }
+    .back { display: inline-block; margin-top: 24px; color: #555; text-decoration: none; }
+    .back:hover { color: #111; }
+    button.copy { float: right; padding: 4px 10px; font-size: 12px; background: #111; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    .finalize { background: #fafafa; padding: 16px 18px; border-radius: 6px; border: 1px solid #eee; }
+    .finalize .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .finalize label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; }
+    .finalize input[type=number], .finalize input[type=url] { width: 100%; padding: 8px 10px; font: 14px ui-monospace, monospace; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    .finalize .col { flex: 1 1 140px; min-width: 0; }
+    .finalize .col-wide { flex: 1 1 100%; }
+    .finalize .preview { font-size: 12px; color: #666; margin: 4px 0 12px; }
+    .finalize button { padding: 8px 14px; font-size: 14px; background: #111; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    .finalize button:hover { background: #333; }
+    .finalize .meta { font-size: 12px; color: #888; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  {% if error %}
+    <h1>Something went wrong</h1>
+    <div class="error">{{ error }}</div>
+  {% else %}
+    <h1>Done.</h1>
+
+    <h2>Application body
+      <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('body').innerText)">copy</button>
+    </h2>
+    <div id="body" class="body">{{ application_body }}</div>
+
+    <h2>Document</h2>
+    <div class="links">
+      <a href="{{ proposal_url }}" target="_blank" rel="noopener">Proposal Doc &rarr; {{ proposal_url }}</a>
+    </div>
+
+    {% if row_index and row_index > 0 %}
+      <h2>After applying — fill the tracking sheet</h2>
+      <form class="finalize" method="post" action="/upwork/finalize" id="finalizeForm">
+        <input type="hidden" name="row_index" value="{{ row_index }}">
+        <div class="row">
+          <div class="col">
+            <label for="base_connects">Base connects</label>
+            <input type="number" min="0" step="1" id="base_connects" name="base_connects" placeholder="15">
+          </div>
+          <div class="col">
+            <label for="boosted_connects">Boosted connects</label>
+            <input type="number" min="0" step="1" id="boosted_connects" name="boosted_connects" placeholder="5">
+          </div>
+        </div>
+        <div class="preview" id="connectsPreview">Sheet will record: <em>(empty)</em></div>
+        <div class="row">
+          <div class="col col-wide">
+            <label for="loom_url">Loom video URL</label>
+            <input type="url" id="loom_url" name="loom_url" placeholder="https://www.loom.com/share/...">
+          </div>
+        </div>
+        <button type="submit">Save to tracking sheet</button>
+        <div class="meta">Row {{ row_index }} on the tracking sheet. Leave blank fields untouched.</div>
+      </form>
+      <script>
+        (function () {
+          var base = document.getElementById('base_connects');
+          var boost = document.getElementById('boosted_connects');
+          var preview = document.getElementById('connectsPreview');
+          function render() {
+            var b = base.value.trim();
+            var x = boost.value.trim();
+            var text;
+            if (b && x) text = b + ' + ' + x;
+            else text = b || x || '';
+            preview.innerHTML = 'Sheet will record: ' + (text ? '<strong>' + text + '</strong>' : '<em>(empty)</em>');
+          }
+          base.addEventListener('input', render);
+          boost.addEventListener('input', render);
+        })();
+      </script>
+    {% endif %}
+  {% endif %}
+
+  <a class="back" href="/upwork">&larr; New proposal</a>
+</body>
+</html>

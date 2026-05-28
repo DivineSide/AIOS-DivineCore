@@ -308,6 +308,141 @@ Drafted 2026-05-10 — see §11 below for the full thread copy. Update §11 in p
 
 ---
 
+## 11 · Standing X Cadence + Aean's Hybrid Acquisition Method (2026-05-26 onwards)
+
+> **Long-term cadence (locked 2026-05-28).** Originally framed as a 2-week sprint cadence (2026-05-26). Locked as Pang's standing X rhythm on 2026-05-28. Adapted from an Aean / coaching-program transcript Pang sourced 2026-05-26. The methodology is platform-agnostic (X + cold outreach across email / IG / LinkedIn / X simultaneously) but anchored here because the X cadence specifics live nowhere else. The cross-channel cold-outreach piece (§11.5) is referenced by [linkedin-playbook.md §12.7](linkedin-playbook.md). Quarterly reviews per §11.9.
+>
+> Pang's call 2026-05-26: go all in on both LinkedIn + X. Confirmed 2026-05-28 as long-term commitment, not sprint-only. Realistic load estimate: ~30 hrs/week combined outreach (see §11.8).
+
+### 11.0 · Role of X during the customer-discovery sprint
+
+X is **secondary** to LinkedIn for the 4-call sprint target. X's job during these 11 days:
+
+1. Build top-of-funnel impressions (5 tweets/day ramping — see §11.1)
+2. Compound recall ("mental bandwidth occupation" — Aean's framing) so the same prospect hit on LinkedIn + email + X books faster
+3. Establish the documented-journey base for post-sprint inbound
+
+X is NOT expected to directly source the 4 sprint calls. If it does, bonus. If not, that's fine — LinkedIn is the channel that owes the calls.
+
+### 11.1 · Posting cadence
+
+**5 tweets/day**, ramping toward 10 once 5 feels easy. Aean's heuristic: 5/day ≈ 500K impressions/month, 10/day ≈ 1M/month. Roughly linear.
+
+**Daily content mix (5 tweets/day):**
+
+| Type | Volume/day | Notes |
+|------|-----------|-------|
+| **Service tweets** (technical or educational about AI / AI OS / ecom ops) | 3-4 | Hook variety: technical step-by-step, contrarian opinion, niche-specific insight |
+| **Personal tweets** (story, journey, McDonald's-flex pattern) | 1-2 | Aean's data: personal tweets reportedly rip the hardest. The 19-yo + UK ecom beauty anchors from [pang.md](../identity/pang.md) reinforced here. |
+
+Ramp gradually. From 0-2/day → 5/day → 7 → 10. Sudden jumps don't stick.
+
+### 11.2 · Reply cadence
+
+§07 already locks 20-30 quality replies/day. Aean's lower sustainable bound is **10-15/day**. During sprint, target 20 — drop to 15 only if visibly burning out. Below 10/day is too thin to feed the funnel.
+
+### 11.3 · Auto-DM lead magnet structure
+
+**Cadence: 2 auto-DM posts/month.** Each one is a tweet that says "comment X and I'll DM you the [asset]" — collects DMs at scale.
+
+**The 3-part structure (Hook → Body → CTA):**
+
+| Part | Rule | Pang-specific example |
+|------|------|----------------------|
+| **Hook** | Big number + time frame | *"How an £8M UK beauty brand killed 12 hrs/week of CS work in 8 weeks."* |
+| **Body** | What the asset is | *"I broke down the exact workflow + Loom walkthrough in a 4-page doc."* |
+| **CTA** | Comment a simple word | *"Comment 'BUCKET' and I'll DM it."* — single-word, easy to type |
+| **Visual** | Image or GIF — **non-negotiable** | GIF of scrolling through the asset (blurred). Takes up screen real estate so it's hard to miss. |
+
+Lead magnets themselves come from [linkedin-playbook.md §12.4](linkedin-playbook.md) deferred list — the BUCKET PDF, the RM365 case study breakdown, etc. Built once, used across LinkedIn + X.
+
+### 11.4 · Long-form tweets
+
+**1-2 per week.** Same content as a thread, but in one long tweet (X's expanded text limit).
+
+Algorithm boosts dwell-time → if the hook makes someone stop and read for ≥1 min, the tweet gets pushed further than a thread with the same total content. Long-form tweets convert better for B2B because operators don't always click into threads.
+
+### 11.5 · Cross-channel cold outreach — the free-work method (Dream 100)
+
+**This is the highest-leverage piece of Aean's method for sprint conversion.** Same methodology applies on LinkedIn — see [linkedin-playbook.md §12.7](linkedin-playbook.md) for the LinkedIn-specific template.
+
+**The principle:** for every 100 prospects you reach out to with free work upfront, 1-2 close (when done properly). Free work differentiates you from the thousands of low-effort cold DMs hitting the same inbox. Sunken-cost effect makes them feel obligated to at least look at it.
+
+**Volume during sprint: 2-3 free-work outreach DMs/day** across all channels combined (X + LinkedIn + email). Quality over volume. These are your Dream 100.
+
+**Multi-channel hit**: same prospect on **email + LinkedIn + IG + X simultaneously**. Compounds recall. They see your face/PFP everywhere → you become the default recall when they need your service.
+
+**What free work means for DivineSide:**
+
+| Asset | When to use | Time per piece |
+|-------|-------------|----------------|
+| **1-page bucket audit** (personalized to that brand's likely top pain) | Default for ICP prospects | 30-45 min |
+| **Loom walkthrough** of the audit + 1 workflow you'd build first | Top-tier ICP — RM-tier brands | 30-60 min |
+| **Custom RM365 case study breakdown** mapped to their stack | When prospect has a specific tool overlap with RM365 | 20-30 min |
+
+**Delivery format (sourced from Aean, 2026-05-26):**
+
+- Embed the Loom video INSIDE a Google Doc with the written audit
+- Send ONLY the Google Doc link in the DM — one link, reads as "trusted," lower spam flag
+- Doc has the Loom at the top + the written audit underneath
+
+**DM script: 3 lines max.** Anything longer gets clicked off. Pang version:
+
+> Hey [name], built a quick audit of where AI could replace ops at [their brand]. Loom walks through it. [Google Doc link]
+>
+> No pitch — share with your team if it's useful.
+
+The "no pitch" line removes the implicit sales pressure and earns the click.
+
+### 11.6 · Follow-up cadence (universal — applies to all cold outreach)
+
+Day 0 → +1 → +3 → +5 → +7 → +7 → +14 → +14 → +30 → +30 → +30 → then quarterly forever.
+
+The money is in the follow-up. Most replies come after follow-up #3-5, not the first message.
+
+**Tracking**: Trello kanban board (or Google Sheet if you prefer). Columns: Outreach Sent → Followed Up → Replied → Call Booked → Closed → Dead. Drag the card right as the prospect moves through stages.
+
+**Don't use HubSpot** during sprint. Over-engineered for early stage. Aean's call: "I hate HubSpot. Too complicated, too many buttons."
+
+### 11.7 · Operations
+
+- **Hype Fury** (or any tweet scheduler) — batch one week of tweets in 1 hour Sundays. Same time slot as the LinkedIn batch session from [linkedin-playbook.md §06](linkedin-playbook.md) step 6.
+- **Tweet recycling** — Aean's McDonald's tweet got 100K impressions, then 20K more on recycle a year later. Find your top-5 performers monthly and recycle them. Hype Fury automates this.
+- **Message every new follower** — same playbook §07 / Aean rule. Personal touch + transition to sales conversation.
+
+### 11.8 · Realistic time cost (X side only)
+
+| Activity | Time/day | Time/week |
+|----------|----------|-----------|
+| 5 tweets/day (batched Sundays) | ~10 min | ~1 hr batch + 70 min/week posting |
+| 20 quality replies/day | ~30-60 min | ~3.5-7 hrs |
+| 2-3 free-work cross-channel DMs/day | ~1-1.5 hrs | ~7-10 hrs |
+| Follow-ups + DM-every-new-follower | ~15-30 min | ~2-3 hrs |
+| Auto-DM lead magnet (2/month) | — | ~2 hrs once |
+| **Total X-side estimate** | — | **~12-15 hrs/week** |
+
+Combined with LinkedIn (~15-20 hrs/wk per [linkedin-playbook.md §12.5](linkedin-playbook.md)) = **~27-35 hrs/week on outreach + content alone.** Plus discovery calls + university. This is the load Pang signed up for on 2026-05-26.
+
+### 11.9 · Long-term cadence — quarterly review
+
+Locked 2026-05-28 as Pang's standing X rhythm. The cadences in §11.1 to §11.8 are not sprint-scoped. They hold through quarterly reviews, matching [linkedin-playbook.md §12.8](linkedin-playbook.md):
+
+| Date | Purpose |
+|------|---------|
+| 2026-06-05 | Sprint checkpoint. Activity cadences hold. Review what converted on X vs LinkedIn during the discovery sprint. |
+| 2026-09-05 | Q3 review. |
+| 2026-12-05 | Q4 review. |
+| 2027-03-05 | Q1 2027 review. |
+
+**Adjustment rules at each review:**
+
+- Three consecutive weeks above or below benchmark is signal. Single-week noise is not.
+- Don't drop below the published cadence without explicit review-meeting decision.
+- If a component (e.g. 20 replies/day) underperforms, swap reps to another component (e.g. free-work DMs) at the same total time cost. Don't cut activity outright.
+- If the free-work DM method shows conversion rate < 1% sustained across two quarters, prune it — that was the original kill condition.
+
+---
+
 ## What this file is NOT
 
 - **Not voice or persona** — those live in [`voice.md`](../identity/voice.md) and [`pang.md`](../identity/pang.md).
@@ -317,4 +452,4 @@ Drafted 2026-05-10 — see §11 below for the full thread copy. Update §11 in p
 
 ---
 
-*Pang · DivineSide X Content Playbook · 2026-05-18*
+*Pang · DivineSide X Content Playbook · 2026-05-26*

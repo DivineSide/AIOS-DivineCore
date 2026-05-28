@@ -1,5 +1,7 @@
 # Business Info — DivineSide
 
+> **IN REVIEW until 2026-06-05.** The "niche-agnostic" framing in this file is stale. **Niche is locked: UK ecommerce, consumer health and beauty DTC, £1M-£5M ARR, on Shopify, on 3PL.** The Stage 1 offer description is also pre-discovery-sprint and may shift. Brand-level positioning (DivineSide turns businesses into systems, AI OS agency, the moat through research) is still current. See [.claude/alignment-2026-05-22.md](../../../.claude/alignment-2026-05-22.md) for the locked direction and the discovery sprint structure.
+
 > Voice-shaped identity context for any agent writing as or about DivineSide. Architectural detail lives in CLAUDE.md §1–§3.
 
 ## What we are
@@ -18,11 +20,20 @@ We are not an automation agency. We do not build chatbots and call them AI. We b
 
 This is the through-line in every piece of copy, content, and pitch. If a sentence doesn't reinforce this, cut it.
 
-## What we sell (current, Stage 1)
+## What we sell (current — Phase 1 of the JP-model path)
 
-Custom AI OS builds. Each build is a fully autonomous operating system that runs an entire department or business function for a client. Niche-agnostic right now — experimenting across industries to find patterns.
+We are replicating **JP Middleton's path** for UK ecom consumer health & beauty DTC. JP built his gym system over years of custom client work, identifying which workflows consistently moved revenue, then productized them into a single sellable system. We are doing the same, compressed to ~6 months for one niche.
 
-In parallel, we ship commoditised solutions (chatbots, simple automations, SMS flows, lead capture) as a financial floor while the deeper AI OS work develops. These are revenue infill, not the product.
+**Phase 1 (CURRENT):** custom workflow builds, **one at a time, per client.** Each build fixes one specific bucket hole the brand surfaced in discovery and teaches us which workflows actually move revenue for this niche.
+
+- **Niche:** UK ecom consumer health & beauty DTC, £1M–£5M ARR, on Shopify, on 3PL.
+- **Pricing today:** £1k–£2.5k per workflow build + £350/mo retainer.
+- **Delivery shape:** audit-first (1–2 weeks of diagnostic), then scoped build. Single workflows, not full department-OS builds yet.
+- **Why custom and not productized:** we don't yet have evidence which 2–3 workflows consistently move revenue for THIS niche. Trying to productize without that data means selling something we haven't validated. Custom builds **are** the validation path.
+
+See [`../sales-and-delivery/offer.md §00`](../sales-and-delivery/offer.md) for current-state offer mechanics, and [`../../../CLAUDE.md §2`](../../../CLAUDE.md) for the full Phase 1 → 2 → 3 arc.
+
+**Phase 3 (DESTINATION):** productized managed-service AI Operating System bundling the 2–3 highest-revenue workflows we identified during Phase 1. Sells as a **system, not individual workflows.** Plugs the biggest bucket holes **simultaneously** rather than one at a time. This is what JP sells today; this is where we are going. Niche stays the same. Lock meeting 2026-06-05 is the first checkpoint toward this.
 
 ## What we sell (future, Stage 2)
 
@@ -32,7 +43,7 @@ Product name: TBD. We earn our way into this one build at a time.
 
 ## Stage
 
-Early. Building, testing, getting first clients, finding distribution. Pre-product. Pre-niche. Cash-flowing through custom builds + commoditised solutions.
+Early. Building, testing, getting first clients, finding distribution. **Pre-productized-offer, niche locked** (UK ecom consumer health & beauty DTC). Cash-flowing through custom workflow builds + £350/mo retainers while we learn what to productize. Lock meeting 2026-06-05 produces the v1 productized offer.
 
 ## What we do NOT do
 

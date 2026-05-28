@@ -36,6 +36,18 @@ class WorkerSettings(BaseSettings):
     DISCORD_OUTREACH_WEBHOOK_URL: str = ""
     DISCORD_OUTREACH_THREAD_ID: str = ""
 
+    # Reply handler (Instantly webhook -> Claude classify -> Claude draft ->
+    # Gmail draft -> Discord ping). Gmail OAuth is separate from
+    # GOOGLE_OAUTH_* (Upwork's Sheets/Drive/Docs) so the two integrations
+    # can be revoked / rotated independently.
+    GMAIL_OAUTH_CLIENT_ID: str = ""
+    GMAIL_OAUTH_CLIENT_SECRET: str = ""
+    GMAIL_OAUTH_REFRESH_TOKEN: str = ""
+    REPLY_CLASSIFIER_MODEL: str = "openai/gpt-4o-mini"
+    REPLY_DRAFTER_MODEL: str = "anthropic/claude-sonnet-4-6"
+    DIVINESIDE_CALENDLY_URL: str = "https://cal.com/yick-ho-pang-wnarcx/free-ai-os-strategy-call"
+    DIVINESIDE_FOLLOWUP_MAX_PINGS: int = 3
+
     # Branding OS agents
     IMAGYN_BOT_TOKEN: str = ""
     LYRA_BOT_TOKEN: str = ""

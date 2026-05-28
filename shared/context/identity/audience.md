@@ -1,5 +1,7 @@
 # Audience — Who DivineSide writes for
 
+> **IN REVIEW until 2026-06-05.** The primary-audience band in this file ("~$50k–$10M ARR") is broader than the **locked sales niche** (UK ecom consumer health & beauty DTC, £1M–£5M ARR, on Shopify, on 3PL). **Current state:** sub-segment #2 (eCom / DTC founder, $500k–$5M ARR) is the **active buyer** during the Phase 1 customer-discovery sprint. The other sub-segments are voice-audience context for content writing, not sales targets right now. After 2026-06-05 lock, this file may narrow further to match the productized offer. See [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc.
+
 > Voice-shaped audience definition. Every writing agent should load this file before producing content — the person on the receiving end determines tone, examples, and which arguments land.
 
 ## Primary audience

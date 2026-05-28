@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ campaign.name if campaign else 'Campaign' }} — DivineCore</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 20px; color: #111; }
+    h1 { font-size: 24px; margin-bottom: 4px; }
+    h2 { font-size: 16px; margin-top: 32px; margin-bottom: 8px; color: #333; }
+    .pos { display: inline-block; padding: 4px 12px; border-radius: 12px; background: #eef6ff; color: #1d4ed8; font-size: 13px; font-weight: 600; vertical-align: middle; }
+    .pos.unset { background: #fff4e5; color: #b45309; }
+    .pos-banner { background: linear-gradient(135deg, #eef6ff 0%, #f5f3ff 100%); padding: 16px 20px; border-radius: 8px; margin-bottom: 28px; border: 1px solid #dde6ff; }
+    .pos-banner .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #555; margin-bottom: 4px; }
+    .pos-banner .value { font-size: 18px; font-weight: 700; color: #1d4ed8; }
+    .pos-banner .value.unset { color: #b45309; }
+    .pos-banner .hint { font-size: 12px; color: #888; margin-top: 6px; }
+    .status { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 12px 0 24px; }
+    .summary .card { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 12px 14px; }
+    .summary .card .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
+    .summary .card .v { font-size: 22px; font-variant-numeric: tabular-nums; font-weight: 700; margin-top: 4px; }
+    .summary .card .v.green { color: #16a34a; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+    th { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pct { color: #16a34a; font-weight: 600; }
+    .pct.zero { color: #999; font-weight: 400; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .pill.pos { background: #dcfce7; color: #15803d; }
+    .pill.neg { background: #fee2e2; color: #991b1b; }
+    .pill.neutral { background: #f3f4f6; color: #4b5563; }
+    .reply { padding: 12px 14px; background: #fafafa; border: 1px solid #eee; border-radius: 6px; margin: 8px 0; }
+    .reply .meta { font-size: 12px; color: #666; margin-bottom: 6px; }
+    .reply .body { white-space: pre-wrap; font: 13px/1.5 ui-monospace, monospace; max-height: 160px; overflow: auto; padding: 8px; background: #fff; border-radius: 4px; border: 1px solid #eee; }
+    .error { background: #fff1f1; border: 1px solid #f5b5b5; color: #7a1f1f; padding: 14px 16px; border-radius: 6px; }
+    .back { display: inline-block; margin-top: 24px; color: #555; text-decoration: none; }
+    .back:hover { color: #111; }
+    .cat-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .cat-grid .chip { background: #f3f4f6; padding: 4px 10px; border-radius: 12px; font-size: 12px; }
+    .cat-grid .chip strong { color: #111; }
+  </style>
+</head>
+<body>
+  <a class="back" href="/outreach">&larr; All campaigns</a>
+
+  {% if error %}
+    <h1>Error</h1>
+    <div class="error">{{ error }}</div>
+  {% else %}
+    <h1>{{ campaign.name }}</h1>
+    <div class="pos-banner">
+      <div class="label">Positioning</div>
+      {% if campaign.positioning %}
+        <div class="value">{{ campaign.positioning }}</div>
+      {% else %}
+        <div class="value unset">(unset)</div>
+        <div class="hint">Set it in Supabase Studio: <code>update outreach_campaigns set positioning = '...' where id = '{{ campaign.id }}'</code></div>
+      {% endif %}
+      <div class="hint">Status: <span class="status">{{ campaign.status or '—' }}</span> · Started: {{ campaign.started_at or '—' }}</div>
+    </div>
+
+    <h2>Lifetime totals</h2>
+    <div class="summary">
+      <div class="card">
+        <div class="k">Emails sent</div>
+        <div class="v">{{ '{:,}'.format(lifetime.emails_sent) }}</div>
+      </div>
+      <div class="card">
+        <div class="k">Replies</div>
+        <div class="v">{{ '{:,}'.format(lifetime.replies) }}</div>
+      </div>
+      <div class="card">
+        <div class="k">Positive replies</div>
+        <div class="v green">{{ '{:,}'.format(positive_replies) }}</div>
+      </div>
+      <div class="card">
+        <div class="k">Reply rate</div>
+        <div class="v">{{ '%.2f%%' % (lifetime_reply_rate * 100) }}</div>
+      </div>
+      <div class="card">
+        <div class="k">Positive rate</div>
+        <div class="v green">{{ '%.2f%%' % (lifetime_positive_rate * 100) }}</div>
+      </div>
+      <div class="card">
+        <div class="k">Unsubscribes</div>
+        <div class="v">{{ '{:,}'.format(lifetime.unsubscribes) }}</div>
+      </div>
+    </div>
+
+    <h2>Reply category breakdown</h2>
+    <div class="cat-grid">
+      {% if not category_totals %}
+        <span class="chip">No replies stored yet.</span>
+      {% endif %}
+      {% for cat, n in category_totals.items() %}
+        <span class="chip"><strong>{{ n }}</strong> · {{ cat }}</span>
+      {% endfor %}
+    </div>
+
+    <h2>Per-step metrics</h2>
+    {% if not step_rows %}
+      <p style="color:#888">No step metrics yet.</p>
+    {% else %}
+      <table>
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Subject</th>
+            <th class="num">Sent</th>
+            <th class="num">Replies</th>
+            <th class="num">Reply rate</th>
+            <th class="num">Unsubs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in step_rows %}
+            <tr>
+              <td><strong>{% if s.step_index == 1 %}Initial{% else %}Follow-up #{{ s.step_index - 1 }}{% endif %}</strong></td>
+              <td>{{ s.subject or '—' }}</td>
+              <td class="num">{{ '{:,}'.format(s.emails_sent) }}</td>
+              <td class="num">{{ '{:,}'.format(s.replies) }}</td>
+              <td class="num">
+                {% if s.reply_rate > 0 %}<span class="pct">{{ '%.1f%%' % (s.reply_rate * 100) }}</span>{% else %}<span class="pct zero">0%</span>{% endif %}
+              </td>
+              <td class="num">{{ '{:,}'.format(s.unsubscribes) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    <h2>Daily totals (last 30 days)</h2>
+    {% if not daily_rows %}
+      <p style="color:#888">No daily snapshots yet.</p>
+    {% else %}
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th class="num">Sent</th>
+            <th class="num">Replies</th>
+            <th class="num">Unsubs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in daily_rows %}
+            <tr>
+              <td>{{ d.date }}</td>
+              <td class="num">{{ '{:,}'.format(d.emails_sent) }}</td>
+              <td class="num">{{ '{:,}'.format(d.replies) }}</td>
+              <td class="num">{{ '{:,}'.format(d.unsubscribes) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    <h2>Recent replies</h2>
+    {% if not replies %}
+      <p style="color:#888">No replies stored yet.</p>
+    {% else %}
+      {% for r in replies %}
+        <div class="reply">
+          <div class="meta">
+            {% if r.is_positive %}
+              <span class="pill pos">{{ r.instantly_category or 'positive' }}</span>
+            {% else %}
+              <span class="pill neutral">{{ r.instantly_category or 'uncategorized' }}</span>
+            {% endif %}
+            <strong>{{ r.lead_email }}</strong>
+            {% if r.lead_company %} · {{ r.lead_company }}{% endif %}
+            · {{ r.replied_at }}
+            {% if r.step_index %} · step {{ r.step_index }}{% endif %}
+            {% if r.reply_url %} · <a href="{{ r.reply_url }}" target="_blank" rel="noopener">thread</a>{% endif %}
+          </div>
+          <div class="body">{{ r.body or '_(empty)_' }}</div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+</body>
+</html>

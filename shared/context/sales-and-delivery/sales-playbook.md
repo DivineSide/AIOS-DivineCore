@@ -1,5 +1,7 @@
 # Sales Playbook — DivineSide
 
+> **IN REVIEW until 2026-06-05.** The end-to-end sales SOP in this file (pre-call audit, 45-min discovery call, 24h audit doc with £2.5k pilot + £2.5k/mo retainer, TYPE A/B guarantee, pilot → retainer transition) is the **destination** sales process. **Current state during the sprint (Phase 1 of the JP-model arc):** sales calls are discovery-first (5-question script from the alignment doc), transition to a custom-build pitch only if fit exists, anchor at **£1k–£2.5k per workflow + £350/mo retainer**. Do NOT use the 24h audit doc template in §06 or the offer reference in §05 as-is. They describe destination productized pricing, not what we charge today. See [`offer.md` §00](offer.md) for current operating state, [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc, and [`../../../.claude/alignment-2026-05-22.md`](../../../.claude/alignment-2026-05-22.md) for the sprint structure.
+
 > **The end-to-end SOP for converting a cold-email reply into a paid pilot, then a retainer.**
 >
 > Current focus: UK skincare and beauty e-commerce brands. Stage 1 of the business model (custom AI OS builds).

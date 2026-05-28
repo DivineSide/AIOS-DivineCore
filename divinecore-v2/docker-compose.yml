@@ -37,6 +37,7 @@ services:
       - ../sales_os:/app/sales_os
       - ../ops_os:/app/ops_os
       - ../branding_os:/app/branding_os
+      - ../shared:/app/shared
 
   beat:
     build:
@@ -54,3 +55,4 @@ services:
       - ../sales_os:/app/sales_os
       - ../ops_os:/app/ops_os
       - ../branding_os:/app/branding_os
+      - ../shared:/app/shared

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Upwork Proposal — Tracking sheet updated</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; color: #111; }
+    h1 { font-size: 22px; margin-bottom: 16px; }
+    .ok { background: #f1faf1; border: 1px solid #b5e0b5; color: #1f5a1f; padding: 14px 16px; border-radius: 6px; }
+    .error { background: #fff1f1; border: 1px solid #f5b5b5; color: #7a1f1f; padding: 14px 16px; border-radius: 6px; }
+    .meta { color: #666; font-size: 13px; margin-top: 12px; }
+    .meta code { background: #f3f3f5; padding: 1px 6px; border-radius: 3px; font: 12px ui-monospace, monospace; }
+    .back { display: inline-block; margin-top: 24px; color: #555; text-decoration: none; }
+    .back:hover { color: #111; }
+  </style>
+</head>
+<body>
+  {% if error %}
+    <h1>Couldn't update the sheet</h1>
+    <div class="error">{{ error }}</div>
+  {% else %}
+    <h1>Tracking sheet updated.</h1>
+    <div class="ok">Row {{ row_index }} patched.</div>
+    {% if updated_columns %}
+      <div class="meta">
+        Cells written:
+        {% for cell in updated_columns %}<code>{{ cell }}</code>{% if not loop.last %} {% endif %}{% endfor %}
+      </div>
+    {% else %}
+      <div class="meta">No values supplied — nothing written. Row {{ row_index }} still has empty Connects / Loom fields.</div>
+    {% endif %}
+  {% endif %}
+
+  <a class="back" href="/upwork">&larr; New proposal</a>
+</body>
+</html>
