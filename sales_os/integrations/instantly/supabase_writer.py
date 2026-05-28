@@ -214,3 +214,104 @@ def fetch_recent_replies(campaign_id: str, limit: int = 50) -> list[dict[str, An
     response = httpx.get(url, headers=_headers("count=exact"), timeout=30.0)
     response.raise_for_status()
     return response.json() or []
+
+
+# ---------- reply-handler writers (classifier + drafter + follow-up) ----------
+
+
+def update_reply_with_classification(
+    reply_id: str,
+    *,
+    intent: str,
+    confidence: float,
+    key_message: str,
+) -> dict:
+    """Patch a stored reply with the LLM classifier output."""
+    url = f"{_rest_base()}/{REPLIES_TABLE}?id=eq.{reply_id}"
+    payload = {
+        "intent": intent,
+        "confidence": confidence,
+        "key_message": _truncate(key_message, 2000),
+    }
+    response = httpx.patch(
+        url,
+        headers=_headers("return=representation"),
+        json=payload,
+        timeout=30.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return (data or [payload])[0]
+
+
+def update_reply_with_draft(
+    reply_id: str,
+    *,
+    gmail_thread_id: str | None,
+    gmail_draft_id: str | None,
+    recommended_reply: str | None,
+) -> dict:
+    """Patch a stored reply with the Gmail draft + drafted body text."""
+    url = f"{_rest_base()}/{REPLIES_TABLE}?id=eq.{reply_id}"
+    payload = {
+        "gmail_thread_id": gmail_thread_id,
+        "gmail_draft_id": gmail_draft_id,
+        "recommended_reply": _truncate(recommended_reply, REPLY_BODY_LIMIT),
+    }
+    response = httpx.patch(
+        url,
+        headers=_headers("return=representation"),
+        json=payload,
+        timeout=30.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return (data or [payload])[0]
+
+
+def fetch_replies_due_for_followup(*, cutoff_iso: str) -> list[dict[str, Any]]:
+    """Returns positive replies that need a follow-up Discord ping.
+
+    Filters:
+      - is_positive = true
+      - intent NOT IN ('OOO', 'OptOut')
+      - follow_up_count < 3
+      - replied_at < cutoff_iso
+      - (last_follow_up_at IS NULL OR last_follow_up_at < cutoff_iso)
+
+    cutoff_iso is normally `now - 24h` -- the daily beat task passes it.
+    """
+    from urllib.parse import quote
+
+    encoded = quote(cutoff_iso, safe="")
+    url = (
+        f"{_rest_base()}/{REPLIES_TABLE}"
+        "?is_positive=eq.true"
+        "&follow_up_count=lt.3"
+        f"&replied_at=lt.{encoded}"
+        "&intent=not.in.(OOO,OptOut)"
+        f"&or=(last_follow_up_at.is.null,last_follow_up_at.lt.{encoded})"
+        "&order=replied_at.desc"
+        "&limit=50"
+    )
+    response = httpx.get(url, headers=_headers("count=exact"), timeout=30.0)
+    response.raise_for_status()
+    return response.json() or []
+
+
+def mark_followup_sent(reply_id: str, *, now_iso: str, new_count: int) -> dict:
+    """After a follow-up ping fires, bump follow_up_count + last_follow_up_at."""
+    url = f"{_rest_base()}/{REPLIES_TABLE}?id=eq.{reply_id}"
+    payload = {
+        "follow_up_count": new_count,
+        "last_follow_up_at": now_iso,
+    }
+    response = httpx.patch(
+        url,
+        headers=_headers("return=representation"),
+        json=payload,
+        timeout=30.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return (data or [payload])[0]

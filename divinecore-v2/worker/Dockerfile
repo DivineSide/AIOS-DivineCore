@@ -14,4 +14,8 @@ COPY sales_os/ ./sales_os/
 COPY ops_os/ ./ops_os/
 COPY branding_os/ ./branding_os/
 
+# shared/ carries cross-module identity + voice anchors loaded by writing agents
+# (e.g. the Instantly reply drafter loads shared/context/identity/pang.md).
+COPY shared/ ./shared/
+
 CMD ["celery", "-A", "celery_app", "worker", "--loglevel=info"]
