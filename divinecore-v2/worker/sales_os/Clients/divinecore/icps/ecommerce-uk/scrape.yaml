@@ -21,6 +21,12 @@ filters:
       - Head of Paid Media
       - Paid Social Manager
       - Performance Marketing Manager
+      - Performance Marketing Director
+      - Digital Marketing Manager
+      - Digital Marketing Director
+      - Brand Manager
+      - Brand Director
+      - Ecommerce Manager
       - VP Marketing
     exclude:
       - intern
@@ -68,6 +74,26 @@ filters:
       - cruelty-free
       - dtc beauty
       - direct to consumer beauty
+      # ── broadened: adjacent beauty verticals ──
+      - haircare
+      - hair care
+      - shampoo
+      - conditioner
+      - hair mask
+      - hair oil
+      - makeup
+      - lipstick
+      - mascara
+      - foundation
+      - eyeshadow
+      - blush
+      - eyeliner
+      - lip gloss
+      - perfume
+      - fragrance
+      - cologne
+      - eau de parfum
+      - scent
 
     exclude_any:
       - salon

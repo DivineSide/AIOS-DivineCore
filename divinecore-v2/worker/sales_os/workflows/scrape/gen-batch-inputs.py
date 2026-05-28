@@ -34,14 +34,28 @@ SIZE_GROUPS = {
     "mid":   ["101-200", "201-500"],
 }
 
-# Keyword themes — each is a subset of include_any in scrape.yaml.
-# Edit here when you change the ICP's keyword strategy.
-KEYWORD_THEMES = {
-    "core":    ["skincare", "skin care", "serum", "moisturiser", "moisturizer",
-                "cleanser", "retinol", "face cream", "eye cream"],
-    "sunbody": ["spf", "sunscreen", "body care", "lip care", "beauty brand", "cosmetics"],
-    "natural": ["natural beauty", "clean beauty", "organic skincare", "vegan skincare",
-                "vegan beauty", "cruelty free", "cruelty-free", "dtc beauty"],
+# Theme profiles. Each profile holds 3 non-overlapping keyword themes that get
+# crossed with the 3 size groups (= 9 partitioned JSONs per profile).
+#
+# Profiles write to scrape-inputs/<icp>/        (core, default)
+#                   scrape-inputs/<icp>-<profile>/  (anything else)
+#
+# Add a new profile by adding a key here. All keywords must exist in scrape.yaml
+# include_any or the script will warn.
+THEME_PROFILES = {
+    "core": {
+        "core":    ["skincare", "skin care", "serum", "moisturiser", "moisturizer",
+                    "cleanser", "retinol", "face cream", "eye cream"],
+        "sunbody": ["spf", "sunscreen", "body care", "lip care", "beauty brand", "cosmetics"],
+        "natural": ["natural beauty", "clean beauty", "organic skincare", "vegan skincare",
+                    "vegan beauty", "cruelty free", "cruelty-free", "dtc beauty"],
+    },
+    "broad": {
+        "haircare":  ["haircare", "hair care", "shampoo", "conditioner", "hair mask", "hair oil"],
+        "makeup":    ["makeup", "lipstick", "mascara", "foundation", "eyeshadow",
+                      "blush", "eyeliner", "lip gloss"],
+        "fragrance": ["perfume", "fragrance", "cologne", "eau de parfum", "scent"],
+    },
 }
 
 
@@ -50,7 +64,10 @@ def main():
     ap.add_argument("icp")
     ap.add_argument("--client", required=True)
     ap.add_argument("--count", type=int, default=100)
+    ap.add_argument("--profile", default="core", choices=list(THEME_PROFILES.keys()))
     args = ap.parse_args()
+
+    themes = THEME_PROFILES[args.profile]
 
     cfg_path = ROOT / "Clients" / args.client / "icps" / args.icp / "scrape.yaml"
     if not cfg_path.exists():
@@ -65,12 +82,13 @@ def main():
 
     # Validate themes are subsets of the ICP's include_any (warn on drift)
     include_any = set(f["company_keywords"]["include_any"])
-    for theme, kws in KEYWORD_THEMES.items():
+    for theme, kws in themes.items():
         missing = [k for k in kws if k not in include_any]
         if missing:
             print(f"WARNING: theme '{theme}' has keywords not in scrape.yaml include_any: {missing}")
 
-    out_dir = ROOT / "scrape-inputs" / args.icp
+    dir_name = args.icp if args.profile == "core" else f"{args.icp}-{args.profile}"
+    out_dir = ROOT / "scrape-inputs" / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     base = {
@@ -85,7 +103,7 @@ def main():
 
     written = []
     for size_name, sizes in SIZE_GROUPS.items():
-        for theme_name, keywords in KEYWORD_THEMES.items():
+        for theme_name, keywords in themes.items():
             label = f"{args.icp}_{size_name}_{theme_name}"
             payload = {
                 "fetch_count": args.count,

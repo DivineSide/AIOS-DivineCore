@@ -6,7 +6,7 @@ sender_company: DivineSide
 
 icps:
   - name: ecommerce-uk
-    sheet_id: <FILL_IN>
+    sheet_id: 1c4FjvsjVMDuHK-P_qCqMcN0Hkforhceh0_rWqHpb8k0
     scrape_config: icps/ecommerce-uk/scrape.yaml
     qualify_config: icps/ecommerce-uk/qualify.yaml
     email_template: templates/ecommerce-uk-email.yaml
