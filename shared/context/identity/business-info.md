@@ -61,4 +61,18 @@ When writing externally: refer to **DivineSide**. Never name DivineCore in clien
 
 ## What makes us different (the moat)
 
-The product isn't built around tools — tools change. We build expertise into the system. Each module gets the encoded knowledge, frameworks, and mental models of the best practitioners in its domain (Kallaway for content, Hormozi for sales, etc.). Enterprise tools can't replicate this because they ship features. We ship research.
+**Two things, in this order:**
+
+### 1. Breadth vs depth (the visible, buyer-facing differentiator)
+
+Most agencies focus on one part of the operations stack. A Klaviyo agency runs retention. A Gorgias partner runs CS. Octane handles pre-purchase. Okendo handles reviews. Each focuses on **one workflow at a time.**
+
+**We set up and run all of them as one operating layer.** The brand gets a single retainer instead of four agency relationships and two in-house hires. AI is the *mechanism* that makes that breadth economically possible for a small team to deliver. It is not the marketing line. The visible, defensible claim is the bundle.
+
+This is the differentiator we lead with on cold email, sales calls, and proposal copy. See [../sales-and-delivery/competitive-landscape.md](../sales-and-delivery/competitive-landscape.md) §02 for the sharpened positioning, §03 for layer-by-layer differentiation, §06 for objection responses.
+
+### 2. Embedded expertise (the moat behind the moat)
+
+The product isn't built around tools. Tools change. We build expertise into the system. Each module gets the encoded knowledge, frameworks, and mental models of the best practitioners in its domain (Kallaway for content, Hormozi for sales, etc.). Enterprise tools can't replicate this because they ship features. We ship research.
+
+Note that #1 is what the customer sees and pays for. #2 is how we deliver it. Do not confuse the marketing layer with the delivery layer.

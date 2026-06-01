@@ -8,7 +8,13 @@
 
 We attract **founders, entrepreneurs, and operators who understand AI is infrastructure, not a tool.** We are not competing with generic AI creators. We are not building for people who want a "ChatGPT prompt pack."
 
-The frame: AI Operating Systems are what enterprise software was in 2010 — most people don't see it yet, the few who do are early enough to be defining the category.
+The core differentiation, in plain English:
+
+> **Most agencies focus on one part of your operations stack: just retention, or just CS, or just reviews. We set up and run all of them as one operating layer. AI is what makes that breadth economically possible at a price one of those agencies would charge for one workflow.**
+
+The frame: AI Operating Systems are what enterprise software was in 2010. Most people don't see it yet. The few who do are early enough to be defining the category.
+
+See [../sales-and-delivery/competitive-landscape.md](../sales-and-delivery/competitive-landscape.md) for the four layers of competition we're positioned against, the anti-pitch objection lines, and the destination-vs-entry distinction (we voice the bundle on cold email, we still sell one workflow at a time in Phase 1 per [`../sales-and-delivery/offer.md` §00](../sales-and-delivery/offer.md)).
 
 ## Distribution — current state
 

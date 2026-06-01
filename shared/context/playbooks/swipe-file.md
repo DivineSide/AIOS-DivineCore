@@ -29,6 +29,16 @@ Any writing agent (LinkedIn / X / YouTube / sales email) can load this file as o
 
 ## 01 · LinkedIn
 
+### Post topic ideas (working list)
+
+Topics Pang wants to write LinkedIn posts on. Strike through or remove the entry once a post has shipped on the topic.
+
+- How I use AI to make my LinkedIn posts more engaging
+- How I use AI to write better hooks for LinkedIn
+- How I use AI to storytell better on LinkedIn
+- How going to the gym every day keeps me focused through the workday
+- How I posted on LinkedIn for two months straight
+
 ### Example 1 — Auditing autonomous AI agents
 
 > **Source / author:** *(unattributed; fill in when re-encountered)*
