@@ -56,6 +56,14 @@ THEME_PROFILES = {
                       "blush", "eyeliner", "lip gloss"],
         "fragrance": ["perfume", "fragrance", "cologne", "eau de parfum", "scent"],
     },
+    "extended": {
+        "bodycare":   ["body lotion", "body wash", "body scrub", "body butter",
+                       "hand cream", "foot care", "exfoliator"],
+        "mens":       ["men's skincare", "men's grooming", "men's beauty",
+                       "beard care", "beard oil"],
+        "devices":    ["led mask", "gua sha", "jade roller", "derma roller",
+                       "beauty device", "skincare device", "microcurrent"],
+    },
 }
 
 

@@ -28,6 +28,10 @@ filters:
       - Brand Director
       - Ecommerce Manager
       - VP Marketing
+      - Head of Brand
+      - Marketing Lead
+      - Performance Lead
+      - Growth Lead
     exclude:
       - intern
       - assistant
@@ -94,6 +98,30 @@ filters:
       - cologne
       - eau de parfum
       - scent
+      # ── extended: bodycare, men's beauty, devices, ingredient-led ──
+      - body lotion
+      - body wash
+      - body scrub
+      - body butter
+      - hand cream
+      - foot care
+      - exfoliator
+      - men's skincare
+      - men's grooming
+      - men's beauty
+      - beard care
+      - beard oil
+      - led mask
+      - gua sha
+      - jade roller
+      - derma roller
+      - beauty device
+      - skincare device
+      - microcurrent
+      - peptide
+      - hyaluronic acid
+      - niacinamide
+      - ceramide
 
     exclude_any:
       - salon
