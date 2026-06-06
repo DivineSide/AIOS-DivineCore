@@ -51,8 +51,9 @@ Last updated: 2026-05-12
 
 **Why:** Posts that show *what was built* without naming *what makes our approach structurally different* don't move the brand forward. The LinkedIn audience already has ten of those in their feed every day. We need to look like a different category, not a better version of the same one. This is the rule that protects against the "this just sounds like every other automation post" failure mode.
 
-**How to apply.** Pick at least one of these per post — not all four, but at least one, surfaced clearly enough that a skimmer catches it:
+**How to apply.** Pick at least one of these per post — not all five, but at least one, surfaced clearly enough that a skimmer catches it. **The strongest one is breadth-vs-depth, because it's the most observable, defensible, and is unique to us at our ICP.**
 
+- **Breadth vs depth (lead with this when in doubt).** Most agencies focus on one part of the operations stack. A Klaviyo agency runs retention. A Gorgias partner runs CS. Octane handles pre-purchase. Okendo handles reviews. **We set up and run all of them as one operating layer.** One retainer instead of four agency relationships and two in-house hires. AI is what makes that breadth economically possible for a small team to deliver. (Source: [`../sales-and-delivery/competitive-landscape.md`](../sales-and-delivery/competitive-landscape.md) §02)
 - **The context layer.** We don't run AI on a one-off prompt. We build a context folder *with* the founder — markdown files covering their customers, business, strategy, voice, competitors, team, SOPs, lead channels. Every workflow reads from this folder before it makes a decision. The AI knows the business; it isn't guessing. (Source: [`offer.md`](../sales-and-delivery/offer.md) §02 Phase 1)
 - **Embedded expertise.** We feed each workflow the public frameworks of domain experts — media buyers, copywriters, retention strategists, whoever owns the discipline that workflow lives in — so the AI makes decisions the way an expert would, not the way a generic chatbot would. (Source: [`../../CLAUDE.md`](../../../CLAUDE.md) §5)
 - **Operating system, not standalone workflow.** We build a layer that wraps the entire business. Each new workflow compounds on the brain we built for the previous one — workflow #2 starts smarter than workflow #1, workflow #3 starts smarter than #2. Standalone automations don't compound. (Source: [`offer.md`](../sales-and-delivery/offer.md) §07)
@@ -380,7 +381,7 @@ Run through this before every post goes live:
 - [ ] Does it pass the 'so what?' test — is there a real insight here?
 - [ ] Is every sentence necessary? Cut anything that's filler.
 - [ ] Does it hit **both non-negotiable anchors** (*"19-year-old"* and *"UK e-commerce beauty brands"*) plus at least one optional anchor? (Locked 2026-05-20. See Constant Reinforcement in [`pang.md`](../identity/pang.md). DivineSide brand name stays OUT of post copy unless the post is explicitly marketing.)
-- [ ] Does it draw at least one explicit distinction between DivineSide and generic "AI automation agencies" — context layer, embedded expertise, operating-system framing, or the guarantee? (See §01 Differentiation Requirement)
+- [ ] Does it draw at least one explicit distinction between DivineSide and generic "AI automation agencies" — breadth-vs-depth bundle, context layer, embedded expertise, operating-system framing, or the guarantee? (See §01 Differentiation Requirement)
 - [ ] Is the closing strong — not a generic question?
 - [ ] No corporate buzzwords. No emojis (unless intentional). No exclamation marks.
 - [ ] Would a smart, busy beauty brand operator stop scrolling for this?
@@ -545,6 +546,134 @@ Locked 2026-05-28 as Pang's standing LinkedIn rhythm. The daily and weekly caden
 - If a cadence component (e.g. 20 connection requests/day) isn't converting, swap reps to a different component (e.g. more free-work DMs) at the same total time cost. Don't just cut the activity.
 
 The 4-calls-by-2026-06-05 KPI in §12.0 is sprint-bound by date. The post-sprint version (calls per month at standing rhythm) gets set at the 2026-06-05 lock meeting based on what's converting.
+
+---
+
+## 13 · Learning Notes — LinkedIn Writing Principles
+
+> Working notes on how to write better LinkedIn posts. **Re-read this section before drafting any post.** Add new principles as they surface from posting data, courses, or top-influencer studies.
+
+Last appended: 2026-05-31.
+
+### 13.1 · Core principle — story, not features
+
+Don't list features. Make the reader envision the experience they'll have if they apply what you're teaching, and the feeling that comes with it.
+
+The most powerful posts follow an ordinary-to-extraordinary arc: a normal person levels up and transforms against the odds. Before-and-after.
+
+If your audience has a problem, package the insight as a story about the problem, not a checklist about the solution.
+
+This principle applies across every step below.
+
+### 13.2 · The 6-step in-post construction process
+
+The full flow for writing a single post, in order. This is the *in-post construction* sequence. For the broader weekly workflow (idea bank → batch on Sundays → AI first draft → voice edit), see §06.
+
+**Step 1 — Come up with the INSIGHT (not the topic).**
+
+Don't copy other people's insights. You become a copycat and the post lacks the texture only you could write.
+
+Sources to mine for your own insights:
+
+- Talk to clients, prospects, your audience. Note their problems, the questions they ask, their dreams, their objectives
+- Take notes from what you're doing every day, especially the interesting parts of building in public
+- Analyze your back story. Look at your past
+
+**Step 2 — Clarify the idea.**
+
+One post = one idea. Never two. If you have two, write two posts.
+
+Package the insight from Step 1 as a story, not as a feature list. If the insight is a problem, tell a story about the problem (see §13.1).
+
+**Step 3 — Choose the structure.**
+
+People skim, they don't read. The structure has to be simple. Short, clear sentences.
+
+*Pick the framework that fits:*
+
+- **PAS** — Problem, Agitate, Solution. Educational top-of-funnel posts. See §07 Framework 1.
+- **Storytelling (SLA)** — Story, Lesson, Application. Personal transformation posts. See §07 Framework 2.
+- **Before-After-Bridge** — Where they are now, where they could be, the bridge that gets them there.
+
+Carousels and infographics are valid format choices for any of these.
+
+*4-part body structure (inside whichever framework you pick):*
+
+> **Set the scene → Problem → Journey → Resolution.**
+
+Tell the story in 3-4 clearly sectioned parts. Section breaks should be visible at a skim, so the skim still delivers the story.
+
+*Reading level:* 5th-7th grade. No complex words. If you wouldn't say it out loud to a friend, rewrite it.
+
+**Step 4 — Write the hook.**
+
+The strongest hook formula:
+
+> *Start with something the audience wants to achieve, then write "how I [achieved it]."*
+
+You have to have actually achieved the thing. If you haven't, pick a different hook — the credibility collapses if the reader senses you're claiming what you don't have.
+
+*What a good hook does:*
+
+- Triggers interest
+- Tells the reader what the post is about
+- Makes them feel concerned enough to keep reading
+- Gives them something they can take and use for themselves
+
+*Hook levers to mix in:*
+
+- Specific numbers
+- Talk directly to the audience ("you")
+- State a problem and agitate it
+- Share a surprising fact or idea
+
+(See §02 for additional hook templates from top influencers.)
+
+**Step 5 — Write the body + CTA.**
+
+The body delivers what the hook promised. Simple sentences. 5th-7th grade reading level.
+
+*Write for ICP fit, not raw visitor count.* Measure profile visitors by who matches your ICP, not how many show up. The body and CTA should pull the right *kind* of reader, not the most readers.
+
+*CTA — specific question.* End every post with a *specific* question related to the post. Not "Thoughts?" — something tied to what you just wrote that the reader can answer in one sentence.
+
+*When someone in your ICP engages with the post, DM them:*
+
+> Hey [name], looks like interesting work at [company]. I'll be looking out for you in the feed so I can support you.
+
+No pitch. Just acknowledgment + a soft signal that you're paying attention.
+
+**Step 6 — Pick the image.**
+
+In priority order:
+
+1. **Before-and-after photos.** Visually show the transformation the post describes.
+2. **A photo of you.** Looking at the camera with an authentic real expression — capturing the emotion of the big win in the post. Bright. Edit to increase vibrance.
+3. **Infographic, graph, or screenshot.** With a title overlay on the image that doubles as the hook (skim-readers read the image first).
+
+Carousels work too, especially for step-by-step or framework posts.
+
+### 13.3 · Content multiplication — double down on what works
+
+When a topic goes viral on your account, the audience has told you what they want. Don't move on, double down.
+
+For one validated topic:
+
+- Write 10 posts on the same topic, each with a different story
+- Create 10 more variations per format (text, video, photo, carousel)
+
+That's 50 posts from one validated topic.
+
+### 13.4 · Qualities of a bad post (pre-post check)
+
+If a post is failing, it's usually one of these four (mapped to the step it failed at):
+
+- The insight inside isn't interesting → Step 1
+- The idea isn't original (copied from someone else) → Step 1
+- The hook is weak → Step 4
+- The body is hard to read → Steps 3 + 5
+
+Check every draft against all four before posting.
 
 ---
 

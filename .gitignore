@@ -11,3 +11,11 @@ celerybeat-schedule.*
 # Google OAuth secrets (never commit)
 credentials.json
 token.json
+
+# Lead lists / scraped prospect data — real PII, never commit (repo is PUBLIC)
+divinecore-v2/worker/sales_os/Clients/divinecore/data/
+*verified-leads*.csv
+
+# Local Claude Code state (machine-specific, not shared)
+.claude/settings.local.json
+.claude/session.md
