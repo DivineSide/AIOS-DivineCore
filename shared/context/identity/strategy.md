@@ -22,9 +22,10 @@ See [`../sales-and-delivery/competitive-landscape.md`](../sales-and-delivery/com
 
 We build complete AI Systems for individual institutes now, and extract the repeating winners into AIOS later. Phases in order:
 
-- **Phase 1 (CURRENT):** custom AI-System builds, deepest pain first, learning which workflows move money for this niche.
-- **Phase 2 (BRIDGE):** the workflows that repeat as the biggest, cleanest wins become the v1 productized menu.
-- **Phase 3 (DESTINATION):** the productized AIOS, sold as a managed service that runs multiple functions at once.
+- **Phase 0 (NOW, weeks 1-4): Validate.** Build the first AI System for the first paying client. Watch what breaks. Goal: 2 paying clients in 4 weeks. If not, revisit the niche, not the product vision.
+- **Phase 1 (months 2-4): Go deep.** Add the 2nd and 3rd workflows for the same clients. Repeat the pattern for 2-3 more institutes. Document what is common across them.
+- **Phase 2 (months 5+): Earn the abstraction.** Patterns that repeat across builds become the productized AIOS core. Widen to adjacent coaching verticals.
+- **Phase 3 (later, optionality not plan): The platform.** AIOS as a SaaS product across verticals. Only after the education vertical is proven.
 
 A pattern goes into AIOS only after it appears across multiple real builds. Delivery is the evidence, not conviction. (Full arc: CLAUDE.md §2.)
 

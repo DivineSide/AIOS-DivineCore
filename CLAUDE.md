@@ -46,25 +46,64 @@ We build complete AI Systems for one business at a time, and the patterns that r
 
 **Geography:** India is the prototype ground (warm connections, fast access). The dream customers are Western (US/UK) coaching businesses with higher pricing power. **The specific foreign market is TBD.** Two-track GTM: Mayank + Shubham own India (Hindi, local trust); Pang owns foreign outreach (English).
 
-### Phase 1: Learn the niche through custom delivery (CURRENT)
+### Phase 0 (NOW, weeks 1-4): Validate
 
-Build complete AI Systems for individual coaching/education businesses, deepest pain first, one workflow at a time. Each build is a real system for that client and paid R&D toward the platform. Each teaches which workflows actually move money for this niche and what language owners use for their pain.
+Build the first AI System for an existing warm contact (a relative's coaching institute in India). Use it. Watch what breaks. **Goal: 2 paying clients in 4 weeks.** If we do not get there, revisit the niche, not the product vision.
 
 - **Delivery model:** retainer (it replaces the manual-labor cost the owner already pays). **Pricing numbers are TBD and must not appear in docs or copy yet.**
-- **The entry workflow (the door we walk in through) is OPEN, pending a deep-research phase.** Candidates span four institute functions: Product (content/PPT/quiz generation, the beachhead's validated #1 pain), Marketing (results/testimonials/social proof), Customer Service (parent updates, doubt management, fee follow-up), Sales (batch recommendation, onboarding, do not lead here, Meritto/GoHighLevel own it). See [shared/context/sales-and-delivery/offer.md §03](shared/context/sales-and-delivery/offer.md). Do not lock or lead with a single workflow until the research lands.
+- **The entry workflow is OPEN, pending a deep-research phase.** Candidates span four institute functions: Product (content/PPT/quiz generation, the beachhead's validated #1 pain), Marketing (results/testimonials/social proof), Customer Service (parent updates, doubt management, fee follow-up), Sales (do not lead here — Meritto/GoHighLevel own it). See [shared/context/sales-and-delivery/offer.md §03](shared/context/sales-and-delivery/offer.md). Do not lock a single lead workflow until the research lands.
 - **We do NOT** pitch the productized system or AIOS, take clients outside the niche, or hard-commit pricing/entry-workflow/foreign-market before the research that decides them.
 
-### Phase 2: Identify the repeating winners (BRIDGE)
+### Phase 1 (months 2-4): Go deep
 
-After enough builds, the workflows that keep producing the biggest lift, the cleanest attribution, and the most repeatable build become the v1 menu of the productized system.
+Add the 2nd and 3rd workflows for the same clients. Agents share memory through the AIOS runtime layer that emerges underneath. Repeat the pattern for 2-3 more institutes. Document what is common across them.
 
-### Phase 3: Sell the system, not the workflows (DESTINATION)
+### Phase 2 (months 5+): Earn the abstraction
 
-The productized AIOS: the highest-value workflows bundled and sold as a managed service that runs multiple functions of the institute **simultaneously** and compounds on its own data. Custom builds fix one function at a time; the system runs several at once. That is the difference between Phase 1 (current) and Phase 3 (destination). DivineCore is the internal system name; the external product name is TBD.
+The patterns that repeat across builds become the productized AIOS core. Widen to adjacent coaching verticals. Begin foreign-market expansion where pricing power is 5-10x higher.
+
+### Phase 3 (later, optionality not plan): The platform
+
+AIOS as a SaaS product, across verticals. **Only after the education vertical is proven.** This is never the starting point. Conviction is not evidence. Delivery is.
 
 ### Why this order matters
 
-You cannot productize what you have not validated through real client work. A pattern enters AIOS only after it shows up across multiple real builds. **Custom builds during Phase 1 are not a detour from the system. They are the only path to it.** Conviction is not evidence. Delivery is. (Full voice-shaped version: [shared/context/identity/business-info.md](shared/context/identity/business-info.md) and [shared/context/identity/strategy.md](shared/context/identity/strategy.md).)
+You cannot productize what you have not validated through real client work. A pattern enters AIOS only after it shows up across multiple real builds. **Custom builds during Phase 0-1 are not a detour from the product. They are the only path to it.** DivineCore is the internal system name; the external product name is TBD. (Full voice-shaped version: [shared/context/identity/business-info.md](shared/context/identity/business-info.md) and [shared/context/identity/strategy.md](shared/context/identity/strategy.md).)
+
+
+## 2b. THE AIOS VISION
+
+AIOS (AI Operating System) is the long-term SaaS product. It is **not a feature** in any individual client build — it is the runtime layer those builds run on, harvested into a product over time. This is the section every future Claude session loads to understand what we are building toward.
+
+### What AIOS is, structurally
+
+AIOS sits between the LLM and AI agents the same way a traditional OS sits between the CPU and apps. Same position, same job, different resource. It manages seven things:
+
+- **LLM Core** — model-agnostic routing. Swap Claude for GPT-4 for DeepSeek in one config line. The system outlives any single model.
+- **Agent Scheduler** — multiple agents run simultaneously without collision. No agent starves the others.
+- **Memory Manager** — context that persists, compounds, and self-organises (A-MEM: agentic memory that connects new memories to existing ones and reorganises knowledge over time). This is the closed-loop foundation.
+- **Storage Manager** — business knowledge navigated by natural language, not folder paths or database queries.
+- **Tool Manager** — agents access external tools (CRMs, APIs, email, web) through a managed layer. One place, all integrations.
+- **Access Manager (Syscall Trust Layer)** — agents never touch raw business data directly. They request through AIOS, which enforces permissions every time. This is the architectural answer to AI trust.
+- **Context Manager** — long tasks stay coherent; agents do not lose the thread mid-workflow.
+
+The reference implementation we study is the AIOS research repo from Rutgers (`agiresearch/AIOS`, published at COLM 2025). The architecture maps directly to traditional OS engineering — process scheduler → agent scheduler, syscall gateway → AIOS system call, kernel → AIOS kernel. Same engineering, applied to a new shared resource.
+
+### The two core concepts that define AIOS
+
+**1. The Closed Loop.** Every business today runs on open loops — they act, then check results weeks later, if ever. Information is produced and leaks. AIOS closes the loop: the system observes what is happening, compares to what should be happening, and adjusts continuously without human initiation. Thermostat vs heater. **Every business runs on heaters today. We sell thermostats.**
+
+**2. The Syscall Trust Layer.** The reason businesses do not trust AI agents on real operations is that agents touch sensitive business data directly. AIOS solves this architecturally — the same way an OS solves it. Apps never touch hardware; they request through the kernel via a system call, and the kernel enforces what is allowed. We do the same for business data. The owner sets the rules once. The system enforces them every time.
+
+These two concepts (closed loop + syscall trust layer) are what make AIOS non-commoditizable. They are also the two pieces nobody else has built properly.
+
+### Why information businesses are the best first vertical
+
+In a coaching institute, one doubt asked by a student is simultaneously a teaching-quality signal, a curriculum gap indicator, a student-profile data point, a predictor of exam performance, and a reusable pattern across future students. **The information IS the product.** Every operational action becomes a data point the closed loop can learn from. After 6 months of operation, AIOS knows more about how to teach that institute's students than any generic platform — and that accumulated intelligence is the moat. A competitor cannot copy it without starting from scratch. Intelligence accumulated over time is the moat — not features.
+
+### How AIOS shows up in a sales conversation (it does not)
+
+AIOS is the moat, not the pitch. Clients buy a solved problem — hours back, output doubled — not infrastructure. They experience the intelligence layer getting smarter over time without needing to understand why. The video script at [`Content/aios-video-script.md`](Content/aios-video-script.md) is the long-form public explainer for anyone who wants to understand what we are building underneath; **client-facing copy never leads with AIOS.**
 
 
 ## 3. DIVINECORE — INTERNAL BUSINESS OS

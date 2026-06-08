@@ -75,9 +75,10 @@ Last updated: 2026-06-07
 We build a **complete AI System for one coaching / education business at a time**, entering through the single most painful manual function and expanding from there. Each build is a real system for that client and paid R&D toward the productized AIOS. We harvest the platform from delivery, we do not design it up front.
 
 **The arc (full version in CLAUDE.md §2):**
-- **Phase 1 (NOW):** custom AI-System builds, deepest pain first, per client. Learn which workflows move money for this niche.
-- **Phase 2 (BRIDGE):** the workflows that repeat as the biggest, cleanest wins become the v1 productized menu.
-- **Phase 3 (DESTINATION):** the productized AIOS, sold as a managed service running multiple functions of the institute at once.
+- **Phase 0 (NOW, weeks 1-4): Validate.** Build the first AI System for the first paying client. Goal: 2 paying clients in 4 weeks.
+- **Phase 1 (months 2-4): Go deep.** Add the 2nd and 3rd workflows for the same clients. Repeat the pattern for 2-3 more institutes.
+- **Phase 2 (months 5+): Earn the abstraction.** Patterns that repeat across builds become the productized AIOS core.
+- **Phase 3 (later, optionality not plan): The platform.** AIOS as a SaaS product. Only after the education vertical is proven.
 
 On a current sales call you are **not** pitching the productized system or AIOS. You are pitching to remove the owner's biggest manual bottleneck. The intelligence layer builds underneath and compounds on their data. Clients buy a solved problem, not infrastructure.
 

@@ -39,11 +39,12 @@ Two concepts make this non-commoditized: the **closed loop** (a thermostat, not 
 
 We are following a **harvest, do not design** path. Phases, in order:
 
-- **Phase 1 (CURRENT): learn the niche through custom delivery.** Build complete AI Systems for individual coaching/education businesses, deepest pain first. Each build teaches which workflows actually move money for this niche and what language owners use for their pain.
-- **Phase 2 (BRIDGE): identify the repeating winners.** After enough builds, the workflows that keep producing the biggest lift and the cleanest, most repeatable build become the v1 productized menu.
-- **Phase 3 (DESTINATION): sell the system, not the workflows.** The productized AIOS: the highest-value workflows bundled as a managed service that runs multiple functions of the institute at once and compounds on its own data.
+- **Phase 0 (NOW, weeks 1-4): Validate.** Build the first AI System for the first paying client. Watch what breaks. Goal: 2 paying clients in 4 weeks. If not, revisit the niche, not the product vision.
+- **Phase 1 (months 2-4): Go deep.** Add the 2nd and 3rd workflows for the same clients. Repeat the pattern for 2-3 more institutes. Document what is common across them.
+- **Phase 2 (months 5+): Earn the abstraction.** Patterns that repeat across builds become the productized AIOS core. Widen to adjacent coaching verticals.
+- **Phase 3 (later, optionality not plan): The platform.** AIOS as a SaaS product across verticals. Only after the education vertical is proven.
 
-**Delivery model:** retainer (it replaces the manual-labor cost the owner already pays). Pricing numbers are TBD and must not appear in docs or copy yet. See [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md) for current offer mechanics and CLAUDE.md §2 for the full Phase 1 to 3 arc.
+**Delivery model:** retainer (it replaces the manual-labor cost the owner already pays). Pricing numbers are TBD and must not appear in docs or copy yet. See [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md) for current offer mechanics and CLAUDE.md §2 for the full Phase 0 to 3 arc.
 
 **The entry workflow (the door we walk in through) is being decided in a deep-research phase.** Candidates sit across four institute functions (Product, Marketing, Customer Service, Sales): see offer.md. Do not lock or lead with any single one until that research lands.
 
