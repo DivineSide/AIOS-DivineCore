@@ -631,4 +631,88 @@ Check every draft against all four before posting.
 
 ---
 
+## 14 · Outreach Sequence (engage-first DMs)
+
+> **Locked 2026-06-08.** Canonical cold-to-warm connection + DM sequence for the education / coaching niche. **Supersedes** the beauty-framed outbound notes in §09 and the sprint DM mechanics in §12 (both written for the old UK beauty ICP and now stale; the rest of this file still needs a niche-reconciliation pass). The engage-first spine here is niche-agnostic; the scripts are written for **US test-prep / tutoring / coaching owners**.
+>
+> **Two hard rules.** (1) **Manual only.** No automation on Pang's account, ever. Ban risk is unacceptable. (2) **Only run the full sequence on people who are actually active on LinkedIn.** Most test-prep owners are not (see §14.5).
+
+### 14.1 · The daily pipeline (solves the "waiting is tedious" problem)
+
+The 2-day wait is only painful if you track people one at a time. Don't. Run it as a rolling batch so every day looks identical and nothing needs remembering.
+
+Each working day, in one 30-45 min block:
+
+1. **Today's new batch (5-10 people):** like + leave a genuine 1-3 sentence comment on a recent post. Log them in the sheet with today's date.
+2. **The batch from 2 days ago:** send blank connection requests to everyone you commented on 2 days ago.
+3. **Just accepted:** send the first message (§14.3).
+4. **Follow-ups due today:** Looms / nudges per the cadence (§14.4).
+
+You never "go back to one account." You process three columns of a sheet once a day. Comment today, connect in 2 days, message on accept.
+
+**Wait time: 2 days** between comment and connection request. Long enough they've likely seen the comment, short enough they still remember it.
+
+### 14.2 · Tracking sheet (minimum viable)
+
+One Google Sheet, one row per prospect:
+
+| Name | Profile URL | Tier (A/B/C) | Date commented | Date connect sent | Date accepted | Date 1st msg | Last touch | Status |
+
+Status = Commented / Connect sent / Accepted / In convo / Loom sent / Nurturing / Dead. Filter by "Date commented = 2 days ago" to get today's connect list. That's the whole system.
+
+### 14.3 · The scripts (LOCKED)
+
+**Engage-first steps** (Tier A/B): comment first → wait 2 days → **blank** connection request. No note. Blank beats a note once you've already engaged, and a note reads as setup-for-a-pitch.
+
+**First message** (on accept):
+
+> Hey [name], came across your post on [specific thing] and really liked it. I'll be keeping an eye out for what you share and supporting your content. I do have a question for you though: [question]
+
+**The opening question** (LOCKED — easy yes/no, true to your story, opens straight onto the referral pain that is the offer):
+
+> I used to study at a tuition center and basically all their new students came from word of mouth. Is it the same for you?
+
+**Soft indirect ask** (LOCKED — only when the conversation is warm; the "do you know anyone" frame gives a face-saving exit):
+
+> By the way, do you know any tutoring or test-prep owners who'd want to increase their Google reviews and word-of-mouth referrals automatically, without anyone chasing it manually? Happy to show what's been working.
+
+If they're interested they say "well, actually, us." If not, "can't think of anyone," and nothing is lost.
+
+**Loom video** (LOCKED — 30 seconds, recorded while you're on their profile so your face is the thumbnail, no pitch):
+
+> Hey [name], I'm just on your profile here. Really liked your post on [specific thing], the part about [detail] especially. No agenda, just saying hi as a real person rather than another message in your inbox, and letting you know I'll be following what you put out. Keep it up.
+
+*Why a Loom:* the thumbnail shows your actual face sitting on their profile, so you stop being text in an inbox and become a person they recognise. That recognition plus the small effort is what earns the reply. The ask never goes in the Loom; it comes later.
+
+### 14.4 · Follow-up cadence (LOCKED)
+
+| Day | Action |
+|-----|--------|
+| 0 | Connection accepted → first message (§14.3) |
+| +3-4 | No reply → Loom (Tier A/B only) |
+| +7 | No reply → react or comment on a new post of theirs. Stay visible, no message. |
+| +30 | Re-approach with a fresh comment or question |
+
+If they reply at any point, stop the cadence and just talk. Soft ask only when warm.
+
+### 14.5 · When the owner isn't on LinkedIn (most of this ICP)
+
+The engage-first sequence needs something to engage with. Tag every prospect:
+
+- **Tier A** (posts regularly): full sequence.
+- **Tier B** (comments but doesn't post): engage on their comments under other people's posts, then connect, then message.
+- **Tier C** (barely logs in): engage-first is dead here. Do **not** manufacture LinkedIn volume. These owners are usually more reachable by **email, phone, or Instagram** — route them there instead.
+
+**Open question for discovery calls:** which channel actually reaches US test-prep owners. Until that's answered, don't over-invest in a LinkedIn machine the ICP may not live on. Spend the freed-up time testing email / IG on a few Tier C owners and see what replies.
+
+### 14.6 · Sourcing without Sales Navigator
+
+No Sales Nav needed for this ICP:
+
+- LinkedIn free search: title `owner / founder / director` + keyword `test prep`, `tutoring`, `coaching`, `academy`, `learning center`, filtered by US location.
+- Google: `site:linkedin.com/in "test prep" "owner" [city]`
+- Instagram + local directories, since many owners live there rather than on LinkedIn.
+
+---
+
 *Pang · DivineSide LinkedIn Content Playbook · 2026-06-07*

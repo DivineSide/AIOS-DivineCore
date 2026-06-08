@@ -1,0 +1,95 @@
+name: DivineSide US ICP — Independent Test Prep & Tutoring Centers
+description: >
+  Independent, owner-operated, local test prep and tutoring companies in the US.
+  $500k-$3M revenue, group classes, 2-20 staff. Source of truth: shared/context/identity/icp.md.
+
+phase: 1  # Active outreach (Pang's US Instantly track)
+
+# Apollo seniority buckets — we want the decision-maker, not staff.
+seniority_level:
+  - founder
+  - owner
+  - c_suite
+
+# NOTE ON REVENUE: the leads-finder actor input (build_input in apify-scrape.py)
+# has no revenue field — it filters on the employee-count buckets only. The
+# $500k-$3M band from icp.md is enforced by the 2-20 headcount proxy here plus
+# manual judgement at the qualify step. Do not assume revenue is filtered.
+
+filters:
+  titles:
+    include:
+      - Owner
+      - Founder
+      - Co-Founder
+      - Director
+      - Center Director
+      - Executive Director
+      - President
+      - Managing Director
+    exclude:
+      - Tutor
+      - Teacher
+      - Instructor
+      - Teaching Assistant
+      - Assistant
+      - Intern
+      - Receptionist
+      - Office Manager
+
+  industries:
+    include:
+      - education management
+      - e-learning
+      - primary/secondary education
+      - professional training & coaching
+
+  employee_count:
+    min: 2
+    max: 20
+
+  locations:
+    - united states
+
+  company_keywords:
+    include_any:
+      - test prep
+      - test preparation
+      - tutoring center
+      - tutoring services
+      - learning center
+      - SAT prep
+      - ACT prep
+      - academic tutoring
+      - exam prep
+    exclude_any:
+      # franchise / chain models — corporate-mandated tools, cannot adopt us (icp.md)
+      - franchise
+      # national online course platforms / course creators — not locally rooted (icp.md)
+      - online courses
+      - course platform
+      - kajabi
+      - teachable
+      - udemy
+      - marketplace
+      # not our buyer
+      - software
+      - SaaS
+      - staffing
+      - recruiting
+
+  # Hard-excluded by name. The four big franchise chains from icp.md, plus the
+  # online tutoring platforms that erode (not match) this ICP.
+  exclude_companies:
+    chains:
+      - Kumon
+      - Mathnasium
+      - Sylvan
+      - Sylvan Learning
+      - Huntington
+      - Huntington Learning
+      - Varsity Tutors
+      - Wyzant
+      - Preply
+      - Tutor.com
+      - Chegg

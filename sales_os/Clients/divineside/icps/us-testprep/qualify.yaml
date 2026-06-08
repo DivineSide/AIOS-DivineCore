@@ -1,0 +1,67 @@
+name: DivineSide US Test Prep & Tutoring — Post-Scrape Qualification
+description: >
+  Removes noise Apollo's exclude filters miss. Schema matches filter-leads-us.py
+  (filter_rules.{name_blacklist, desc_blacklist, keywords_blacklist, name_whitelist}).
+  Reasoning for every exclusion lives in shared/context/identity/icp.md.
+
+filter_rules:
+  # Checked against company NAME only. Franchise chains + online platforms +
+  # institutions that look like tutoring but are not our buyer.
+  name_blacklist:
+    - kumon
+    - mathnasium
+    - sylvan
+    - huntington
+    - varsity tutors
+    - wyzant
+    - preply
+    - tutor.com
+    - chegg
+    - school district
+    - high school
+    - elementary school
+    - middle school
+    - university
+    - college
+    - community college
+    - public schools
+    - charter school
+
+  # Checked against company DESCRIPTION (specific phrases only — avoid common words).
+  desc_blacklist:
+    - franchise opportunity
+    - franchise location
+    - online course platform
+    - course creator
+    - kajabi
+    - teachable
+    - learning management system
+    - lms platform
+    - staffing agency
+    - recruiting firm
+    - we are hiring tutors  # job-board / gig marketplace tell
+
+  # Checked against Apollo's structured keywords field (high signal).
+  keywords_blacklist:
+    - franchising
+    - e-learning platform
+    - edtech saas
+    - online marketplace
+    - mooc
+
+  # Company NAME (or keywords) MUST contain one of these ICP signals, or it is dropped.
+  name_whitelist:
+    - tutor
+    - tutoring
+    - test prep
+    - test preparation
+    - prep
+    - learning center
+    - learning lab
+    - academy
+    - academic
+    - sat
+    - act
+    - education
+    - educational
+    - exam
