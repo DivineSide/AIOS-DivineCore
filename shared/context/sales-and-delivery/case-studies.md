@@ -1,5 +1,7 @@
 # Case Studies
 
+> **⚠️ SUPERSEDED (pre-2026-06-06, beauty DTC).** Niche pivoted to education / coaching. The real past-client numbers here (Reliable Medicare, Cracked.ai, etc.) stay valid as Pang's credentials, but the framing/positioning is beauty-era and not yet migrated. Current niche/audience/offer: [business-info.md](../identity/business-info.md), [audience.md](../identity/audience.md), [offer.md](offer.md).
+
 > **Canonical record of Pang's shipped client work.** Loaded by any agent or human generating sales content (Upwork applications, proposal docs, LinkedIn posts, DMs, discovery-call follow-ups). Update here first, then propagate framing changes to [`../identity/pang.md`](../identity/pang.md) and [`../../../sales_os/integrations/upwork/about_me.py`](../../../sales_os/integrations/upwork/about_me.py).
 
 ---

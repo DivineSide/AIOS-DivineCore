@@ -6,9 +6,10 @@
 
 ## Role
 
-- **Founder, CEO** of DivineSide.
-- **Engineering lead** — owns system architecture across DivineCore and all client builds.
-- **Video content owner** — all video output is his POV, his face, his voice.
+- **Co-founder, CEO** of DivineSide.
+- **Product and engineering lead.** Owns product design, system architecture, and the build across DivineCore and all client builds.
+- **Video content owner.** All video output is his POV, his face, his voice (YouTube long-form 1/week plus 2 Shorts).
+- **India market and the beachhead.** Owns the India prototype ground and the beachhead client's 50+ connections, in Hindi, where local trust matters.
 - **Discord**: `mayank082527`
 
 ## Worldview / point of view
@@ -40,10 +41,10 @@ These are the load-bearing beliefs. Content that contradicts them is off-brand.
 
 ## Team (for first-person content where the team gets named)
 
-- **Shubham** — co-founder, research and ops. Owns Kallaway KB build.
-- **Pang (彭毅和)** — developer + marketing. CS at Wuhan University. Being evaluated as co-founder.
-- **William** — sales + written content. LinkedIn outreach, DMs.
-- **Anish** — lead developer.
+DivineSide is run by three co-founders.
+
+- **Shubham Aswal** — co-founder. Frontend (product UI/UX), video animation and motion graphics (Hyperframes), consultation/research, and India + community (LinkedIn / Skool) outreach. See [`shubham.md`](shubham.md).
+- **Pang (彭毅和)** — co-founder. Foreign (US/UK) outreach and conversion, market research, product design and build, and LinkedIn content. CS at Wuhan University. See [`pang.md`](pang.md).
 
 (Full role detail: CLAUDE.md §7.)
 

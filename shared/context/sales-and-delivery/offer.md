@@ -1,238 +1,163 @@
 # Offer — DivineSide
 
-> **IN REVIEW until 2026-06-05.** §01–§09 below describe the **destination** productized offer we're building toward. **They do NOT describe what we sell today.** Current operating state lives in §00 — read that first. Lock meeting on 2026-06-05 produces the next version of this file based on what 10 founder conversations + paid builds teach us. See [.claude/alignment-2026-05-22.md](../../../.claude/alignment-2026-05-22.md) for the sprint structure.
+---
 
-> **What we sell, what we promise, what we charge.** Two operating states coexist in this file during the sprint:
-> - **§00 = what we actually charge and ship today.** Custom workflow builds at £1k–£2.5k per workflow + £350/mo retainer. Audit-first. Scope and timeline vary per build.
-> - **§01–§09 = the eventual productized offer.** Fixed 8-week pilot, TYPE A/B guarantee, productized pricing. Lands on 2026-06-05.
+## ⭐ CORE OFFER — WORKING HYPOTHESIS (US market, Pang's outreach track)
+
+> **Status: working hypothesis — pending 5-10 discovery calls with actual US tutoring center owners before fully locking.** The one-liner and four workflows are our best current read. One cofounder already pushed back that lead generation is not the primary pain for established centers. That may shift the offer. Do not treat this as final.
 >
-> **Pitch §00, not §01–§09, on any sales call before 2026-06-05.** Same locked niche either way (UK ecom consumer health & beauty DTC, £1M–£5M ARR, on Shopify, on 3PL). Same eventual brand promise ("Your business, running on AI"). Different operating reality during the sprint.
+> Load this before writing any US cold email, LinkedIn outreach, sales script, or proposal. Everything below §00 is context and architecture — this block is the thing you say.
+
+**One-liner (use across all campaigns):**
+"We help test prep and tutoring centers get more referrals, more Google reviews, and instant follow-up on every inquiry, all running automatically."
+
+**Guarantee:**
+"You pay nothing until we book you [X] new consultations in [Y] weeks."
+
+> ⚠️ **X and Y are TBD.** Do not invent these numbers. Lock them after 3-5 discovery calls with actual US tutoring center owners once you know their baseline inquiry volume and referral situation.
+
+**What we build (4 workflows):**
+1. **Reviews system** — automated review requests sent at the right moment (after a score milestone, after a compliment), so the center's Google rating and review count grows consistently
+2. **Referral system** — automated referral asks to happy parents, with tracking and incentive fulfillment, so word-of-mouth becomes a managed channel not a happy accident
+3. **Google review replies** — auto-replies to every new review posted on their Google Business Profile, written in the owner's voice (important for local SEO)
+4. **Lead follow-up** — every inquiry (web form, voicemail, SMS) gets a response within minutes, qualifies the lead, and books the consultation automatically, without the owner being available
+
+**The positioning line (when asked why us vs anyone else):**
+"Other agencies build you one thing and leave. We run all four on one retainer, learn your business over time, and add more as you grow."
+
+**What we do NOT mention on the sales call:** AIOS, the closed loop, "AI agents," or any technical architecture. We mention outcomes and the workflows that produce them.
+
+---
+
+## Hormozi Value Equation (applied to this offer)
+
+> Framework from *$100M Offers* by Alex Hormozi. Use this to pressure-test any offer or guarantee before committing to it. Value is high when the top is big and the bottom is small.
+
+**Value = (Dream Outcome × Perceived Likelihood) / (Time Delay × Effort)**
+
+| Component | What it is | How we maximize it |
+|-----------|-----------|-------------------|
+| **Dream Outcome** | More enrolled students without more ad spend or manual work. Word-of-mouth grows on its own. No inquiry slips through. | Lead with the outcome, not the mechanism. "More students" not "AI automation." |
+| **Perceived Likelihood** | Why will they believe it works? | The guarantee carries this weight at zero case studies. Proof-first (pay nothing until results) removes their risk entirely. Add case studies as they accumulate. |
+| **Time Delay** | How fast do they see results? | Lead follow-up works week 1. Reviews and referrals compound over 60-90 days. Do NOT quote a specific timeframe in copy until we have real data. |
+| **Effort and Sacrifice** | What does it cost them in time and energy? | We handle setup and maintenance. Minimal owner input. Runs in the background. The only ask is the retainer. |
+
+---
+
+> **Niche pivot locked 2026-06-06.** This file is rebuilt for **education / coaching businesses**. The old beauty-DTC offer (fixed 8-week pilot, TYPE A/B guarantee, £ pricing, bucket framing) is retired.
 >
-> The guarantee deep-dive (TYPE A / TYPE B verbatim, claim mechanic, voids) lives in [`guarantee.md`](guarantee.md). This file is the strategic offer; that file is the legal mechanic.
+> **Status as of 2026-06-07:**
+> - ✅ **US ICP locked** — see [`../identity/icp.md`](../identity/icp.md)
+> - ✅ **Guarantee structure locked** — pay nothing until we book X consultations in Y weeks
+> - ⚠️ **Core offer = working hypothesis** — the 4-workflow lead-gen angle is our best read, not a locked answer. A cofounder pushed back that established centers already have enough leads. May shift after discovery calls.
+> - ⚠️ **X and Y (guarantee numbers) TBD** — lock after 5-10 discovery calls
+> - ⚠️ **Retainer pricing TBD** — lock after discovery calls
+> - ⚠️ **India entry workflow still OPEN** — see §03 candidate catalog below for India/beachhead track
 >
-> **Loading discipline** — any agent or human running outreach, sales calls, audits, or proposals should load:
-> 1. [`../identity/business-info.md`](../identity/business-info.md) — what we sell, what we don't
-> 2. [`../identity/audience.md`](../identity/audience.md) — who we sell to (channel-specific)
-> 3. [`../identity/voice.md`](../identity/voice.md) — brand tone
-> 4. **This file** — the unified offer
-> 5. [`guarantee.md`](guarantee.md) — the guarantee mechanic (TYPE A/B, what triggers, what voids)
-> 6. [`sales-playbook.md`](sales-playbook.md) — the process wrapped around the offer
-> 7. [`sales-discovery-call.md`](sales-discovery-call.md) — for the live call
+> For the full reasoning on why three other pain points (billing, scheduling, parent communication) were ruled out, see [`../identity/niche-research.md`](../identity/niche-research.md) §Pain Point Analysis. Short version: all three require replacing existing processes or migrating existing data before we can even start, which is too high an ask for an unknown agency with no case studies.
+>
+> The guarantee mechanic in [`guarantee.md`](guarantee.md) is tied to the old offer and is being reworked; do not pitch TYPE A/B or any "$500 penalty" language.
 
-Last updated: 2026-05-25
+> **Loading discipline** — any agent or human running outreach, calls, or proposals loads:
+> 1. **This file §00** — the locked core offer and guarantee (read this first)
+> 2. [`../identity/icp.md`](../identity/icp.md) — who we target (US filters, exclusions, why local not online/offline)
+> 3. [`../identity/niche-research.md`](../identity/niche-research.md) — how their business works, pain points, owner language
+> 4. [`../identity/business-info.md`](../identity/business-info.md) — what DivineSide is, what we don't do
+> 5. [`../identity/voice.md`](../identity/voice.md) — brand tone
+> 6. [`sales-discovery-call.md`](sales-discovery-call.md) — for the live call
 
----
-
-## 00 · Current operating state (READ FIRST until 2026-06-05)
-
-> Everything in §01–§09 describes the **destination**. This section describes what we actually sell today during the customer-discovery sprint. **Pitch from §00. Do not pitch §01–§09 yet.**
-
-### Why custom builds now, not the productized system yet (the JP-model arc)
-
-We are replicating **JP Middleton's path,** compressed for UK ecom health & beauty DTC. JP built his gym system through years of custom client work, watching which workflows kept showing up as the ones that moved revenue. Then he productized. We are doing the same, compressed to ~6 months for one niche.
-
-**The arc:**
-- **Phase 1 (NOW):** custom workflow builds, one at a time, per client. Fixes **one bucket hole per engagement.** Each build teaches us which workflows actually move money for this niche.
-- **Phase 2 (BRIDGE, after 5–10 paid builds):** patterns emerge. The 2–3 workflows that consistently moved revenue across multiple brands become the v1 productized menu.
-- **Phase 3 (DESTINATION):** sell the **system, not the workflows.** The system plugs the biggest holes in the bucket **simultaneously,** instead of one at a time. This is what JP sells today.
-
-**Why this matters for your sales calls.** Custom builds during Phase 1 are not a detour from the system. They are the only path to it. Trying to sell a productized system now (Phase 3) without the validation data from Phase 1 means selling something we haven't proven. **JP didn't skip Phase 1 (he took 7 years). We don't either, we just compress it.**
-
-This means: on any current sales call, you are NOT pitching the productized system. You are pitching a custom workflow build to fix the **one biggest bucket hole** the prospect surfaced in discovery. The system comes later, after the data does.
-
-See [CLAUDE.md §2 BUSINESS MODEL](../../../CLAUDE.md) for the full Phase 1 → 2 → 3 arc.
-
-### What we sell right now
-
-| Item | Current price | Detail |
-|---|---|---|
-| **Custom workflow build** | £1k–£2.5k per workflow | Scoped to the specific pain the client surfaced in discovery. One workflow per build. Timeline varies with scope (typically 2–6 weeks, not the fixed 8 in §02). |
-| **Ongoing retainer** | £350/mo | Monitoring + bug fixes (1 business day response), weekly 30-min strategy call, 25% discount on every new workflow build. First month opt-out, no lock-in. See §03 for the full retainer model. |
-| **AI audit** (paid front-end) | £2.5k | 1–2 week diagnostic that identifies which workflow fits the brand. May fold into the build engagement if they continue. **In review** — discovery may surface that bundling this into the build is the right move. |
-
-**This is not the destination offer. It is what we run while learning the industry.** Each build teaches us which workflows actually move the needle, what pricing the niche supports, and what language founders use for their pain.
-
-### How sales calls run right now
-
-1. **Discovery first (15–20 min).** Run the 5 questions in [`.claude/alignment-2026-05-22.md §4`](../../../.claude/alignment-2026-05-22.md). Listen. Don't pitch.
-2. **Transition to pitch only if fit exists.** Fit = their stated pain maps to something we can build in 2–6 weeks. Bridge with the bucket framing: *"Sounds like [their specific pain] is your worst leak. Want me to walk you through what I'd build to plug it?"*
-3. **Anchor pricing only after discovery:** £1k–£2.5k for the build (depending on complexity), £350/mo retainer post-delivery.
-4. **Do NOT pitch the 8-week fixed pilot in §02** or the TYPE A/B guarantee in §04 until the lock meeting on 2026-06-05 confirms them.
-
-### What we're actively researching (resolved 2026-06-05)
-
-- **Workflow scope:** which 2–3 workflows consistently move the needle for the niche. Hypothesis menu: Replenishment, Lapsed Winback, Post-purchase Nurture, CS Automation, Pre-purchase Concierge. To be confirmed, narrowed, or replaced.
-- **Pricing range:** what the niche actually supports. Current data point: RM365 retainer at £350/mo. Sample of one. Will move.
-- **Founder language:** the words people use for their own pain. Will replace the "current campaigns" copy in [`../identity/strategy.md`](../identity/strategy.md) after lock.
-- **Offer shape:** whether the destination is the productized managed service in §01–§09, or a different shape entirely (stacked workflows on retainer, hybrid, etc.).
-
-### The destination (§01–§09 below)
-
-Everything below describes the **eventual productized offer** we're building toward. Target state, not current state. After 2026-06-05 the lock decisions replace §00 with productized content, and §01–§09 gets rewritten to match what we actually validated.
+Last updated: 2026-06-07
 
 ---
 
-## 01 · The headline promise (DESTINATION — see §00 for current pitch)
+## 01 · What we sell (current path)
 
-**"Your business, running on AI."**
+We build a **complete AI System for one coaching / education business at a time**, entering through the single most painful manual function and expanding from there. Each build is a real system for that client and paid R&D toward the productized AIOS. We harvest the platform from delivery, we do not design it up front.
 
-Long-form, what we say on calls, in the audit doc, in the proposal:
+**The arc (full version in CLAUDE.md §2):**
+- **Phase 1 (NOW):** custom AI-System builds, deepest pain first, per client. Learn which workflows move money for this niche.
+- **Phase 2 (BRIDGE):** the workflows that repeat as the biggest, cleanest wins become the v1 productized menu.
+- **Phase 3 (DESTINATION):** the productized AIOS, sold as a managed service running multiple functions of the institute at once.
 
-> *"In 8 weeks, we build the AI brain that learns your business and runs the repetitive work for you. You don't pay anything upfront. You only pay when we've delivered what we agreed at kickoff. If we miss the target, you don't pay anything, and I pay you $500 out of my own pocket for the time you committed."*
+On a current sales call you are **not** pitching the productized system or AIOS. You are pitching to remove the owner's biggest manual bottleneck. The intelligence layer builds underneath and compounds on their data. Clients buy a solved problem, not infrastructure.
 
-Universal across channels. The specific *target* depends on the guarantee variant (TYPE A or TYPE B); see §04 and [`guarantee.md`](guarantee.md).
+## 02 · The principle: enter through a painful function, never through AIOS
 
-### Naming discipline
+- Each entry workflow automates something the owner does manually today, saves measurable time or money, and as a by-product starts accumulating the context layer that makes AIOS possible.
+- We do not mention AIOS or "the closed loop" on the sales call. We deliver the workflow. The intelligence emerges.
+- The buyer-facing differentiator is **one connected system vs the 4 to 7 disconnected point tools plus manual work they run today.** AI is the mechanism, not the marketing line.
 
-- **External / customer-facing default:** *"Your business, running on AI."* Lead with the outcome, not the category noun.
-- **Internal / strategy / repo:** *AI Operating System.* DivineCore is the internal AI OS; every client build is an AI OS for that brand. CLAUDE.md uses this language; don't change internal vocabulary.
-- **In-call frame** when a prospect asks *"what is this exactly?":* *"It's the AI brain for your business. It learns how you do things, then runs the repetitive work for you."*
-- **Upwork channel exception** (per [../../../CLAUDE.md](../../../CLAUDE.md) §13 and [../../../sales_os/integrations/upwork/.overview.md](../../../sales_os/integrations/upwork/.overview.md)): the application body and Loom lead with the AIOS framing because on Upwork specifically AIOS is the differentiator that justifies the price floor. Verbatim sentence: *"I don't build commoditized automations. I build AI Operating Systems: your business, running on AI."*
+## 03 · The four functions and the candidate entry workflows (catalog, not a locked pick)
 
----
+A coaching institute has four functions. Each has automatable workflows. **Which one leads the offer is OPEN pending the deep-research phase.** Treat this as the menu we choose from, and as the "here is what is possible" map for discovery calls. Do not commit a single lead workflow in copy yet.
 
-## 02 · The pilot (DESTINATION — current builds are variable scope, see §00)
+### Function 1 — Product: the education itself  *(validated paid need at the beachhead)*
+What exists: Teachmint/EduAI, Testmate, MagicSchool generate content from a prompt or syllabus, isolated and manual.
+Workflows we could build:
+- **Content / presentation automation** — generate formatted decks, study material, and exercises from the lesson plan, in the institute's template and brand voice.
+- **Question-paper generation tied to batch performance** — generate papers targeting the topics the current batch is weakest on, not just "a paper on Chapter 5."
+- **Auto-notes from class recordings** — structured notes and revision summaries same-day. (Note: the beachhead said students prefer self-notes, so this is low-priority; offer as an option, not a lead.)
+Why it matters: the beachhead named manual content production as his #1 time sink, unprompted. This is the validated paid need on the India side.
 
-**8 weeks, fixed shape.** What we build varies brand to brand. The shape doesn't.
+### Function 2 — Sales: enrolment & lead conversion  *(defended, do not lead)*
+What exists: Meritto (AI voice calls, lead allocation) and GoHighLevel own this; it is the most automated of the four.
+Workflows: batch-recommendation agent (intelligent placement from past student profiles), post-enrolment onboarding sequence.
+Guidance: do NOT lead with sales automation. Use it as a second or third workflow after trust is established.
 
-### Phases
+### Function 3 — Marketing: results, testimonials & social proof  *(open gap, revenue-linked)*
+What exists: generic announcements; owners post manually. Most underserved of the four.
+Workflows: result/topper announcement engine, testimonial collection at the optimal moment, social-proof pipeline.
+Note: strong "fixes revenue" story in theory, but for the word-of-mouth-driven beachhead a **referral system** (he liked it) fits his actual channel better than social content. Validate per client.
 
-| Weeks | Phase | What happens |
-|-------|-------|--------------|
-| 1-2 | **Context** | We learn the business (products, voice, SOPs, decisions, why you do things the way you do). This becomes the AI brain. |
-| 3-4 | **Data** | We connect the brain to the business (Shopify, Klaviyo, Gorgias, Meta, GoHighLevel, whatever's relevant). Now it sees what's happening in real time. |
-| 5-7 | **Build** | We ship the workflow that takes the specific repetitive task off the team's plate. Live, monitored, used daily. |
-| 8 | **Verify** | Delivery test against the kickoff spec (TYPE B) or the hours-saved baseline (TYPE A). Buyer pays. |
+### Function 4 — Customer service: parent & student communication  *(high priority, fast time-to-value)*
+What exists: Classplus/Proctur/TrackFee do one-way broadcasting (reminders, notifications).
+Workflows: intelligent contextual parent updates, doubt-queue management (categorize + route + cluster for the next session), channel-aware fee follow-up (knows who responds on WhatsApp vs SMS vs call). Saves staff 5+ hours/week of repetitive questions and fee chasing.
 
-### Deliverables at the end of week 8
+> The deep-research phase decides which of these leads externally (and whether the India lead workflow differs from the Western one). Until then: in discovery, surface the owner's pain and map it to this catalog; in cold copy, lead with the niche and the manual-work problem, not a named workflow.
 
-- The AI brain (a maintained context layer about the business)
-- One live workflow that demonstrably performs the function we agreed on (TYPE B) or saves 10+ hrs/week (TYPE A)
-- Documentation of what we built and how to extend it
-- A 30-day support window where we tune the workflow as the team uses it
+## 04 · Pricing model (numbers TBD)
 
----
+- **Delivery model: retainer.** It replaces the manual-labor cost the owner already pays (admin staff, content help). The beachhead confirmed he would pay a retainer if we do the work better and cheaper than his current cost.
+- **No numbers in any doc or copy yet.** India is price-sensitive (volume over margin); the West has higher pricing power. Both numbers are TBD and resolve through discovery, not analysis.
+- Every new workflow beyond the first is scoped and priced as its own engagement. Keep the retainer defensible as monitoring + access + the compounding system, not a bucket of pre-paid hours.
 
-## 03 · Pricing
+## 05 · Payment posture: proof first
 
-**All pricing is per-project, agreed at kickoff before any work begins.** Pricing is currently in test mode, anchored around the numbers below, refined as we run more pilots.
+The beachhead (and skeptical owners generally) carry a trust gap with AI ("it will make mistakes"). Counter it with a **proof-first posture**: show it working on their business before they pay, offer a trial/demo, and structure payment so they commit on delivered value rather than upfront. This is a principle, not a fixed mechanic. The formal guarantee for the new offer is still to be written (see [`guarantee.md`](guarantee.md)).
 
-### Anchors (provisional, May 2026, updated 2026-05-22)
+## 06 · Hidden / switching cost (build the offer around removing it)
 
-| Item | Anchor | Notes |
-|---|---|---|
-| **Pilot (one workflow, 8 weeks)** | ~£2.5k | Varies by scope. Higher for complex builds, lower for straightforward ones. |
-| **Ongoing support retainer** | ~£350 / month | Monitoring + bug fixes (1 business day response), self-service error documentation, weekly 30-min strategy call, priority queue. First month is opt-out, no lock-in. |
-| **25% discount on every new workflow build** | included in retainer | While the client is on retainer, every new workflow they commission lands at the discounted rate (£2.5k standard → £1,875 retainer). Each new workflow is scoped and priced separately. |
-
-### Retainer model, in one paragraph
-
-The retainer is intentionally thin: monitoring, bug fixes, a weekly 30-min strategy call to surface the next workflow opportunity, and a 25% discount on every new workflow the client commissions. It is **not** a bundle of pre-paid build hours. Every new workflow is scoped and priced as its own engagement (at the discounted retainer rate). This kills scope creep and keeps the retainer fee defensible as monitoring + access, with the discount as the offensive value driver.
-
-### Retainer model — what changed (2026-05-22)
-
-Previous version (bundle workflows): £2.5k/mo base + £500/mo per additional active workflow, "up to 2 active workflows included." Killed because the bundled-workflows framing creates scope creep (every conversation becomes "is this in scope?") and a £2.5k/mo monitoring fee is indefensible against a £541/mo time-saving per workflow.
-
-New version (thin retainer + discount): RM365 retainer locked at £350/mo following this pattern. **In review** along with the rest of offer.md until 2026-06-05 — the discovery sprint may surface that this anchor is too low for the locked UK ecom beauty niche.
-
-### Payment
-
-- **0% upfront.** Buyer commits to the price at kickoff but pays nothing until delivery.
-- **100% on delivery**, conditional on the guarantee (see §04 and [`guarantee.md`](guarantee.md)).
-
-The payment model is the same across all channels. No "founding partner" discount or tiered pricing. Every pilot is quoted per-project from kickoff, with the £2.5k anchor as the rough starting point.
-
----
-
-## 04 · The guarantee (DESTINATION — TYPE A/B not in use during sprint, see §00)
-
-**You only pay when the system is delivered and we've verified it does what we agreed at kickoff. If we miss the target at the delivery test, you don't pay me anything, and I pay you $500 out of my own pocket for the time you committed.**
-
-Two variants:
-
-- **TYPE B (functions-delivered, DEFAULT).** Use for the vast majority of JDs and prospects. The trigger is "a function in the signed spec doesn't work, work correctly, or is missing at the week 8 delivery test."
-- **TYPE A (hours-saved).** Use only when four signals are all present (see [`guarantee.md`](guarantee.md) §02). The trigger is "the system fails to save the team at least 10 hours per week by the end of month two."
-
-Full deep-dive in [`guarantee.md`](guarantee.md), including: the four-signal test for picking TYPE A, the verbatim paragraphs as they appear in the application body and proposal Doc, what does NOT trigger the guarantee, buyer obligations during the build, what voids the guarantee on the buyer's side, and the claim mechanic.
-
-The guarantee terms are the same across channels. Only the variant (A vs B) depends on the specific JD or prospect.
-
----
-
-## 05 · Scope envelope
-
-The pilot is **fixed in shape, variable in subject.** Inside the envelope:
-
-- **One workflow per pilot.** Not "1-2." One.
-- **Buildable in ≤2 weeks of engineering** (within the 8-week pilot framework; the rest of the time is context, integration, testing, refinement).
-- **Uses APIs we can access.** Standard stack (Shopify, Klaviyo, Gorgias, Meta, Google, OpenAI/Anthropic, etc.) is fine. Niche internal tools are case-by-case.
-- **Measurable.** TYPE A in hours saved, TYPE B against a function checklist.
-
-Anything outside this envelope = separate engagement, separately priced. Don't wedge it into the pilot.
-
----
-
-## 06 · What needs its own engagement
-
-Real and valuable, but **not** in the pilot:
-
-- More than one workflow at a time (each additional = its own scope + price)
-- Workflows requiring custom hardware or physical logistics
-- Workflows requiring data we don't have API/permissions for
-- Migrations from old tools or large-scale data clean-up
-- Training programs or hiring support for client staff
-- Anything taking more than 2 weeks of engineering
-
-If a prospect wants any of these, scope and price separately in the audit doc. Don't pretend they fit.
-
----
+From the Hormozi value equation: an offer carries a financial cost and a **hidden cost** (effort, sacrifice, disruption, learning curve). Maximize value by reducing both.
+- The biggest hidden cost surfaced so far: the owner already runs his own app, with all batch context inside it. Plan for it (get API/code access to integrate) rather than forcing a switch.
+- Most owners do **not** have their own app (they use an off-the-shelf tool or nothing), so this hidden cost varies per client; DivineSide may build its own app later.
+- Discovery question to surface it: *"What would you have to give up or change about how you work to use a system like this?"*
+- Sales-call discipline: reduce the felt hidden cost, deliver smoothly, and introduce the honest "there is a learning curve" framing only after onboarding, never on the first sales call.
 
 ## 07 · Expansion path
 
-The pilot proves one workflow. The retainer keeps it running and gives the client a 25% discount on every additional workflow they commission.
+1. Same institute, **second workflow** in the same function (e.g. content automation, then performance-aware papers).
+2. Same institute, **second function** (e.g. product, then customer service).
+3. Same institute, **multiple functions running as one system** (the compounding AIOS).
 
-**Order of expansion:**
-1. Same brand, same department, **second workflow** (e.g., CS triage → CS draft responses)
-2. Same brand, **second department** (e.g., marketing pilot → returns automation)
-3. Same brand, **full operational coverage** (compounding across functions)
-
-**One task at a time, one department at a time.** Don't sell breadth before depth. The brand should feel the win on workflow #1 before they're scoped for workflow #2.
-
-This is also how the AI brain (context layer) compounds. Each new workflow runs faster and cheaper than the last because the brain is already trained on the business. By workflow #4, *they* describe it as their AI operating system. You earn the platform language by showing the value, not by claiming it.
-
----
+One workflow at a time, one function at a time. Do not sell breadth before depth. Each new workflow runs faster and cheaper because the context layer is already trained. By the time several functions run together, the owner describes it as their operating system. You earn the platform language by showing value, not claiming it.
 
 ## 08 · Channels: same offer, different audiences
 
-The offer is universal. The **audience** and **naming discipline** differ by channel:
-
 | Channel | Audience | Naming discipline |
 |---|---|---|
-| **Cold email** | UK skincare/beauty e-comm brands, £500k-£5M revenue, 5-50 employees | Outcome-first (no AIOS) |
-| **Upwork** | Open, qualify on budget + fit | AIOS-first (channel exception per §01) |
-| **LinkedIn DMs / inbound** | Open, qualify on budget + fit | Outcome-first |
-| **Warm intro / network** | Open, say yes if budget exists | Outcome-first |
+| **Foreign outreach (Pang)** | Western coaching / tutoring businesses (US vs UK TBD) | Outcome-first, no AIOS |
+| **India / connections (Mayank, Shubham)** | Beachhead + 50 connections, Hindi, local trust | Outcome-first, no AIOS |
+| **LinkedIn / community (Pang, Shubham)** | Coaching owners and operators | Outcome-first |
 
-The **payment model, guarantee, pricing anchor, scope envelope, and expansion path** are the same across all channels.
+> The Upwork and Instantly channel copy still carries the old beauty positioning and is on the downstream rewrite list (it lives in integration code, outside this folder). Do not treat that copy as current.
 
----
+## 09 · Scope discipline
 
-## 09 · What this doc is, what it isn't
-
-**It is:**
-- The unified offer for **all channels** (cold email, Upwork, LinkedIn, inbound) as of 2026-05-17.
-- The training doc any agent generating proposals, audit docs, or sales pitches loads from.
-- A living doc, revised after every 3-5 pilots once we know what works.
-
-**It isn't:**
-- The guarantee deep-dive. That's [`guarantee.md`](guarantee.md): TYPE A vs B classification rules, verbatim paragraphs, claim mechanic, voids, buyer obligations.
-- Final on pricing. The £2.5k pilot anchor and £2.5k/mo retainer are provisional. We'll lock them after testing.
-- The cold email or call script. Those reference this doc but live separately: see [`../playbooks/outbound-playbook.md`](../playbooks/outbound-playbook.md) and [`sales-discovery-call.md`](sales-discovery-call.md).
-
-**Update cadence:** revise once per quarter or after every 3 pilots, whichever comes first. Append a `## Lessons` section at the bottom with one-liners after each pilot.
-
----
+- One workflow per build. Not "1 to 2." One.
+- Uses APIs/data we can access. The owner's own app is case-by-case (request code/API access).
+- Measurable. Define the success check at kickoff.
+- Anything bigger (migrations, custom hardware, multi-workflow) is a separate, separately-priced engagement. Do not wedge it in.
 
 ## 10 · Lessons
 
-*(Add a one-liner per pilot here. What worked, what didn't, what the actual outcome was, whether the guarantee variant + pricing landed.)*
+*(Add a one-liner per build: what worked, what the actual outcome was, what the owner's language for the pain was, whether the entry workflow and model landed. The beachhead build is the first entry.)*

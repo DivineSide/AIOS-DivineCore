@@ -15,7 +15,7 @@
 >
 > v0 — strategic frame only. Hooks / CTAs / closings / post-type frameworks land here once Pang has a feel for what works on X (mirror the structure of [`linkedin-playbook.md`](linkedin-playbook.md) when adding them).
 
-Last updated: 2026-05-18
+Last updated: 2026-06-07
 
 Adapted from Matt Gray's X Growth Blueprint and a "Leverage Creator" course Pang watched 2026-05-18, pruned to the parts we use. Community-building, email-list, and sales-launch sections of the latter course are deliberately not loaded here. Per Pang's scope choice, this file is X growth only.
 
@@ -63,7 +63,7 @@ X is a tool to put Pang in specific rooms. Followers are a side effect of being 
 
 **The 5 buckets of people we want X to put us in rooms with.** Specific names per bucket are TBD — fill in as you encounter the right accounts.
 
-1. **ICP — specific e-comm beauty operators.** Named founders / COOs / ops managers at 10–50 employee, $500k+ brands you'd want to deliver a pilot for. *Specific names:* TBD.
+1. **ICP — education / coaching business owners.** Named founders / operators of tutoring centers, test-prep companies, and coaching institutes (US focus for Pang's track, India for Mayank's). People you'd want to run a pilot for. *Specific names:* TBD.
 2. **Peer AI-agency / build-in-public founders.** People building AI agencies, automation studios, or agentic products in public — audience overlap with Pang's. Mutual amplification compounds. *Specific names:* TBD.
 3. **Category-defining voices.** People who already frame AI as infrastructure, not as a tool. If they quote-tweet, the AIOS framing lands harder on the rest of the timeline. *Specific names:* TBD.
 4. **Top experts on the sales / marketing / content side.** Operators who teach the craft — sales systems, marketing systems, content systems. **Not** podcasters or journalists. *Specific names:* TBD.
@@ -168,7 +168,7 @@ Every X thread (and most single-tweet posts about the build) must make at least 
 
 ## 07 · X Growth Strategy
 
-(LinkedIn growth strategy — connection requests, "after 60 days" message, ICP outbound — lives in [`linkedin-playbook.md`](linkedin-playbook.md) §09. The X strategy below is **different in intent**: LinkedIn = client outreach inside the e-comm beauty ICP. X = peer community inside the automation / AIOS / build-in-public niche, where the 5 buckets in §03 live.)
+(LinkedIn growth strategy — connection requests, "after 60 days" message, ICP outbound — lives in [`linkedin-playbook.md`](linkedin-playbook.md) §09. The X strategy below is **different in intent**: LinkedIn = client outreach inside the coaching / tutoring ICP. X = peer community inside the automation / AIOS / build-in-public niche, where the 5 buckets in §03 live.)
 
 ### Reply Strategy
 
@@ -282,13 +282,11 @@ Locked 2026-05-10.
 
 ### Bio (160 char max — used: ~127)
 
-> Co-founder @ DivineSide | AI Operating Systems for e-commerce brands | 10+ hrs back every week | 19yr old building in public.
-
-Same wording as LinkedIn headline — single source of truth across both channels.
+> *(To be updated. Niche is now education / coaching businesses. Rewrite after the LinkedIn About is locked — both channels stay in sync. See [`linkedin-playbook.md`](linkedin-playbook.md) §10 for the source-of-truth profile copy.)*
 
 ### Banner
 
-Gold accent on near-black, 1500 × 500 px. Layout: DS mark + DivineSide wordmark top-left, *"Your business, running on AI."* headline (gold accent on *running on AI*), *"Custom AI Operating Systems for e-commerce brands."* sub, *"10+ hours back every week."* gold accent line, portrait of Pang composited right-side. Generated via Nano Banana — multi-pass prompt iteration to restore natural skin tones and add a closed-lip slight smile after the first generation produced a desaturated funeral-portrait result.
+Gold accent on near-black, 1500 × 500 px. Layout: DS mark + DivineSide wordmark top-left, *"Your business, running on AI."* headline (gold accent on *running on AI*), sub-line and portrait of Pang composited right-side. *(Sub-line to be updated for coaching/education niche once the LinkedIn About is locked. Generated via Nano Banana.)*
 
 ### Profile picture
 
@@ -332,8 +330,8 @@ X is NOT expected to directly source the 4 sprint calls. If it does, bonus. If n
 
 | Type | Volume/day | Notes |
 |------|-----------|-------|
-| **Service tweets** (technical or educational about AI / AI OS / ecom ops) | 3-4 | Hook variety: technical step-by-step, contrarian opinion, niche-specific insight |
-| **Personal tweets** (story, journey, McDonald's-flex pattern) | 1-2 | Aean's data: personal tweets reportedly rip the hardest. The 19-yo + UK ecom beauty anchors from [pang.md](../identity/pang.md) reinforced here. |
+| **Service tweets** (technical or educational about AI / AI OS / education business ops) | 3-4 | Hook variety: technical step-by-step, contrarian opinion, niche-specific insight |
+| **Personal tweets** (story, journey, McDonald's-flex pattern) | 1-2 | Aean's data: personal tweets reportedly rip the hardest. The 19-yo + education/coaching anchors from [pang.md](../identity/pang.md) reinforced here. |
 
 Ramp gradually. From 0-2/day → 5/day → 7 → 10. Sudden jumps don't stick.
 
@@ -349,12 +347,12 @@ Ramp gradually. From 0-2/day → 5/day → 7 → 10. Sudden jumps don't stick.
 
 | Part | Rule | Pang-specific example |
 |------|------|----------------------|
-| **Hook** | Big number + time frame | *"How an £8M UK beauty brand killed 12 hrs/week of CS work in 8 weeks."* |
-| **Body** | What the asset is | *"I broke down the exact workflow + Loom walkthrough in a 4-page doc."* |
-| **CTA** | Comment a simple word | *"Comment 'BUCKET' and I'll DM it."* — single-word, easy to type |
+| **Hook** | Big number + time frame | *"How a tutoring center owner cut 10 hrs/week of manual parent updates."* |
+| **Body** | What the asset is | *"I broke down the exact system + Loom walkthrough in a 4-page doc."* |
+| **CTA** | Comment a simple word | *"Comment 'SYSTEM' and I'll DM it."* — single-word, easy to type |
 | **Visual** | Image or GIF — **non-negotiable** | GIF of scrolling through the asset (blurred). Takes up screen real estate so it's hard to miss. |
 
-Lead magnets themselves come from [linkedin-playbook.md §12.4](linkedin-playbook.md) deferred list — the BUCKET PDF, the RM365 case study breakdown, etc. Built once, used across LinkedIn + X.
+Lead magnets themselves come from [linkedin-playbook.md §12.4](linkedin-playbook.md) — the coaching ops audit, Loom walkthrough, and case study breakdowns from coaching / education builds. Built once, used across LinkedIn + X.
 
 ### 11.4 · Long-form tweets
 
@@ -376,9 +374,9 @@ Algorithm boosts dwell-time → if the hook makes someone stop and read for ≥1
 
 | Asset | When to use | Time per piece |
 |-------|-------------|----------------|
-| **1-page bucket audit** (personalized to that brand's likely top pain) | Default for ICP prospects | 30-45 min |
-| **Loom walkthrough** of the audit + 1 workflow you'd build first | Top-tier ICP — RM-tier brands | 30-60 min |
-| **Custom RM365 case study breakdown** mapped to their stack | When prospect has a specific tool overlap with RM365 | 20-30 min |
+| **1-page ops audit** (personalized to that institute's likely top manual pain) | Default for ICP prospects | 30-45 min |
+| **Loom walkthrough** of the audit + 1 workflow you'd build first | Top-tier ICP — beachhead-tier operators | 30-60 min |
+| **Case study breakdown** mapped to their ops stack | When prospect has tool or pain overlap with an existing build | 20-30 min |
 
 **Delivery format (sourced from Aean, 2026-05-26):**
 
@@ -388,7 +386,7 @@ Algorithm boosts dwell-time → if the hook makes someone stop and read for ≥1
 
 **DM script: 3 lines max.** Anything longer gets clicked off. Pang version:
 
-> Hey [name], built a quick audit of where AI could replace ops at [their brand]. Loom walks through it. [Google Doc link]
+> Hey [name], built a quick audit of where AI could replace manual work at [their center / institute]. Loom walks through it. [Google Doc link]
 >
 > No pitch — share with your team if it's useful.
 
@@ -429,7 +427,6 @@ Locked 2026-05-28 as Pang's standing X rhythm. The cadences in §11.1 to §11.8 
 
 | Date | Purpose |
 |------|---------|
-| 2026-06-05 | Sprint checkpoint. Activity cadences hold. Review what converted on X vs LinkedIn during the discovery sprint. |
 | 2026-09-05 | Q3 review. |
 | 2026-12-05 | Q4 review. |
 | 2027-03-05 | Q1 2027 review. |
@@ -452,4 +449,4 @@ Locked 2026-05-28 as Pang's standing X rhythm. The cadences in §11.1 to §11.8 
 
 ---
 
-*Pang · DivineSide X Content Playbook · 2026-05-26*
+*Pang · DivineSide X Content Playbook · 2026-06-07*

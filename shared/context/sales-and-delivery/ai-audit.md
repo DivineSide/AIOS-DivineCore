@@ -1,5 +1,7 @@
 # AI Audit — DivineSide
 
+> **⚠️ SUPERSEDED (pre-2026-06-06, beauty DTC).** Niche pivoted to education / coaching. This file still describes the old UK-beauty offer and is not yet migrated. Do NOT generate copy from it. Current niche/audience/offer: [business-info.md](../identity/business-info.md), [audience.md](../identity/audience.md), [offer.md](offer.md). Entry workflow, foreign market, and pricing are OPEN.
+
 > ⚠️ **DEFERRED, to be discussed further.** Status as of 2026-05-22, re-confirmed 2026-05-25.
 >
 > AI audit as a paid £2,500 product was killed: no buyer will pay £2,500 for just a diagnostic when the actual offer is "we run your systems as a managed service." Running 10+ free interviews per prospect is also not viable at scale.

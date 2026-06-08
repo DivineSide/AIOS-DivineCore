@@ -1,5 +1,7 @@
 # Sales Discovery Call (JP Middleton Framework, Adapted to UK Ecom Beauty/Skincare DTC)
 
+> **⚠️ SUPERSEDED (pre-2026-06-06, beauty DTC).** Niche pivoted to education / coaching. The discovery *technique* may still be useful, but every example and the ICP here are beauty-era and not yet migrated. Do NOT read examples as current. Current niche/audience/offer: [business-info.md](../identity/business-info.md), [audience.md](../identity/audience.md), [offer.md](offer.md).
+
 > **PURPOSE.** This is the master sales-call script for the Phase 1 customer-discovery sprint. It applies JP Middleton's 6-step sales process (extracted from his $1.5k/mo gym AI agency close video) to UK ecom consumer health & beauty DTC. Use when you're confident the workflows we discuss would benefit the brand and you intend to pitch a custom workflow build (£1k-£2.5k + £350/mo retainer).
 >
 > **Use this when:** you've done basic pre-call audit, the brand fits the niche (UK ecom beauty/skincare DTC, £1M-£5M ARR, on Shopify, on 3PL), and you intend to leave the call with either a 24h audit doc commitment or a booked follow-up. **Do not use this for:** purely-validation conversations with non-decision-makers (use a lighter DM/research script instead), or non-niche prospects.

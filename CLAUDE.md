@@ -2,68 +2,69 @@
 
 This file gives Claude Code full context on DivineSide, DivineCore, the team, the tech stack, the business model, and the current state of the build. Read this before touching anything.
 
-> **IN REVIEW until 2026-06-05.** Some commercial details in this file are being re-validated through a 2-week customer-discovery sprint with UK DTC ecom founders.
+> **NICHE PIVOT LOCKED 2026-06-06.** DivineSide moved off UK ecom health & beauty DTC entirely. The niche is now **education and coaching businesses (exam-prep / coaching institutes)**, a pure-information business chosen for its structural fit with the AIOS context-learning moat plus a warm beachhead client. See [shared/context/identity/business-info.md](shared/context/identity/business-info.md) and the beachhead discovery note [shared/context/conversations/2026-06-05-beachhead-coaching-owner-call.md](shared/context/conversations/2026-06-05-beachhead-coaching-owner-call.md).
 >
-> **Locked, will not change:** the niche (UK ecommerce, consumer health and beauty DTC, £1M-£5M ARR, on Shopify, on 3PL), the bucket-with-holes positioning, managed-service as the eventual destination model, RM365 as anchor case study, brand identity, all infrastructure / repo conventions. Audit-first now, productize after pilot 5-10.
+> **Locked, will not change:** the niche above; the product vision (build complete AI Systems per client, harvest the repeating patterns into AIOS, never design AIOS up front); AIOS-is-the-moat-not-the-pitch (enter through a painful manual function); retainer delivery model; all infrastructure / repo conventions.
 >
-> **Current working state (NOT the destination):** custom workflow builds at £1k-£2.5k per workflow + £350/mo retainer (monitoring, docs, workflow discounts, priority queue, monthly strategy call). We are actively selling and delivering custom work during the sprint, not running pure research. Each build teaches us what to productize.
+> **Open, do NOT invent:** (1) the headline entry workflow / core-offer sentence, resolved in an upcoming **deep-research phase**. Until then, describe the niche and the manual-work pain, drawing from the four-function candidate catalog in [shared/context/sales-and-delivery/offer.md §03](shared/context/sales-and-delivery/offer.md), not a single locked workflow. (2) the foreign target market (US vs UK); India is the prototype ground. (3) all pricing numbers.
 >
-> **In review, may shift on 2026-06-05:** §1 and §2 "niche-agnostic" language (superseded by the locked niche above), §14 Instantly positioning copy (and whether to keep Instantly running at all is still being decided), specific offer mechanics and productized pricing in [shared/context/sales-and-delivery/offer.md](shared/context/sales-and-delivery/offer.md), and message-level positioning in [shared/context/identity/strategy.md](shared/context/identity/strategy.md).
->
-> See [.claude/alignment-2026-05-22.md](.claude/alignment-2026-05-22.md) for the discovery sprint structure and the lock criteria.
+> **Scope of the 2026-06-07 overhaul:** `shared/context/identity/`, `shared/context/sales-and-delivery/offer.md`, the beachhead conversation note, and this file's §1 to §2 are rewritten. **Still carrying stale beauty positioning** (downstream follow-up, not yet done): §14 Instantly/Upwork copy, the LinkedIn-outreach prompt, social_perf copy, and most of the rest of `shared/context/sales-and-delivery/` + `shared/context/playbooks/` (guarantee, sales-playbook, sales-discovery-call, intake-form, delivery, workflow-build, competitive-landscape, case-studies, linkedin/x/upwork playbooks, swipe-file). Treat those as not-yet-migrated.
 
 
 ## 1. COMPANY OVERVIEW
 
 Company name: DivineSide  
-Type: AI Operating System (AI OS) Agency  
+Type: builder of complete AI Systems (deep, custom, vertical-first), harvesting a productized AI Operating System (AIOS) from delivery  
 One-liner: "DivineSide turns businesses into systems."  
-Stage: Early — building, testing, getting first clients, finding distribution
+Stage: Early. Building, testing, getting first clients, finding distribution.
 
 Core philosophy:
 - Traditional business: people execute, tools assist
 - DivineSide model: systems execute, people supervise
 - The shift: from doing work to designing systems
 
-DivineSide is not an automation agency. We do not build chatbots and call them AI. We build fully autonomous operating systems that run entire functions of a business end-to-end. The machine executes. Humans supervise.
+DivineSide is not an automation agency. We do not build chatbots and call them AI, and we do not ship template GoHighLevel/Zapier workflows as the product. We build complete AI Systems that run business functions end to end and improve from the data the business already produces. The machine executes. Humans supervise.
+
+### The product (the AI System) and the moat (AIOS)
+
+An AI System has four layers: **Automation** (n8n/Make/Zapier, the nervous system), the **AIOS kernel** (the runtime: compounding memory, agent scheduling, tool access, and a syscall trust layer), **AI agents** (one job each), and the **LLM** (model-agnostic, used surgically). Two concepts make it non-commoditized: the **closed loop** (a thermostat, not a heater: observe, compare to target, self-correct without a human starting each step) and the **syscall trust layer** (agents never touch raw business data; they request through AIOS, which enforces permissions the owner set once).
+
+We build complete AI Systems for one business at a time, and the patterns that repeat across builds get harvested into **AIOS**, our production platform. We do not design AIOS up front. We earn it from delivery. A pattern enters AIOS only after it shows up across multiple real builds: conviction is not evidence, delivery is. **AIOS is the moat, not the sales pitch.** We enter by solving a painful manual function; the intelligence layer builds underneath and compounds on the client's data. (Voice-shaped detail: [shared/context/identity/business-info.md](shared/context/identity/business-info.md).)
 
 
 ## 2. BUSINESS MODEL
 
-We are replicating **JP Middleton's path**, compressed for one specific niche. The model is sequential. Each phase has to be completed before the next becomes possible.
+**Harvest, do not design.** We build complete AI Systems for individual businesses, deepest pain first, and extract the patterns that repeat into the productized AIOS. The model is sequential: each phase has to be completed before the next becomes possible.
+
+### The niche (locked 2026-06-06): education & coaching businesses
+
+**Exam-prep / coaching institutes**, a pure-information business. Why this niche:
+
+- **Domain edge.** The founders lived inside this world as students, and there is a warm beachhead client (an 8-year coaching-institute owner) who is a distribution channel, not just a customer (50+ convertible connections).
+- **Structural fit with AIOS.** Coaching is the rare business where running the business and accumulating intelligence are the same activity. Every doubt asked, paper attempted, result recorded, and parent message is structured, reusable, causal context: exactly what a closed loop learns from. This is architectural, not a slogan.
+- **Fragmented tooling, established budget.** Owners run 4 to 7 disconnected point tools (Classplus, Teachmint, Meritto, Proctur) and already pay for software. No unified closed-loop system exists.
+
+**Geography:** India is the prototype ground (warm connections, fast access). The dream customers are Western (US/UK) coaching businesses with higher pricing power. **The specific foreign market is TBD.** Two-track GTM: Mayank + Shubham own India (Hindi, local trust); Pang owns foreign outreach (English).
 
 ### Phase 1: Learn the niche through custom delivery (CURRENT)
 
-Pick a niche, work in it, get good at it through real client work. We are here.
+Build complete AI Systems for individual coaching/education businesses, deepest pain first, one workflow at a time. Each build is a real system for that client and paid R&D toward the platform. Each teaches which workflows actually move money for this niche and what language owners use for their pain.
 
-- **Niche:** UK ecom consumer health & beauty DTC, £1M–£5M ARR, on Shopify, on 3PL.
-- **What we sell:** custom workflow builds at **£1k–£2.5k per workflow + £350/mo retainer.** Audit-first delivery (1–2 weeks of diagnostic, then scoped build). One workflow per engagement.
-- **What we are doing during Phase 1:** running discovery conversations, taking on paid custom builds, **fixing one bucket hole at a time per client.** Each build teaches us which workflows actually move revenue for which kinds of brands in this niche, what pricing the niche supports, and what language founders use to describe their pain.
-- **What Phase 1 is NOT:** we are NOT trying to plug every hole in a client's bucket yet. We are NOT selling a productized system. We are NOT taking clients outside the locked niche. We deliberately stay narrow and deep.
+- **Delivery model:** retainer (it replaces the manual-labor cost the owner already pays). **Pricing numbers are TBD and must not appear in docs or copy yet.**
+- **The entry workflow (the door we walk in through) is OPEN, pending a deep-research phase.** Candidates span four institute functions: Product (content/PPT/quiz generation, the beachhead's validated #1 pain), Marketing (results/testimonials/social proof), Customer Service (parent updates, doubt management, fee follow-up), Sales (batch recommendation, onboarding, do not lead here, Meritto/GoHighLevel own it). See [shared/context/sales-and-delivery/offer.md §03](shared/context/sales-and-delivery/offer.md). Do not lock or lead with a single workflow until the research lands.
+- **We do NOT** pitch the productized system or AIOS, take clients outside the niche, or hard-commit pricing/entry-workflow/foreign-market before the research that decides them.
 
-See [shared/context/sales-and-delivery/offer.md §00](shared/context/sales-and-delivery/offer.md) for current-state offer mechanics, and [.claude/alignment-2026-05-22.md](.claude/alignment-2026-05-22.md) for the active discovery sprint structure.
+### Phase 2: Identify the repeating winners (BRIDGE)
 
-### Phase 2: Identify the highest-revenue workflows from real delivery (BRIDGE, after 5–10 paid builds)
-
-Once we've delivered enough custom builds, patterns emerge. Some workflows will keep showing up as the ones that produced the biggest revenue lift, the cleanest attribution, the most repeatable build process. **Those workflows become the v1 menu of the productized system.**
-
-The lock meeting on 2026-06-05 is the **first checkpoint** toward Phase 2. It uses the first ~10 discovery conversations plus any initial paid builds to commit to which workflows we keep building during the next batch of pilots. The full Phase 2 transition (productizing the winners) comes after ~5–10 paid builds, not after 10 conversations alone.
+After enough builds, the workflows that keep producing the biggest lift, the cleanest attribution, and the most repeatable build become the v1 menu of the productized system.
 
 ### Phase 3: Sell the system, not the workflows (DESTINATION)
 
-The productized AI Operating System: **2–3 of the highest-revenue workflows bundled, sold as a managed service** that plugs the biggest holes in a brand's bucket **simultaneously.** Custom workflow builds fix one hole at a time. The system fixes the biggest holes at once. **That is the difference between Phase 1 (current) and Phase 3 (destination).**
+The productized AIOS: the highest-value workflows bundled and sold as a managed service that runs multiple functions of the institute **simultaneously** and compounds on its own data. Custom builds fix one function at a time; the system runs several at once. That is the difference between Phase 1 (current) and Phase 3 (destination). DivineCore is the internal system name; the external product name is TBD.
 
-This is what JP Middleton sells today for gyms. This is what we're building toward for UK ecom health & beauty DTC. We earn our way here one paid build at a time.
+### Why this order matters
 
-### Why this order matters (the JP lesson)
-
-You cannot productize what you haven't validated through real client work. JP didn't design his gym system from a chair. He built it through years of custom client builds, watching which workflows kept showing up as the ones that moved money. Then he productized.
-
-**Custom builds during Phase 1 are not a detour from the system. They are the only path to it.** The data from real delivery is what makes Phase 3 possible. JP took 7 years. We're compressing it to ~6 months for one niche, but we cannot skip it.
-
-### Stage labels (legacy framing, being retired)
-
-The "Stage 1 / Stage 2 / GaaS" framing previously used in this section conflated phase of the business (Phase 1 above) with phase of the eventual product. After 2026-06-05 lock, we standardize on the Phase 1/2/3 framing. DivineCore is the internal system name; the external product name is TBD.
+You cannot productize what you have not validated through real client work. A pattern enters AIOS only after it shows up across multiple real builds. **Custom builds during Phase 1 are not a detour from the system. They are the only path to it.** Conviction is not evidence. Delivery is. (Full voice-shaped version: [shared/context/identity/business-info.md](shared/context/identity/business-info.md) and [shared/context/identity/strategy.md](shared/context/identity/strategy.md).)
 
 
 ## 3. DIVINECORE — INTERNAL BUSINESS OS

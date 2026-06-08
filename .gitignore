@@ -19,3 +19,6 @@ divinecore-v2/worker/sales_os/Clients/divinecore/data/
 # Local Claude Code state (machine-specific, not shared)
 .claude/settings.local.json
 .claude/session.md
+
+# Internal meeting transcripts pulled for context work (never push to public repo)
+.claude/_transcripts_tmp/

@@ -8,7 +8,7 @@
 >
 > **Update discipline**: when you screenshot, save, or scroll past something that hits — paste it in here within 24 hours. It rots otherwise.
 
-Last updated: 2026-05-20
+Last updated: 2026-06-07
 
 ---
 
@@ -29,15 +29,32 @@ Any writing agent (LinkedIn / X / YouTube / sales email) can load this file as o
 
 ## 01 · LinkedIn
 
+### Warm profiles — comment on posts + connect
+
+Profiles found while searching. Action: engage with their content (comment), then connect.
+
+| Name | LinkedIn | Notes |
+|------|----------|-------|
+| Mike Brown | https://www.linkedin.com/in/mike-brown-699054178/ | |
+| Ana Timofte | https://www.linkedin.com/in/ana-timofte-277316178/ | |
+| Maria Macik | https://www.linkedin.com/in/maria-macik-017k1011/ | |
+
+Add notes (role, center name, what they post about) as you learn more.
+
+---
+
 ### Post topic ideas (working list)
 
 Topics Pang wants to write LinkedIn posts on. Strike through or remove the entry once a post has shipped on the topic.
 
-- How I use AI to make my LinkedIn posts more engaging
-- How I use AI to write better hooks for LinkedIn
-- How I use AI to storytell better on LinkedIn
-- How going to the gym every day keeps me focused through the workday
-- How I posted on LinkedIn for two months straight
+- What a coaching institute owner's week actually looks like (the manual tasks nobody talks about)
+- Why most "AI tools for education" miss the point (they automate content, not operations)
+- The 4 disconnected tools a tutoring center owner pays for that could run as one system
+- What I learned building AI for a coaching institute that runs on WhatsApp and Google Sheets
+- Why parent follow-up is the most expensive manual task a tutoring center ignores
+- How an AI system handles 200 parent update messages a week without a staff member
+- The difference between an AI chatbot and an AI system for an education business
+- Building in public: week 1 with our first coaching institute client
 
 ### Example 1 — Auditing autonomous AI agents
 
@@ -88,7 +105,7 @@ Topics Pang wants to write LinkedIn posts on. Strike through or remove the entry
 
 > **Source / author:** *(TBD; Pang flagged this 2026-05-20, source not captured at the time)*
 > **Posted / logged:** 2026-05-20
-> **Topic intent:** Pang called this *"the most unique thing I've ever seen"* and wants to use it as a future post topic. Likely angle: a "non-obvious AI workflow" example for e-com brands (birthday emails are standard, so whatever was unique here is the angle worth digging up). Could fit a LinkedIn post about uncommon AI workflows worth building, or as a single-tweet curiosity hook on X.
+> **Topic intent:** Pang called this *"the most unique thing I've ever seen"* and wants to use it as a future post topic. Likely angle: an uncommon AI workflow example (birthday emails are standard, so whatever was unique here is the angle worth digging up). Could fit a LinkedIn post about non-obvious AI workflows worth building, or as a single-tweet curiosity hook on X.
 >
 > **Action before this can be drafted:** Pang to fill in what specifically he saw. Without that, the saved phrase has no usable substance. Search prompts to jog memory: *"birthday celebration automation"* + recent LinkedIn / X / YouTube history.
 >
@@ -164,4 +181,4 @@ For *moves* that aren't tied to one platform — abstract patterns you can name.
 
 ---
 
-*DivineSide Cross-Channel Swipe File · 2026-05-20*
+*DivineSide Cross-Channel Swipe File · 2026-06-07*

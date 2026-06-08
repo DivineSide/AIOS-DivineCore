@@ -1,119 +1,106 @@
 # Strategy — DivineSide
 
-> **IN REVIEW until 2026-06-05.** The 3-week niche-test cycle described in this file has been **demoted to message-level tests only** (subject lines, positioning sentences). The niche itself is locked for at least 5 pilots and does not get pivoted on a 3-week timer. The "current campaigns" and distribution sections are pre-discovery-sprint and likely shift after the lock meeting. See [.claude/alignment-2026-05-22.md](../../../.claude/alignment-2026-05-22.md) for the current direction and the discovery sprint structure.
-
-> Current positioning, distribution, content cadence, and monetisation. The "what we're doing right now and why" file. Sourced from CLAUDE.md §8–§9 and adapted for writing context.
+> **Niche pivot locked 2026-06-06.** Positioning, distribution, and content are now built around **education / coaching businesses**, not UK beauty DTC. The "what we are doing right now and why" file. Sourced from CLAUDE.md §8 to §9 and adapted for writing context.
+>
+> **Open (do not invent):** the headline entry workflow / core offer (deep-research phase pending), the foreign market (US vs UK), and pricing. Treat the current positioning lines as scaffolding to sharpen once those land.
 
 ## Positioning
 
-We attract **founders, entrepreneurs, and operators who understand AI is infrastructure, not a tool.** We are not competing with generic AI creators. We are not building for people who want a "ChatGPT prompt pack."
+We attract **operators who run information businesses and understand AI should run functions, not just assist with tasks.** We are not competing with generic AI creators or "ChatGPT prompt pack" sellers.
 
 The core differentiation, in plain English:
 
-> **Most agencies focus on one part of your operations stack: just retention, or just CS, or just reviews. We set up and run all of them as one operating layer. AI is what makes that breadth economically possible at a price one of those agencies would charge for one workflow.**
+> **A coaching institute runs on 4 to 7 disconnected tools plus a pile of manual work: a CRM here, a content tool there, fee reminders somewhere else, and the owner stitching it together by hand. We run the whole operation as one system that watches the business, reasons across all the data, and acts. One system instead of seven tools and a full week of manual work.**
 
-The frame: AI Operating Systems are what enterprise software was in 2010. Most people don't see it yet. The few who do are early enough to be defining the category.
+AI is the *mechanism* that makes that breadth deliverable by a small team. It is not the lead line. **AIOS is the moat, not the pitch.** We walk in the door fixing one painful, manual function; the intelligence layer builds underneath and compounds on the institute's own data.
 
-See [../sales-and-delivery/competitive-landscape.md](../sales-and-delivery/competitive-landscape.md) for the four layers of competition we're positioned against, the anti-pitch objection lines, and the destination-vs-entry distinction (we voice the bundle on cold email, we still sell one workflow at a time in Phase 1 per [`../sales-and-delivery/offer.md` §00](../sales-and-delivery/offer.md)).
+The frame: AI Operating Systems are what enterprise software was around 2010. Most people do not see it yet. Nobody has shipped a closed-loop AI OS for coaching operations specifically, which is the window we are taking.
 
-## Distribution — current state
+See [`../sales-and-delivery/competitive-landscape.md`](../sales-and-delivery/competitive-landscape.md) for the competitor map (point tools, student-facing AI, CRMs) and the objection lines.
 
-| Channel | Status | Notes |
-|---------|--------|-------|
-| **Mayank's personal network** | Primary today | Highest-conversion channel at this stage. Warm relationships, direct conversations, trusted intros. |
-| **Direct outreach** | Active | Team executing manually via DMs, LinkedIn, targeted conversations. Cold calling being introduced shortly. |
-| **Sales OS (autonomous outbound)** | In build | Will execute volume once mature. Team sets strategy, system runs the operation. |
-| **Brand (long-term engine)** | In build | Building in public on YouTube + Instagram. The compounding engine. |
+## The path (harvest, do not design)
 
-## The 3-week niche-test cycle (operating rule)
+We build complete AI Systems for individual institutes now, and extract the repeating winners into AIOS later. Phases in order:
 
-For any outbound campaign — cold email, LinkedIn, ads, anything that targets a niche — we commit to **3 weeks** before evaluating.
+- **Phase 1 (CURRENT):** custom AI-System builds, deepest pain first, learning which workflows move money for this niche.
+- **Phase 2 (BRIDGE):** the workflows that repeat as the biggest, cleanest wins become the v1 productized menu.
+- **Phase 3 (DESTINATION):** the productized AIOS, sold as a managed service that runs multiple functions at once.
 
-```
-Week 0       →  Pick the niche + positioning
-Weeks 1–3    →  Run the campaign. Track:
-                  · Reply rate
-                  · Discovery calls booked
-                  · Calls that qualified
-Week 3 review →  KEEP if metrics trending up
-                 PIVOT if they're flat
-                 KILL if they're zero
-```
+A pattern goes into AIOS only after it appears across multiple real builds. Delivery is the evidence, not conviction. (Full arc: CLAUDE.md §2.)
 
-**Why 3 weeks:** long enough to see signal, short enough to avoid sunk-cost commitment. If a niche doesn't work in 3 weeks, it probably won't work in 6 — pivot.
+## Distribution — current state (two-track)
 
-This applies to every outbound surface, not just cold email. LinkedIn outreach, Upwork strategy, future ad campaigns — same cycle.
+| Track | Owner | Status | Notes |
+|---|---|---|---|
+| **India / beachhead + connections** | Mayank + Shubham | Primary today | The beachhead owner plus his 50+ connections. Local language (Hindi), local trust. Prototype ground and first case studies. |
+| **Foreign outreach (US/UK)** | Pang | In setup | Cold and warm outreach in English to Western coaching businesses. Market and ICP TBD. Higher pricing power. |
+| **Content / build-in-public** | Mayank (video), Pang (LinkedIn) | In build | The compounding engine. Mayank owns YouTube; Pang owns LinkedIn. |
 
-**Current state (2026-05-23 → 2026-06-05):** No active 3-week niche tests are running. The niche is locked (UK ecom consumer health & beauty DTC). We are in a customer-discovery sprint — 10 conversations with founders in or near the niche, plus paid custom builds where there is fit. The 3-week niche-test framework returns to active use only AFTER the lock meeting if we extend into adjacent niches.
+Outreach should not depend on a single person: foreign and India tracks run in parallel, and conversion plus research are shared.
+
+## Outreach has two objectives on every call
+
+1. **Convert** the lead into a client.
+2. **Research**: capture the pain points, the distribution channels they actually use, and the **hidden / switching costs** (what they would have to give up or change to adopt a system like ours). Hidden cost is load-bearing: we build the product around eliminating it. See [`../sales-and-delivery/sales-discovery-call.md`](../sales-and-delivery/sales-discovery-call.md).
 
 ## Content — cadence and platforms
 
-| Platform | Tier | Notes |
-|----------|------|-------|
-| YouTube | Primary | Long-form + Shorts |
-| Instagram | Primary | Reels + carousels |
-| LinkedIn | Secondary | Text posts + carousels — written content lane |
-| Reddit | Secondary | Niche communities, low-effort high-signal |
+| Platform | Tier | Owner | Notes |
+|----------|------|-------|-------|
+| YouTube | Primary | Mayank | Long-form (1/week) + 2 Shorts |
+| LinkedIn | Primary (written lane) | Pang | Posts + comments. Pang's growth channel. |
+| Instagram | Secondary | Mayank | Reels + carousels, as video scales |
+| Reddit / Skool / communities | Secondary | Shubham | Niche communities, also an outreach surface |
 
-**Cadence**: minimum one piece of content per day. No "skip days" — the system is what produces consistency, not motivation.
+**Cadence:** aim for at least one piece of content per day across the team. The system produces consistency, not motivation.
 
 ## Content categories
 
-- **Journey** — what we're building, what's working, what isn't. Raw and honest.
-- **Lessons & insights** — practical, not inspirational. The thing learned + how it applies.
-- **DivineSide as AI OS agency** — behind-the-scenes builds, architecture decisions, what AI OS actually means.
-- **Client work** — case studies, testimonials, results.
-- **Business lessons** — for founders and entrepreneurs.
+- **Journey** — what we are building, what is working, what is not. Raw and honest.
+- **Lessons and insights** — practical, the thing learned plus how it applies.
+- **DivineSide as an AI-System builder** — behind-the-scenes builds, architecture decisions, what an AI System and AIOS actually are.
+- **Client / institute work** — case studies, results, what we removed for an owner.
+- **Business lessons** — for founders and operators.
 
-When picking an angle for a piece of content, name which category it belongs to. If it doesn't fit one cleanly, it probably shouldn't ship.
+Name the category before writing. If a piece does not fit one cleanly, it probably should not ship.
 
-## What we're saying right now (current campaigns)
+## What we are saying right now (current themes)
 
-> *Update this section as campaigns shift. Agents will keep writing the old pitch otherwise.*
+> *Update as positioning sharpens. Agents will keep writing the old pitch otherwise.*
 
-**Current operating reality (2026-05-23 → 2026-06-05):** we are NOT running a high-volume outbound campaign. We are running a **customer-discovery sprint** with UK ecom consumer health & beauty DTC founders. Active outreach posture per channel:
-
-- **Instantly cold email:** new sends paused while we re-evaluate positioning and whether to keep Instantly running at all. Inbound replies from in-flight sequences run as discovery + pitch calls.
-- **Upwork:** pipeline continues. Each interview is run as discovery first (15-20 min), then transitions to pitch a custom workflow build if fit exists. Pricing anchor: £1k–£2.5k build + £350/mo retainer.
-- **LinkedIn DMs / warm intros:** the primary source of the 10 discovery calls during the sprint.
-- **Content:** lower priority during the sprint. Resume normal cadence after 2026-06-05.
-
-Active themes the team uses in conversations and any content that does ship:
-
-- **The bucket framing.** Every £1–5M DTC brand is a bucket with 7 holes. Most agencies hand you one plug. We plug the ones that move money. This is the meta-message under all current outreach.
-- **The shift:** people execute → systems execute.
-- **AI OS vs AI tools:** most "AI agencies" build chatbots and call them systems. We build systems that run a business function end-to-end. (Destination framing — currently we're shipping custom workflows on the path to the OS.)
+- **One system vs seven tools.** A coaching institute is run on disconnected point tools plus manual work. We run it as one connected system. This is the meta-message under all current outreach.
+- **The shift:** people execute, then systems execute. Humans supervise.
+- **Information business = the right fit for AI.** Coaching produces structured, reusable, causal context all day. That is exactly what a closed-loop system learns from. (Use as the "why this works for you specifically" argument, not as the lead.)
 - **Build in public:** documenting the build of an AI OS for an underserved niche. The path is the moat.
 
-**Note:** this entire section gets rewritten after 2026-06-05 using the language captured from the 10 discovery conversations (especially Q2 "what have you tried that didn't work" and Q4 "what would you wand-away" answers). Agents writing copy should treat current themes as scaffolding, not gospel.
+**Note:** the headline offer sentence and the proof points get rewritten after the deep-research phase and the first foreign calls, using the language owners actually use for their pain (especially "what is the most time-consuming manual thing you do" and "what would you have to give up to adopt this"). Treat current themes as scaffolding.
 
 ## Monetisation layers
 
-Ranked by current revenue contribution:
+Ranked by current intended contribution:
 
-1. **Custom AI OS builds** — primary lead gen pulled from content + network.
-2. **Commoditised solutions** (chatbots, automations, SMS flows, lead capture) — financial floor while bigger work develops.
-3. *(Future)* **Brand deals + advertisements** — once content reaches scale.
-4. *(Future)* **Community + premium access** — free community feeding paid upsells.
-5. *(Future)* **Coaching + consulting** — accelerator-style, high ticket.
-6. *(Future)* **One-on-one coaching** — selective.
+1. **Custom AI-System builds (retainer)** — primary, the Phase 1 engine. Pricing TBD.
+2. *(Future)* **Productized AIOS** — the Phase 3 destination.
+3. *(Future)* **Brand deals, community, coaching** — only once content reaches scale.
 
-Don't mention layers 3–6 in client-facing copy yet — they're not real product yet.
+Do not mention layers 2 to 3 in client-facing copy yet. They are not real product yet.
 
-## Calls to action — what we send people to do
+## Calls to action
 
-When a piece of content includes a CTA, it should be one of these (and only one):
+When content carries a CTA, use exactly one:
 
-- **DM "OS"** (or similar) → starts a sales conversation.
-- **Book a call** → for warm leads asking what we do.
-- **Subscribe** → for content where the next move is "see more like this."
-- **Read the full breakdown** → for top-funnel, drives to long-form.
+- **DM a keyword** to start a conversation.
+- **Book a call** for warm leads asking what we do.
+- **Subscribe / follow** for content where the next move is "see more."
+- **Read the full breakdown** for top-funnel driving to long-form.
 
-If the content can't earn a CTA, ship without one. Forced CTAs read as desperate.
+If the content cannot earn a CTA, ship without one. Forced CTAs read as desperate.
 
-## What we're NOT doing right now
+## What we are NOT doing right now
 
-- Cold paid ads. We're not at the LTV/CAC clarity to justify spend yet.
-- Mass cold email blasts. Volume without targeting burns the domain.
-- Selling courses or info products. The product is the AI OS itself, not knowledge about it.
-- Building for niches we haven't validated. Niche selection comes after enough custom builds reveal the pattern.
+- Cold paid ads. Not at LTV/CAC clarity yet.
+- Mass cold-email blasts. Volume without targeting burns the domain, and the Western buyer (especially UK) is outreach-averse.
+- Selling courses or info products. The product is the AI System, not knowledge about it.
+- Selling a student-facing AI tutor. We sell to the business.
+- Building for niches we have not validated. Expansion comes after the exam-prep vertical is mastered.
+- Hard-committing the entry workflow, the foreign market, or pricing before the research that decides them.

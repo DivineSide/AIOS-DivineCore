@@ -37,6 +37,27 @@ The system runs me. I don't run the system.
 
 ---
 
+## The board — every KPI needs a system (fill in live)
+"System?" = is there a documented system behind this number (target + playbook + tracking + who you follow)? Y / N / partial.
+
+| KPI | Owner | Target | Bridge | System? |
+| --- | --- | --- | --- | --- |
+| Cold email sent | M + P joint | 1,500/wk | Meetings booked/wk: 5 | |
+| LinkedIn posts | Pang | 7/wk | First client off LinkedIn in 2 wks | |
+| LinkedIn connection requests | Pang | 140/wk | | |
+| LinkedIn cold DMs | Pang | 70/wk | | |
+| LinkedIn engagement comments | Pang | 70/wk | | |
+| X tweets | Pang | 35/wk | | |
+| X quality replies | Pang | 140/wk | | |
+| Cold calls | Pang | starts 2026-06-09, target TBD | | |
+| LinkedIn DMs | Shubham | 50/wk | 4 meetings in 2 wks | |
+| Partner outreach | Shubham | 3-5/wk | | |
+| YT long-form | Mayank | 1/wk | First client in 1 month | |
+| YT shorts | Mayank | 2/wk | | |
+| Infra hours | Mayank | 21/wk | | |
+
+---
+
 ## The gap, plainly
 - **Pang:** hit KPIs this sprint.
 - **Mayank:** 1 video in 3 weeks. Week 1 research (fine). Weeks 2 and 3, nothing. 4 sales calls assigned 2026-05-22, none happened.

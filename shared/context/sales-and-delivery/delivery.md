@@ -1,5 +1,7 @@
 # Delivery — DivineSide
 
+> **⚠️ SUPERSEDED (pre-2026-06-06, beauty DTC).** Niche pivoted to education / coaching. This delivery SOP describes the old 8-week beauty pilot and is not yet migrated. Do NOT use it to set client expectations. Current niche/audience/offer: [business-info.md](../identity/business-info.md), [audience.md](../identity/audience.md), [offer.md](offer.md). Entry workflow and pricing are OPEN.
+
 > **IN REVIEW until 2026-06-05.** The 8-week pilot delivery flow in this file (Phase 0 → Phase 4, the 8-category brain, the two parallel tracks) is the **destination** shape, not current operating reality. **Current state during the sprint (Phase 1 of the JP-model arc):** custom workflow builds at £1k–£2.5k + £350/mo retainer, audit-first, scoped per-pain per-client. The full 8-week productized pilot relaunches after the 2026-06-05 lock based on what 10 founder conversations + paid builds teach us. See [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc and [`../../../.claude/alignment-2026-05-22.md`](../../../.claude/alignment-2026-05-22.md) for the sprint structure.
 
 > **The 8-week pilot delivery process.** What gets built, by whom, in what order, with what hand-offs. Same shape for every client; only the workflow varies.

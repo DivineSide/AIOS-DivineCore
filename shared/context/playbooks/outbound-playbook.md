@@ -1,7 +1,5 @@
 # Outbound Copywriting Playbook
 
-> **IN REVIEW until 2026-06-05.** The general outbound copywriting principles in this file (Seven Principles of Yes, four-step framework, offer formula, channel-specific optimization, subject lines, iteration discipline) are channel-agnostic and **remain valid as-is.** What's in review: **§15 "Outbound for DivineSide Specifically"** references the destination offer (0% upfront + $500 penalty, 8-week pilot template). **Current state during the sprint (Phase 1 of the JP-model arc):** Instantly cold email is paused while we re-evaluate, Upwork outbound continues, the DivineSide-specific offer template in §15 should be adapted to current pricing (£1k–£2.5k workflow build + £350/mo retainer) rather than the destination 8-week pilot. See [`../sales-and-delivery/offer.md` §00](../sales-and-delivery/offer.md) for current operating state and [`../../../CLAUDE.md` §2](../../../CLAUDE.md) for the Phase 1/2/3 arc.
-
 > **Cross-channel tactical playbook for cold outbound copy.** Cold email, LinkedIn DM, Instagram DM, X DM, SMS, even cold call openers. The principles are the same: convince a stranger with zero pre-established trust to take an action.
 >
 > **Why outbound is different from other copywriting:** every other discipline assumes opt-in (newsletter signup, form fill, warm intro). Outbound has none of that. The reader did not ask for the message. So every line has to do work that opt-in copy gets for free.
@@ -15,7 +13,7 @@
 >
 > Source: distilled from a senior B2B outbound practitioner ($15M+ generated, decade in field, runs a $4M/yr profit business and a 10K-member copywriting community). Adapted for DivineSide's voice and offer.
 
-Last updated: 2026-05-15
+Last updated: 2026-06-07
 
 ---
 
@@ -819,14 +817,15 @@ If any of these appear in a message, rewrite it.
 
 ## 15 · Outbound for DivineSide Specifically
 
-Translating the framework to our actual offer:
+Translating the framework to our actual offer. Load [`../identity/pang.md`](../identity/pang.md), [`../identity/icp.md`](../identity/icp.md), and [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md) alongside this section.
 
-- **Default voice** is Pang on most channels (LinkedIn, Upwork, IG, X, cold email). Mayank's voice is reserved for video and founder-led email. Load the persona file accordingly.
-- **Default offer reference** is *"your business, running on AI"* (outcome-led). The category noun *AIOS* is for posts/messages where the differentiation is the subject. See [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md) §01.
-- **Authority anchors that work**: shipped builds (Upwork pipeline, Fathom, Instantly integration), the 0%-upfront + $500-penalty guarantee, named clients we are allowed to reference.
-- **Differentiation requirement** (carried over from [`linkedin-playbook.md`](linkedin-playbook.md)): every cold message should imply or state at least one of the five DivineSide differentiators (**breadth-vs-depth bundle**, context layer, embedded expertise, operating-system framing, skin-in-the-game guarantee). **The strongest one for cold outbound is breadth-vs-depth:** other agencies do one workflow (retention, CS, or reviews); we do all of them on one retainer. AI is the mechanism, not the marketing line. See [`../sales-and-delivery/competitive-landscape.md`](../sales-and-delivery/competitive-landscape.md) §02 for the sharpened positioning frame and §06 for objection responses. Otherwise the reader sorts us into the "another AI automation agency" bucket.
-- **Upwork is the exception** to "never lead with AIOS externally" per [`../../CLAUDE.md`](../../../CLAUDE.md) §13. On Upwork the AIOS framing is the differentiator that justifies the price floor. Other channels: outcome-first.
-- **DivineSide-specific offer template:** *"You don't pay anything upfront. If I deliver what we agree on at kickoff by week 8, you pay then. If not, you don't pay anything and I pay you $500 out of pocket. We'd only need ~15 min on a call to scope it."*
+- **Default voice** is Pang on most channels (LinkedIn, Upwork, IG, X, cold email). Mayank's voice is reserved for video and India-track outreach. Load [`../identity/pang.md`](../identity/pang.md) for the persona.
+- **Default ICP (Pang's US track):** independent, owner-operated, local test prep / tutoring companies in the US. $500k–$3M revenue, group classes, 2–20 staff. Exclude franchise chains (Kumon, Mathnasium, Sylvan, Huntington) — their owners cannot freely adopt outside systems. See [`../identity/icp.md`](../identity/icp.md) for the full filter set and the reasoning behind every exclusion. Use US terminology: "tutoring center," "learning center," "test prep company" — not "coaching center" (that is Indian terminology and tanks credibility with a US reader).
+- **Default offer framing:** lead with the painful manual function being removed, not the system name. The ICP speaks "I am drowning in [specific task]," not "I need an AI Operating System." The entry workflow for the US ICP is TBD pending discovery calls — do not lock a specific outcome claim until it is validated. See [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md) for current operating state. Reserve "AI Operating System" / AIOS for contexts where the differentiation itself is the subject (e.g. Upwork, where the AIOS framing justifies a price floor vs. generic freelancers).
+- **Authority anchors that work for this ICP:** shipped builds (Reading Rhythms cold-email system — 8% reply rate, 3% positive reply rate; OuterSignal CRM automation — ~10 hrs/week saved), the guarantee mechanic in [`../sales-and-delivery/guarantee.md`](../sales-and-delivery/guarantee.md) (exact numbers TBD until the offer is locked), and the framing that we have personally lived inside the education/coaching world as students.
+- **Differentiation requirement:** every cold message should surface at least one of these distinctions between DivineSide and a generic "AI automation" vendor. **The strongest one for cold outbound to coaching/tutoring owners is breadth-vs-depth:** most tools they already pay for handle one function (Classplus for delivery, Meritto for CRM, Google Forms for feedback). We connect and run multiple functions on one retainer. AI is the mechanism that makes that economically possible. The other differentiators: context layer (we build the AI around their specific students, parents, and curricula, not a generic prompt), embedded expertise, operating-system framing. Without at least one of these the message gets sorted into the "AI chatbot vendor" bucket.
+- **What not to claim yet:** the specific retainer number, any hours-saved or revenue guarantee, and the entry workflow. These are open until the deep-research phase and first US discovery calls close them. Write to the pain; let offer.md hold the specifics once they land.
+- **Outreach status (as of 2026-06-07):** Instantly cold email is being set up for the US ICP. Upwork outbound continues on Pang's track. India outreach (Mayank + Shubham) is warm/direct, not cold email.
 
 ---
 
@@ -846,7 +845,7 @@ The mechanics of actually shipping and managing a campaign from launch to iterat
 
 ### B. Launch Timing
 
-| Day | UK send quality |
+| Day | US send quality |
 |---|---|
 | Monday morning | Strong (peak fresh inbox) |
 | Tuesday morning | **Best** (highest reply rates in B2B) |
@@ -855,7 +854,7 @@ The mechanics of actually shipping and managing a campaign from launch to iterat
 | Friday morning | OK |
 | Friday afternoon / weekend | Dead |
 
-For a 2-message sequence with a 3-day gap, **launch Monday or Tuesday morning UK time** so the follow-up lands Thursday or Friday (still a weekday). Avoid Friday launches: the follow-up lands Monday, which is fine, but Day 0 fights the weekend triage drift.
+US ICP: spread sends across **9 am – 5 pm ET** (Eastern Time, covers the bulk of US tutoring/test-prep businesses). For west-coast-heavy segments, extend to PT. For a 2-message sequence with a 3-day gap, **launch Monday or Tuesday morning ET** so the follow-up lands Thursday or Friday. Avoid Friday launches: the follow-up lands Monday, which is fine, but Day 0 fights weekend triage drift.
 
 ### C. Days 0-5. Hands Off
 
