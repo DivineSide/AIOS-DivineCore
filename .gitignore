@@ -30,3 +30,4 @@ tools/outreach-tracker/data/
 # Social post tracker data — your own LinkedIn impressions are private analytics (repo is PUBLIC)
 tools/social-tracker/posts.csv
 tools/social-tracker/.inbox.txt
+tools/social-tracker/.import-*.json
