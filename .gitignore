@@ -22,3 +22,7 @@ divinecore-v2/worker/sales_os/Clients/divinecore/data/
 
 # Internal meeting transcripts pulled for context work (never push to public repo)
 .claude/_transcripts_tmp/
+
+# Outreach tracker backups — contain prospect URLs (PII), never commit (repo is PUBLIC)
+outreach-tracker-backup-*.json
+tools/outreach-tracker/data/

@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DivineSide — Outreach & KPI Tracker</title>
+<style>
+  :root {
+    --bg: #0e0f13;
+    --panel: #171922;
+    --panel-2: #1f2230;
+    --line: #2a2e3e;
+    --text: #e7e9f0;
+    --muted: #9aa0b4;
+    --gold: #e8b84b;
+    --gold-dim: #b9913a;
+    --green: #3ecf8e;
+    --red: #ef5c6b;
+    --blue: #5aa9ff;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: .3px; }
+  header h1 .gold { color: var(--gold); }
+  header .date { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  .tabs {
+    display: flex; gap: 6px; padding: 12px 22px 0; flex-wrap: wrap;
+  }
+  .tab {
+    background: transparent; border: 1px solid transparent; color: var(--muted);
+    padding: 9px 16px; border-radius: 9px 9px 0 0; cursor: pointer; font-size: 14px;
+  }
+  .tab.active { color: var(--text); background: var(--panel); border-color: var(--line); border-bottom-color: var(--panel); }
+  main { padding: 20px 22px 80px; max-width: 1100px; }
+  .view { display: none; }
+  .view.active { display: block; }
+  h2 { font-size: 15px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin: 26px 0 12px; }
+  h2:first-child { margin-top: 6px; }
+
+  /* counters */
+  .counter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .counter {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px; position: relative;
+  }
+  .counter .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; min-height: 32px; }
+  .counter .num { font-size: 34px; font-weight: 700; line-height: 1; cursor: pointer; }
+  .counter .num:hover { color: var(--gold); }
+  .counter .num .target { font-size: 15px; color: var(--muted); font-weight: 500; }
+  .counter .bar { height: 4px; background: var(--panel-2); border-radius: 3px; margin: 10px 0 12px; overflow: hidden; }
+  .counter .bar > i { display: block; height: 100%; background: var(--gold); width: 0; }
+  .counter .bar > i.done { background: var(--green); }
+  .counter .btns { display: flex; gap: 8px; }
+  .counter button.tick {
+    flex: 1; background: var(--gold); color: #20160a; border: none; border-radius: 8px;
+    padding: 10px; font-size: 18px; font-weight: 700; cursor: pointer;
+  }
+  .counter button.tick:active { transform: translateY(1px); }
+  .counter button.minus {
+    width: 40px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 8px; font-size: 18px; cursor: pointer;
+  }
+  .counter .x { position: absolute; top: 8px; right: 10px; color: #4a4f63; cursor: pointer; font-size: 13px; }
+  .counter .x:hover { color: var(--red); }
+  .counter .tgt-edit { position: absolute; top: 8px; right: 28px; color: #4a4f63; cursor: pointer; font-size: 12px; }
+  .counter .tgt-edit:hover { color: var(--gold); }
+
+  /* queue + prospects */
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .card.overdue { border-color: var(--red); }
+  .card .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card .name { font-weight: 600; }
+  .card a.url { color: var(--blue); text-decoration: none; font-size: 13px; word-break: break-all; }
+  .card a.url:hover { text-decoration: underline; }
+  .tier { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
+  .tier.A { color: var(--green); border-color: var(--green); }
+  .tier.B { color: var(--gold); border-color: var(--gold-dim); }
+  .tier.C { color: var(--muted); }
+  .stage-pill { font-size: 11px; padding: 2px 9px; border-radius: 20px; background: var(--panel-2); color: var(--muted); }
+  .action-line { margin: 10px 0 6px; font-size: 14px; }
+  .action-line .due { color: var(--gold); font-weight: 600; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
+  .badge.over { background: rgba(239,92,107,.15); color: var(--red); }
+  .badge.today { background: rgba(232,184,75,.15); color: var(--gold); }
+  .card .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  button.act { background: var(--panel-2); border: 1px solid var(--line); color: var(--text); padding: 7px 13px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  button.act:hover { border-color: var(--gold-dim); }
+  button.act.primary { background: var(--gold); color: #20160a; border-color: var(--gold); font-weight: 600; }
+  button.act.danger:hover { border-color: var(--red); color: var(--red); }
+  button.act.good { color: var(--green); }
+  .spacer-row { flex: 1; }
+
+  .muted { color: var(--muted); }
+  .empty { color: var(--muted); padding: 18px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+  .notes { font-size: 13px; color: var(--muted); margin-top: 6px; white-space: pre-wrap; }
+
+  /* add form */
+  .addbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; background: var(--panel); border: 1px solid var(--line); padding: 12px; border-radius: var(--radius); }
+  input[type=text], select, textarea {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    padding: 9px 11px; border-radius: 8px; font-size: 14px; font-family: inherit;
+  }
+  input.url-in { flex: 1; min-width: 240px; }
+  button.primary-btn { background: var(--gold); color: #20160a; border: none; padding: 9px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  button.ghost:hover { color: var(--text); border-color: var(--gold-dim); }
+
+  .filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+
+  /* stats table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; min-width: 130px; }
+  .stat .v { font-size: 26px; font-weight: 700; }
+  .stat .k { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 22px; }
+  .help { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .help code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; color: var(--gold); }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--gold-dim); color: var(--text); padding: 10px 18px; border-radius: 10px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 50; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="gold">DivineSide</span> · Outreach & KPI Tracker</h1>
+  <span class="date" id="todayLabel"></span>
+  <span class="spacer"></span>
+  <span class="muted" id="backupNudge" style="font-size:12px"></span>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="today">Today</button>
+  <button class="tab" data-tab="pipeline">Pipeline</button>
+  <button class="tab" data-tab="stats">Stats &amp; Backup</button>
+</nav>
+
+<main>
+  <!-- TODAY -->
+  <section class="view active" id="view-today">
+    <h2>Today's counters</h2>
+    <div class="counter-grid" id="counterGrid"></div>
+    <div style="margin-top:12px">
+      <button class="ghost" id="addMetricBtn">+ Add counter</button>
+    </div>
+
+    <h2>Needs attention today <span class="muted" id="queueCount"></span></h2>
+    <div id="queue"></div>
+  </section>
+
+  <!-- PIPELINE -->
+  <section class="view" id="view-pipeline">
+    <div class="addbar">
+      <input type="text" class="url-in" id="newUrl" placeholder="Paste LinkedIn profile URL after you comment on their post…" />
+      <input type="text" id="newName" placeholder="Name (optional)" style="width:150px" />
+      <select id="newTier">
+        <option value="A">Tier A · posts</option>
+        <option value="B">Tier B · comments</option>
+        <option value="C">Tier C · inactive</option>
+      </select>
+      <select id="newStage">
+        <option value="commented">Commented</option>
+        <option value="connect_sent">Connect sent</option>
+        <option value="accepted">Accepted</option>
+        <option value="first_msg">First msg sent</option>
+      </select>
+      <button class="primary-btn" id="addProspect">Add</button>
+    </div>
+
+    <div class="filters">
+      <select id="filterStage">
+        <option value="">All stages</option>
+        <option value="active">Active only</option>
+        <option value="commented">Commented</option>
+        <option value="connect_sent">Connect sent</option>
+        <option value="accepted">Accepted</option>
+        <option value="first_msg">First msg sent</option>
+        <option value="loom_sent">Loom sent</option>
+        <option value="engaged">Re-engaged</option>
+        <option value="in_convo">In conversation</option>
+        <option value="won">Won</option>
+        <option value="dead">Dead</option>
+      </select>
+      <select id="filterTier">
+        <option value="">All tiers</option>
+        <option value="A">Tier A</option>
+        <option value="B">Tier B</option>
+        <option value="C">Tier C</option>
+      </select>
+      <input type="text" id="filterText" placeholder="Search name / URL…" style="flex:1;min-width:160px" />
+    </div>
+    <div id="prospectList"></div>
+  </section>
+
+  <!-- STATS -->
+  <section class="view" id="view-stats">
+    <h2>This week (last 7 days)</h2>
+    <div class="stat-row" id="weekStats"></div>
+
+    <h2>Pipeline snapshot</h2>
+    <div class="stat-row" id="pipeStats"></div>
+
+    <h2>Daily history</h2>
+    <div style="overflow-x:auto"><table id="historyTable"></table></div>
+
+    <h2>Backup &amp; data</h2>
+    <p class="help">All data lives in this browser only (localStorage), so it is never committed to the public repo. Export a JSON backup regularly. To move machines or recover, Import the file.</p>
+    <div class="toolbar">
+      <button class="primary-btn" id="exportBtn">⬇ Export backup (JSON)</button>
+      <label class="ghost" style="cursor:pointer">⬆ Import backup<input type="file" id="importFile" accept="application/json" style="display:none" /></label>
+      <button class="ghost danger" id="clearBtn">Clear all data</button>
+    </div>
+
+    <h2>How to use</h2>
+    <div class="help">
+      <p><b>Daily rhythm (matches linkedin-playbook §14.1):</b></p>
+      <p>1. Comment on 5–10 prospects' posts. For each, paste their URL on the <b>Pipeline</b> tab and hit <b>Add</b> (logs the comment + bumps the LinkedIn-comments counter).<br>
+      2. The app waits 2 days, then shows them under <b>Needs attention today</b> with "Send connection request." Tick it once sent.<br>
+      3. When LinkedIn says they accepted, hit <b>Accepted</b> → it then prompts the first message → then Loom on silence, all on the §14 cadence.</p>
+      <p><b>Counters:</b> tap <code>+</code> after every post, reply, comment, dial, or call. Advancing a prospect's stage auto-ticks the matching counter, so don't double-count those. Set a daily target by clicking the small target icon.</p>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+// ---------- storage ----------
+const KEY = "divineside_tracker_v1";
+const DUE = { COMMENT_TO_CONNECT: 2, FIRSTMSG_TO_LOOM: 3, LOOM_TO_ENGAGE: 7, REAPPROACH: 30 };
+const TARGETS_VERSION = 2; // bump to re-sync default targets onto existing installs
+
+// Daily targets = Pang's weekly KPIs / 7 (dials set directly to 50/day). See linkedin-playbook §14.
+const DEFAULT_METRICS = [
+  { id: "li_posts",      label: "LinkedIn posts",         target: 1   },
+  { id: "li_comments",   label: "Engagement comments",    target: 10  },
+  { id: "conn_sent",     label: "Connection requests",    target: 20  },
+  { id: "cold_dms",      label: "Cold DMs",               target: 10  },
+  { id: "x_posts",       label: "X tweets",               target: 5   },
+  { id: "x_replies",     label: "X quality replies",      target: 20  },
+  { id: "cold_emails",   label: "Cold emails",            target: 214 },
+  { id: "dials",         label: "Cold call dials",        target: 50  },
+  { id: "disco_booked",  label: "Discovery calls booked", target: 0   },
+  { id: "dms",           label: "First messages (pipeline)", target: 0 },
+  { id: "looms",         label: "Looms sent",             target: 0   },
+  { id: "calls_conn",    label: "Calls connected",        target: 0   },
+];
+
+function defaultState() {
+  return { version: 1, targetsVersion: TARGETS_VERSION, metrics: JSON.parse(JSON.stringify(DEFAULT_METRICS)), counts: {}, prospects: [] };
+}
+
+let state = load();
+migrateTargets();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return defaultState();
+    const s = JSON.parse(raw);
+    if (!s.metrics) s.metrics = JSON.parse(JSON.stringify(DEFAULT_METRICS));
+    if (!s.counts) s.counts = {};
+    if (!s.prospects) s.prospects = [];
+    return s;
+  } catch (e) { return defaultState(); }
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(state)); updateBackupNudge(); }
+
+// One-time sync of default counters/targets onto an existing install (runs when TARGETS_VERSION changes).
+// Updates target + label for known default counters, adds any new ones, keeps user-added custom counters,
+// and reorders to the default layout. Does not touch recorded counts or prospects.
+function migrateTargets(){
+  if (state.targetsVersion === TARGETS_VERSION) return;
+  const byId = {}; state.metrics.forEach(m => byId[m.id] = m);
+  const merged = [];
+  DEFAULT_METRICS.forEach(dm => {
+    if (byId[dm.id]) { byId[dm.id].target = dm.target; byId[dm.id].label = dm.label; merged.push(byId[dm.id]); delete byId[dm.id]; }
+    else merged.push(Object.assign({}, dm));
+  });
+  Object.keys(byId).forEach(id => merged.push(byId[id])); // preserve custom counters
+  state.metrics = merged;
+  state.targetsVersion = TARGETS_VERSION;
+  save();
+}
+
+// ---------- dates ----------
+function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function todayStr(){ return ymd(new Date()); }
+function parseYmd(s){ const p=s.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
+function addDays(s,n){ const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); }
+function daysBetween(a,b){ return Math.round((parseYmd(b)-parseYmd(a))/86400000); }
+function fmtDate(s){ const d=parseYmd(s); return d.toLocaleDateString(undefined,{weekday:"short", month:"short", day:"numeric"}); }
+
+// ---------- counters ----------
+function countFor(metricId, day){ const c = state.counts[day]; return (c && c[metricId]) || 0; }
+function bump(metricId, day, delta){
+  day = day || todayStr();
+  if (!state.counts[day]) state.counts[day] = {};
+  const cur = state.counts[day][metricId] || 0;
+  const next = Math.max(0, cur + delta);
+  state.counts[day][metricId] = next;
+  save();
+}
+function metricById(id){ return state.metrics.find(m => m.id === id); }
+
+// ---------- prospects ----------
+const STAGE_LABEL = {
+  commented: "Commented", connect_sent: "Connect sent", accepted: "Accepted",
+  first_msg: "First msg sent", loom_sent: "Loom sent", engaged: "Re-engaged",
+  in_convo: "In conversation", won: "Won", dead: "Dead"
+};
+const ACTIVE_STAGES = ["commented","connect_sent","accepted","first_msg","loom_sent","engaged","in_convo"];
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function stageDate(p, stage){
+  for (let i = p.history.length - 1; i >= 0; i--) if (p.history[i].stage === stage) return p.history[i].date;
+  return null;
+}
+function setStage(p, stage, opts){
+  opts = opts || {};
+  p.stage = stage;
+  p.history.push({ stage, date: todayStr() });
+  if (opts.metric) bump(opts.metric, todayStr(), 1);
+  save();
+}
+
+// Returns the next due action for a prospect, or null if passive/archived.
+function nextAction(p){
+  const today = todayStr();
+  switch (p.stage){
+    case "commented": {
+      const d = stageDate(p, "commented");
+      return { label: "Send connection request", due: addDays(d, DUE.COMMENT_TO_CONNECT) };
+    }
+    case "connect_sent":
+      return null; // waiting on LinkedIn acceptance — passive
+    case "accepted":
+      return { label: "Send first message", due: stageDate(p, "accepted") };
+    case "first_msg": {
+      if (p.replied) return null;
+      return { label: "Send Loom video", due: addDays(stageDate(p,"first_msg"), DUE.FIRSTMSG_TO_LOOM) };
+    }
+    case "loom_sent": {
+      if (p.replied) return null;
+      return { label: "Comment on a new post (stay visible)", due: addDays(stageDate(p,"loom_sent"), DUE.LOOM_TO_ENGAGE) };
+    }
+    case "engaged": {
+      if (p.replied) return null;
+      const last = stageDate(p, "engaged");
+      return { label: "Re-approach with a fresh question", due: addDays(last, DUE.REAPPROACH) };
+    }
+    default: return null; // in_convo, won, dead
+  }
+}
+
+// ---------- rendering ----------
+const $ = sel => document.querySelector(sel);
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 1600); }
+
+function renderCounters(){
+  const grid = $("#counterGrid");
+  const day = todayStr();
+  grid.innerHTML = state.metrics.map(m => {
+    const n = countFor(m.id, day);
+    const tgt = m.target || 0;
+    const pct = tgt > 0 ? Math.min(100, Math.round(n/tgt*100)) : 0;
+    const done = tgt > 0 && n >= tgt;
+    return `<div class="counter" data-id="${m.id}">
+      <span class="tgt-edit" data-edit-target="${m.id}" title="Set daily target">◎</span>
+      <span class="x" data-del-metric="${m.id}" title="Remove counter">✕</span>
+      <div class="label">${escapeHtml(m.label)}</div>
+      <div class="num" data-set="${m.id}" title="Click to type today's total">${n}${tgt>0?`<span class="target"> / ${tgt}</span>`:""}</div>
+      <div class="bar"><i class="${done?"done":""}" style="width:${tgt>0?pct:0}%"></i></div>
+      <div class="btns">
+        <button class="minus" data-dec="${m.id}">–</button>
+        <button class="tick" data-inc="${m.id}">+</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderQueue(){
+  const today = todayStr();
+  const items = state.prospects
+    .map(p => ({ p, a: nextAction(p) }))
+    .filter(x => x.a && daysBetween(x.a.due, today) >= 0)   // due today or overdue
+    .sort((a,b) => parseYmd(a.a.due) - parseYmd(b.a.due));
+
+  $("#queueCount").textContent = items.length ? `(${items.length})` : "";
+  const q = $("#queue");
+  if (!items.length){ q.innerHTML = `<div class="empty">Nothing due. Comment on a few new prospects in the Pipeline tab to feed tomorrow's queue.</div>`; return; }
+
+  q.innerHTML = items.map(({p,a}) => {
+    const overdue = daysBetween(a.due, today) > 0;
+    return `<div class="card ${overdue?"overdue":""}" data-id="${p.id}">
+      ${prospectHeader(p)}
+      <div class="action-line"><span class="due">→ ${a.label}</span>
+        ${overdue ? `<span class="badge over">${daysBetween(a.due,today)}d overdue</span>` : `<span class="badge today">due today</span>`}
+      </div>
+      <div class="acts">${stageActions(p)}</div>
+    </div>`;
+  }).join("");
+}
+
+function prospectHeader(p){
+  const url = escapeHtml(p.url || "");
+  const display = escapeHtml(p.name || prettyUrl(p.url) || "(no name)");
+  return `<div class="top">
+    <span class="name">${display}</span>
+    <span class="tier ${p.tier}">${p.tier}</span>
+    <span class="stage-pill">${STAGE_LABEL[p.stage]||p.stage}</span>
+    ${p.replied ? `<span class="stage-pill" style="color:var(--green)">replied</span>` : ""}
+    ${url ? `<a class="url" href="${url}" target="_blank" rel="noopener">open ↗</a>` : ""}
+  </div>`;
+}
+
+// Buttons that advance a prospect. Stage transitions auto-tick the matching counter.
+function stageActions(p){
+  const b = (action, label, cls) => `<button class="act ${cls||""}" data-act="${action}" data-id="${p.id}">${label}</button>`;
+  let out = [];
+  switch (p.stage){
+    case "commented":   out = [b("to_connect","Connect sent","primary"), b("dead","Drop","danger")]; break;
+    case "connect_sent":out = [b("to_accepted","Accepted ✓","primary"), b("dead","Withdraw","danger")]; break;
+    case "accepted":    out = [b("to_firstmsg","First message sent","primary"), b("dead","Drop","danger")]; break;
+    case "first_msg":   out = [b("to_loom","Loom sent","primary"), b("replied","Got a reply","good"), b("dead","Drop","danger")]; break;
+    case "loom_sent":   out = [b("to_engaged","Commented on new post","primary"), b("replied","Got a reply","good"), b("dead","Drop","danger")]; break;
+    case "engaged":     out = [b("reapproach","Re-approached","primary"), b("replied","Got a reply","good"), b("dead","Drop","danger")]; break;
+    case "in_convo":    out = [b("won","Won 🎉","good"), b("nurture","Back to nurture"), b("dead","Drop","danger")]; break;
+    default:            out = [b("revive","Reactivate")]; break; // won/dead
+  }
+  out.push(`<span class="spacer-row"></span>`, `<button class="act" data-act="note" data-id="${p.id}">Note</button>`);
+  return out.join("");
+}
+
+function renderPipeline(){
+  const fs = $("#filterStage").value, ft = $("#filterTier").value, fx = $("#filterText").value.trim().toLowerCase();
+  let list = state.prospects.slice().reverse();
+  if (fs === "active") list = list.filter(p => ACTIVE_STAGES.includes(p.stage));
+  else if (fs) list = list.filter(p => p.stage === fs);
+  if (ft) list = list.filter(p => p.tier === ft);
+  if (fx) list = list.filter(p => ((p.name||"")+" "+(p.url||"")).toLowerCase().includes(fx));
+
+  const el = $("#prospectList");
+  if (!list.length){ el.innerHTML = `<div class="empty">No prospects match. Paste a LinkedIn URL above to start.</div>`; return; }
+  el.innerHTML = list.map(p => {
+    const a = nextAction(p);
+    const nextTxt = a ? `<div class="action-line muted">Next: ${a.label} · ${fmtDate(a.due)}</div>` : "";
+    return `<div class="card" data-id="${p.id}">
+      ${prospectHeader(p)}
+      ${nextTxt}
+      ${p.notes ? `<div class="notes">${escapeHtml(p.notes)}</div>` : ""}
+      <div class="acts">${stageActions(p)}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderStats(){
+  // week totals
+  const days = []; for (let i=6;i>=0;i--) days.push(addDays(todayStr(), -i));
+  const wrap = $("#weekStats");
+  const headline = ["li_posts","conn_sent","cold_dms","li_comments","x_posts","x_replies","cold_emails","dials"];
+  wrap.innerHTML = headline.map(id => {
+    const m = metricById(id); if (!m) return "";
+    const total = days.reduce((s,d)=> s + countFor(id,d), 0);
+    const wt = (m.target||0)*7;
+    const hit = wt>0 && total>=wt;
+    const sub = wt>0 ? `<span style="font-size:15px;color:${hit?'var(--green)':'var(--muted)'};font-weight:500"> / ${wt}</span>` : "";
+    return `<div class="stat"><div class="v">${total}${sub}</div><div class="k">${escapeHtml(m.label)} (this week)</div></div>`;
+  }).join("");
+
+  // pipeline snapshot
+  const ps = $("#pipeStats");
+  const byStage = {};
+  state.prospects.forEach(p => byStage[p.stage] = (byStage[p.stage]||0)+1);
+  const active = state.prospects.filter(p => ACTIVE_STAGES.includes(p.stage)).length;
+  const dueToday = state.prospects.map(nextAction).filter(a => a && daysBetween(a.due, todayStr())>=0).length;
+  ps.innerHTML =
+    `<div class="stat"><div class="v">${active}</div><div class="k">Active prospects</div></div>`+
+    `<div class="stat"><div class="v">${dueToday}</div><div class="k">Due today</div></div>`+
+    `<div class="stat"><div class="v">${byStage["in_convo"]||0}</div><div class="k">In conversation</div></div>`+
+    `<div class="stat"><div class="v">${byStage["won"]||0}</div><div class="k">Won</div></div>`;
+
+  // history table (last 14 days with any data)
+  const allDays = days.concat([]); // last 7 visible; extend to 14 for table
+  for (let i=13;i>=7;i--) allDays.unshift(addDays(todayStr(), -i));
+  const t = $("#historyTable");
+  const head = `<tr><th>Date</th>${state.metrics.map(m=>`<th class="n">${escapeHtml(shortLabel(m.label))}</th>`).join("")}</tr>`;
+  const rows = allDays.slice().reverse().map(d => {
+    const has = state.counts[d];
+    return `<tr><td>${fmtDate(d)}${d===todayStr()?" ·today":""}</td>${state.metrics.map(m=>`<td class="n">${has?(countFor(m.id,d)||""):""}</td>`).join("")}</tr>`;
+  }).join("");
+  t.innerHTML = head + rows;
+}
+
+function shortLabel(l){ return l.replace("LinkedIn","LI").replace("First messages / DMs","DMs").replace("Connection requests","Conn req").replace("Discovery calls booked","Disco"); }
+
+// ---------- actions ----------
+function findProspect(id){ return state.prospects.find(p => p.id === id); }
+
+function handleProspectAction(action, id){
+  const p = findProspect(id); if (!p) return;
+  switch (action){
+    case "to_connect":  setStage(p, "connect_sent", { metric: "conn_sent" }); toast("Connection request logged (+1)"); break;
+    case "to_accepted": setStage(p, "accepted"); toast("Marked accepted — first message is now due"); break;
+    case "to_firstmsg": setStage(p, "first_msg", { metric: "dms" }); toast("First message logged (+1)"); break;
+    case "to_loom":     setStage(p, "loom_sent", { metric: "looms" }); toast("Loom logged (+1)"); break;
+    case "to_engaged":  setStage(p, "engaged", { metric: "li_comments" }); toast("Re-engagement logged (+1)"); break;
+    case "reapproach":  setStage(p, "engaged", { metric: "li_comments" }); toast("Re-approach logged, 30-day clock reset"); break;
+    case "replied":     p.replied = true; setStage(p, "in_convo"); toast("Nice — moved to In conversation"); break;
+    case "won":         setStage(p, "won"); toast("🎉 Won!"); break;
+    case "dead":        setStage(p, "dead"); toast("Dropped"); break;
+    case "nurture":     p.replied = false; setStage(p, "engaged"); toast("Back to nurture"); break;
+    case "revive":      p.replied = false; setStage(p, "commented"); toast("Reactivated"); break;
+    case "note": {
+      const v = prompt("Note for "+(p.name||prettyUrl(p.url))+":", p.notes||"");
+      if (v !== null){ p.notes = v; save(); }
+      break;
+    }
+  }
+  renderAll();
+}
+
+// ---------- helpers ----------
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+function prettyUrl(u){ if(!u) return ""; try{ return decodeURIComponent(u.replace(/\/$/,"").split("/in/")[1]||u.split("/").filter(Boolean).pop()); }catch(e){ return u; } }
+
+function updateBackupNudge(){
+  const last = localStorage.getItem(KEY+"_lastexport");
+  const el = $("#backupNudge");
+  if (!state.prospects.length){ el.textContent = ""; return; }
+  if (!last){ el.textContent = "⚠ never backed up — Export on the Stats tab"; return; }
+  const d = daysBetween(last, todayStr());
+  el.textContent = d >= 3 ? `⚠ last backup ${d}d ago` : "";
+}
+
+function renderAll(){ renderCounters(); renderQueue(); renderPipeline(); renderStats(); }
+
+// ---------- events ----------
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.tab){ switchTab(t.dataset.tab); return; }
+  const setEl = t.closest && t.closest("[data-set]");
+  if (setEl){
+    const id = setEl.dataset.set, m = metricById(id);
+    const v = prompt("Set today's "+(m?m.label:id)+" total:", countFor(id, todayStr()));
+    if (v !== null){ const n = Math.max(0, parseInt(v)||0); if(!state.counts[todayStr()]) state.counts[todayStr()]={}; state.counts[todayStr()][id]=n; save(); renderCounters(); renderStats(); }
+    return;
+  }
+  if (t.dataset.inc){ bump(t.dataset.inc, todayStr(), 1); renderCounters(); renderStats(); return; }
+  if (t.dataset.dec){ bump(t.dataset.dec, todayStr(), -1); renderCounters(); renderStats(); return; }
+  if (t.dataset.delMetric){ if(confirm("Remove this counter? History stays in backups.")){ state.metrics = state.metrics.filter(m=>m.id!==t.dataset.delMetric); save(); renderCounters(); renderStats(); } return; }
+  if (t.dataset.editTarget){ const m = metricById(t.dataset.editTarget); const v = prompt("Daily target for "+m.label+" (0 = no target):", m.target||0); if(v!==null){ m.target = Math.max(0, parseInt(v)||0); save(); renderCounters(); } return; }
+  if (t.dataset.act){ handleProspectAction(t.dataset.act, t.dataset.id); return; }
+});
+
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab===name));
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  $("#view-"+name).classList.add("active");
+  renderAll();
+}
+
+$("#addProspect").addEventListener("click", () => {
+  const url = $("#newUrl").value.trim();
+  const name = $("#newName").value.trim();
+  const tier = $("#newTier").value;
+  const stage = $("#newStage").value;
+  if (!url && !name){ toast("Paste a URL or a name first"); return; }
+  const p = { id: uid(), name, url, tier, stage, replied:false, notes:"", history:[{stage, date: todayStr()}], createdAt: todayStr() };
+  state.prospects.push(p);
+  // auto-tick the counter implied by the entry stage
+  if (stage === "commented") bump("li_comments", todayStr(), 1);
+  else if (stage === "connect_sent") bump("conn_sent", todayStr(), 1);
+  else if (stage === "first_msg") bump("dms", todayStr(), 1);
+  save();
+  $("#newUrl").value = ""; $("#newName").value = "";
+  toast("Added"); renderAll();
+});
+$("#newUrl").addEventListener("keydown", e => { if (e.key === "Enter") $("#addProspect").click(); });
+
+["filterStage","filterTier","filterText"].forEach(id => $("#"+id).addEventListener("input", renderPipeline));
+
+$("#addMetricBtn").addEventListener("click", () => {
+  const label = prompt("Counter name (e.g. 'LinkedIn DMs replied'):"); if (!label) return;
+  const tgt = parseInt(prompt("Daily target (0 = none):","0")) || 0;
+  state.metrics.push({ id: "m_"+uid(), label: label.trim(), target: Math.max(0,tgt) });
+  save(); renderCounters();
+});
+
+$("#exportBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "outreach-tracker-backup-" + todayStr() + ".json";
+  a.click();
+  localStorage.setItem(KEY+"_lastexport", todayStr());
+  updateBackupNudge(); toast("Backup downloaded");
+});
+$("#importFile").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const s = JSON.parse(r.result);
+      if (!s.metrics || !s.prospects) throw new Error("bad file");
+      if (!confirm("Replace all current data with this backup?")) return;
+      state = s; if(!state.counts) state.counts={};
+      save(); renderAll(); toast("Imported");
+    } catch (err){ alert("That doesn't look like a valid backup file."); }
+  };
+  r.readAsText(f);
+});
+$("#clearBtn").addEventListener("click", () => {
+  if (!confirm("Delete ALL counters and prospects? Export a backup first if unsure.")) return;
+  if (!confirm("Really delete everything? This cannot be undone.")) return;
+  state = defaultState(); save(); renderAll(); toast("Cleared");
+});
+
+// ---------- init ----------
+$("#todayLabel").textContent = new Date().toLocaleDateString(undefined, { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+updateBackupNudge();
+renderAll();
+</script>
+</body>
+</html>
