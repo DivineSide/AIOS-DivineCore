@@ -112,6 +112,70 @@ Topics Pang wants to write LinkedIn posts on. Strike through or remove the entry
 > **What works:** *(TBD until source is captured)*
 > **Transfers to:** LinkedIn (likely primary), X (single-tweet curiosity hook).
 
+### Example 3 — "Unpopular opinion" + competitor-vs-you AI inevitability post
+
+> **Source / author:** *(unattributed; pasted by Pang 2026-06-10)*
+> **Posted / logged:** 2026-06-10
+> **Topic intent:** Pang flagged this as the model he wants to adapt for his next LinkedIn post (~2026-06-11). Wants to keep the 3-parallel-competitor-scenario structure and the forcing-question close, but strip the AI tells and adapt the scenarios for coaching / education businesses.
+>
+> ---
+>
+> Unpopular opinion:
+>
+> Businesses that refuse to use AI Automation in 2026 won't exist by 2028.
+>
+> Here's the hard truth nobody is telling you:
+>
+> Your competitor just automated their lead follow-up.
+> They respond in 90 seconds. You respond in 6 hours.
+> Who wins the deal?
+>
+> Your competitor just deployed an AI Chatbot.
+> It handles 200 customer queries a day. You hired 2 more staff.
+> Who has better margins?
+>
+> Your competitor built an AI Agent for onboarding.
+> New clients are live in 24 hours. Yours take 2 weeks.
+> Who gets better reviews?
+>
+> AI isn't about replacing people.
+> It's about making your business impossible to compete with.
+>
+> I help business owners build AI systems that:
+> 💰 Cut operational costs by 40–60%
+> ⚡ Save 30–50 hours of manual work per week
+> 📈 Scale revenue without scaling headcount
+>
+> This isn't the future. This is happening right now.
+>
+> The question is — are you building the machine, or becoming obsolete?
+>
+> If you want to see EXACTLY how this works for your industry, DM me the word "AUTOMATE" and I'll show you a live demo.
+>
+> ---
+>
+> **What works:**
+> - **"Unpopular opinion" + bold doomsday claim hook.** Classic LinkedIn pattern interrupt. Triggers algorithm engagement from both sides (people who agree save it, people who disagree comment). Strong scroll-stopper.
+> - **Three parallel competitor-vs-you scenarios.** Each follows the same structure: *"Your competitor did X. You did Y. Who wins?"* Specific time/number contrasts (90 sec vs 6 hrs, 200 queries vs hiring staff, 24 hrs vs 2 weeks) make the abstract pain concrete in one line. Repeatable and easy to skim.
+> - **Forcing-question close.** *"Are you building the machine, or becoming obsolete?"* Forces self-identification, drives saves and shares because the reader has to answer it (silently) for themselves.
+> - **DM keyword + concrete offer.** *"DM me 'AUTOMATE' for a live demo"* — clear next action, low-friction, signals the seller has a real thing to show.
+>
+> **Watch out for (when adapting for Pang's voice):**
+> - **Em-dash** in *"The question is — are you building..."*: banned. Use a colon or period instead.
+> - ***"AI isn't about replacing people. It's about making your business impossible to compete with."*** : exact "not X but Y" reversal pattern. Banned. State the positive insight directly.
+> - ***"This isn't the future. This is happening right now."*** : another "not X. It's Y" reversal. Banned.
+> - **Emojis 💰 ⚡ 📈** in the benefit bullets: persona is "no emojis or very rarely." Drop them.
+> - **"Unpopular opinion" framing is manufactured controversy.** Pang's persona is "quietly polarizing, not manufactured." Use a more measured opening that lets the contrast scenarios do the polarization.
+> - **"Won't exist by 2028" is too vague to defend.** Replace with a grounded claim tied to the niche (e.g. "the tutoring centers still doing X manually in 2028 will lose share to the ones that automated this year").
+> - **The benefit bullets ("40-60%", "30-50 hours/week") are unverified marketing numbers.** Pang's rule: never claim numbers he can't defend. Drop or rewrite with directional language.
+>
+> **Adaptation angles worth keeping:**
+> - The 3-parallel-scenario structure with specific time/number contrasts. This is the strongest mechanic in the post and translates cleanly to coaching/tutoring (e.g. "Your competitor's center responds to a parent inquiry in 5 minutes. Yours responds in 6 hours.")
+> - The forcing-question close
+> - The DM keyword CTA pattern (adjust keyword to fit current offer)
+>
+> **Transfers to:** LinkedIn (native fit), X (would split into 4-5 standalone tweets: the framing tweet, one tweet per competitor scenario, the closer).
+
 (Add more as you find them.)
 
 ---
