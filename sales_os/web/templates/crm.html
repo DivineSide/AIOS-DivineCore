@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DivineSide — CRM & KPI</title>
+<style>
+  :root{
+    --bg:#0e0f13; --panel:#171922; --panel-2:#1f2230; --line:#2a2e3e;
+    --text:#e7e9f0; --muted:#9aa0b4; --gold:#e8b84b; --gold-dim:#b9913a;
+    --green:#3ecf8e; --red:#ef5c6b; --blue:#5aa9ff; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+  .app{display:flex;min-height:100vh}
+
+  /* sidebar */
+  .sidebar{width:210px;flex-shrink:0;border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:0;height:100vh}
+  .brand{font-size:16px;font-weight:700;letter-spacing:.3px;margin:0 8px 22px}
+  .brand .gold{color:var(--gold)}
+  .navlink{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;
+           color:var(--muted);padding:11px 14px;border-radius:9px;cursor:pointer;font-size:14px;margin-bottom:4px}
+  .navlink:hover{color:var(--text);background:var(--panel)}
+  .navlink.active{color:var(--text);background:var(--panel);border-color:var(--line)}
+  .sidebar .hint{color:#5a5f73;font-size:12px;margin:18px 8px 0;line-height:1.5}
+
+  /* main */
+  main{flex:1;padding:22px 26px 80px;max-width:1080px}
+  .view{display:none}.view.active{display:block}
+  h1{font-size:19px;margin:0 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  h2{font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin:26px 0 12px}
+  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .spacer{flex:1}
+
+  input,select,textarea{background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+        padding:9px 11px;border-radius:8px;font-size:14px;font-family:inherit}
+  input[type=date]{color-scheme:dark}
+  button{font-family:inherit}
+  .btn{background:var(--gold);color:#20160a;border:none;border-radius:8px;padding:9px 15px;font-weight:600;cursor:pointer;font-size:14px}
+  .btn.ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line);font-weight:500}
+  .btn.ghost:hover{border-color:var(--gold-dim)}
+
+  /* kpi counters */
+  .counter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px}
+  .counter{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+  .counter .label{font-size:13px;color:var(--muted);margin-bottom:8px;min-height:18px}
+  .counter .num{font-size:34px;font-weight:700;line-height:1}
+  .counter .num .target{font-size:15px;color:var(--muted);font-weight:500}
+  .counter .bar{height:4px;background:var(--panel-2);border-radius:3px;margin:10px 0 12px;overflow:hidden}
+  .counter .bar>i{display:block;height:100%;background:var(--gold);width:0;transition:width .2s}
+  .counter .bar>i.done{background:var(--green)}
+  .counter .btns{display:flex;gap:8px}
+  .counter button.tick{flex:1;background:var(--gold);color:#20160a;border:none;border-radius:8px;padding:9px;font-size:18px;font-weight:700;cursor:pointer}
+  .counter button.tick:active{transform:translateY(1px)}
+  .counter button.minus{width:40px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line);border-radius:8px;font-size:18px;cursor:pointer}
+
+  /* prospect cards */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+  .card.due{border-color:var(--gold-dim)}
+  .card.overdue{border-color:var(--red)}
+  .card .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card .name{font-weight:600}
+  .card .co{color:var(--muted);font-size:13px}
+  .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .pill.hot{color:var(--red);border-color:var(--red)}
+  .pill.warm{color:var(--gold);border-color:var(--gold-dim)}
+  .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .badge.over{background:rgba(239,92,107,.15);color:var(--red)}
+  .badge.today{background:rgba(232,184,75,.15);color:var(--gold)}
+  .suggest{margin:9px 0 4px;font-size:13px;color:var(--gold)}
+  .meta{font-size:12px;color:var(--muted);margin-top:4px}
+  .meta a{color:var(--blue);text-decoration:none}
+  .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;align-items:center}
+  .acts button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:6px 11px;border-radius:8px;cursor:pointer;font-size:13px}
+  .acts button:hover{border-color:var(--gold-dim)}
+  .acts button.primary{background:var(--gold);color:#20160a;border-color:var(--gold);font-weight:600}
+  .acts button.danger:hover{border-color:var(--red);color:var(--red)}
+  .acts select{padding:6px 8px;font-size:13px}
+  .notes{width:100%;margin-top:9px;min-height:38px;resize:vertical;display:none}
+  .notes.show{display:block}
+  .empty{color:var(--muted);padding:16px;text-align:center;border:1px dashed var(--line);border-radius:var(--radius)}
+
+  /* add form */
+  .addbar{background:var(--panel);border:1px solid var(--line);padding:13px;border-radius:var(--radius);margin-bottom:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .addbar input,.addbar select{width:100%}
+  .addbar .full{grid-column:1/-1}
+  @media(max-width:760px){.addbar{grid-template-columns:1fr 1fr}.sidebar{width:150px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">Divine<span class="gold">Side</span></div>
+    <nav>
+      <button class="navlink active" data-view="crm">Leads CRM</button>
+      <button class="navlink" data-view="kpi">KPI Tracker</button>
+    </nav>
+    <div class="hint">Reply in 5 min. Propose 2 times, never just a link. Follow up daily until they book.</div>
+  </aside>
+
+  <main>
+    <!-- ============ LEADS CRM ============ -->
+    <section id="view-crm" class="view active">
+      <h1>Leads CRM</h1>
+      <div class="sub">Positive-reply pipeline. Work the "needs a touch today" list first, every day.</div>
+
+      <div class="addbar">
+        <input id="f-name" type="text" placeholder="Name *" />
+        <input id="f-company" type="text" placeholder="Company" />
+        <select id="f-temp"><option value="hot">🔥 Hot</option><option value="warm" selected>🌤️ Warm</option></select>
+        <input id="f-email" type="text" placeholder="Email" />
+        <input id="f-phone" type="text" placeholder="Phone" />
+        <select id="f-source">
+          <option value="cold_email">Cold email</option>
+          <option value="linkedin">LinkedIn</option>
+          <option value="referral">Referral</option>
+          <option value="other">Other</option>
+        </select>
+        <input id="f-linkedin" class="full" type="text" placeholder="LinkedIn URL (optional)" />
+        <button class="btn full" id="add-btn">Add lead (next touch = today)</button>
+      </div>
+
+      <h2>Needs a touch today <span id="due-count" class="muted"></span></h2>
+      <div id="due-list"></div>
+
+      <h2>Pipeline</h2>
+      <div class="row" style="margin-bottom:12px">
+        <select id="stage-filter">
+          <option value="active">Active only</option>
+          <option value="all">All stages</option>
+        </select>
+      </div>
+      <div id="pipeline"></div>
+    </section>
+
+    <!-- ============ KPI TRACKER ============ -->
+    <section id="view-kpi" class="view">
+      <h1>KPI Tracker</h1>
+      <div class="sub">Daily non-negotiables. Every count is saved to Supabase, so the history builds over time.</div>
+      <div class="row" style="margin-bottom:18px">
+        <label class="muted" style="font-size:13px">Day</label>
+        <input id="kpi-date" type="date" />
+        <button class="btn ghost" id="kpi-today">Today</button>
+      </div>
+      <div class="counter-grid" id="kpi-grid"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const API = "/crm/api";
+
+// ---- config ----
+const KPI_METRICS = [
+  {key:"connections", label:"Connection requests", target:20},
+  {key:"comments",    label:"Engagement comments", target:10},
+  {key:"cold_dms",    label:"Cold DMs",            target:6},
+  {key:"replies",     label:"Warm replies handled",target:5},
+  {key:"calls",       label:"Warm calls made",     target:3},
+  {key:"looms",       label:"Looms / audits sent", target:2},
+  {key:"booked",      label:"Calls booked",        target:1},
+];
+
+const STAGES = [
+  {key:"new",         label:"New reply"},
+  {key:"contacted",   label:"In sequence"},
+  {key:"call_booked", label:"Call booked"},
+  {key:"showed",      label:"Showed"},
+  {key:"won",         label:"Won"},
+  {key:"lost",        label:"Lost / dead"},
+];
+const STAGE_LABEL = Object.fromEntries(STAGES.map(s=>[s.key,s.label]));
+const CLOSED = new Set(["won","lost"]);
+
+// Days from this touch to the next, indexed by touch_count. Matches the locked
+// positive-reply cadence: day 0,1,2,3,4,5,7,14,30...
+const CADENCE = [1,1,1,1,1,2,7,16,30];
+const SUGGEST = [
+  "Reply in 5 min, propose 2 times, send LinkedIn connect",
+  "Email bump, 2 fresh times",
+  "Warm call (or LinkedIn DM)",
+  "Warm call + voicemail + text",
+  "Value touch (competitor teardown) + re-ask",
+  "One more light angle (LinkedIn/email)",
+  "Break-up email: should I close this out?",
+  "Long-tail nurture",
+];
+
+// ---- helpers ----
+const $ = s=>document.querySelector(s);
+const todayStr = ()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);};
+function addDays(iso, n){const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);}
+async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(await r.text());return r.json();}
+async function jsend(u,m,b){const r=await fetch(u,{method:m,headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error(await r.text());return r.status===204?null:r.json();}
+
+// ---- nav ----
+document.querySelectorAll(".navlink").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".navlink").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  $("#view-"+b.dataset.view).classList.add("active");
+  if(b.dataset.view==="kpi")loadKpi();
+});
+
+// ================= CRM =================
+let PROSPECTS = [];
+
+async function loadProspects(){
+  try{ PROSPECTS = await jget(API+"/prospects"); }
+  catch(e){ PROSPECTS=[]; console.error(e); }
+  renderCrm();
+}
+
+function cardHtml(p){
+  const today = todayStr();
+  const due = p.next_touch_date && p.next_touch_date <= today;
+  const overdue = p.next_touch_date && p.next_touch_date < today;
+  const closed = CLOSED.has(p.stage);
+  let badge = "";
+  if(!closed && overdue) badge = `<span class="badge over">overdue</span>`;
+  else if(!closed && due) badge = `<span class="badge today">today</span>`;
+  const suggest = closed ? "" : `<div class="suggest">→ ${SUGGEST[Math.min(p.touch_count||0,SUGGEST.length-1)]}</div>`;
+  const opts = STAGES.map(s=>`<option value="${s.key}" ${s.key===p.stage?"selected":""}>${s.label}</option>`).join("");
+  const li = p.linkedin_url?`<a href="${p.linkedin_url}" target="_blank">LinkedIn</a> · `:"";
+  const next = p.next_touch_date?`next ${p.next_touch_date}`:"no next touch";
+  return `<div class="card ${overdue&&!closed?'overdue':due&&!closed?'due':''}" data-id="${p.id}">
+    <div class="top">
+      <span class="name">${esc(p.name)}</span>
+      ${p.company?`<span class="co">${esc(p.company)}</span>`:""}
+      <span class="pill ${p.temp}">${p.temp==='hot'?'🔥 hot':'🌤️ warm'}</span>
+      <span class="pill">${STAGE_LABEL[p.stage]||p.stage}</span>
+      ${badge}
+    </div>
+    ${suggest}
+    <div class="meta">${li}${p.email?esc(p.email)+" · ":""}${p.phone?esc(p.phone)+" · ":""}touch #${p.touch_count||0} · ${next}</div>
+    <div class="acts">
+      <button class="primary" data-act="touch">Log touch ✓</button>
+      <select data-act="stage">${opts}</select>
+      <button data-act="temp">${p.temp==='hot'?'Make warm':'Make hot'}</button>
+      <button data-act="notes">Notes</button>
+      <button data-act="snooze">+1d</button>
+      <button class="danger" data-act="del">Delete</button>
+    </div>
+    <textarea class="notes" data-act="notesbox" placeholder="Notes...">${esc(p.notes||"")}</textarea>
+  </div>`;
+}
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function renderCrm(){
+  const today = todayStr();
+  const due = PROSPECTS.filter(p=>!CLOSED.has(p.stage) && (!p.next_touch_date || p.next_touch_date<=today));
+  $("#due-list").innerHTML = due.length ? due.map(cardHtml).join("") : `<div class="empty">Nothing due. Inbox zero on follow-ups. Go get more replies.</div>`;
+  $("#due-count").textContent = due.length ? `(${due.length})` : "";
+
+  const filter = $("#stage-filter").value;
+  let list = PROSPECTS.slice();
+  if(filter==="active") list = list.filter(p=>!CLOSED.has(p.stage));
+  $("#pipeline").innerHTML = list.length ? list.map(cardHtml).join("") : `<div class="empty">No leads yet. Add one above.</div>`;
+}
+
+// delegated card actions
+$("#view-crm").addEventListener("click", async e=>{
+  const btn = e.target.closest("[data-act]");
+  const card = e.target.closest(".card");
+  if(!card) return;
+  const id = card.dataset.id;
+  const p = PROSPECTS.find(x=>x.id===id);
+  if(!p || !btn) return;
+  const act = btn.dataset.act;
+  try{
+    if(act==="touch"){
+      const tc = (p.touch_count||0);
+      const patch = {touch_count: tc+1, last_touch_at: new Date().toISOString(), next_touch_date: addDays(todayStr(), CADENCE[Math.min(tc,CADENCE.length-1)])};
+      if(p.stage==="new") patch.stage="contacted";
+      await jsend(`${API}/prospects/${id}`,"PATCH",patch);
+    } else if(act==="temp"){
+      await jsend(`${API}/prospects/${id}`,"PATCH",{temp: p.temp==='hot'?'warm':'hot'});
+    } else if(act==="snooze"){
+      await jsend(`${API}/prospects/${id}`,"PATCH",{next_touch_date: addDays(p.next_touch_date||todayStr(),1)});
+    } else if(act==="notes"){
+      card.querySelector(".notes").classList.toggle("show"); return;
+    } else if(act==="del"){
+      if(!confirm(`Delete ${p.name}?`)) return;
+      await jsend(`${API}/prospects/${id}`,"DELETE");
+    } else return;
+    await loadProspects();
+  }catch(err){ alert("Error: "+err.message); }
+});
+
+// stage select + notes blur
+$("#view-crm").addEventListener("change", async e=>{
+  const sel = e.target.closest('select[data-act="stage"]');
+  if(!sel) return;
+  const id = e.target.closest(".card").dataset.id;
+  const p = PROSPECTS.find(x=>x.id===id);
+  const patch = {stage: sel.value};
+  if(CLOSED.has(sel.value)) patch.next_touch_date = null;
+  else if(sel.value==="call_booked" && !p.next_touch_date) patch.next_touch_date = todayStr();
+  try{ await jsend(`${API}/prospects/${id}`,"PATCH",patch); await loadProspects(); }
+  catch(err){ alert("Error: "+err.message); }
+});
+$("#view-crm").addEventListener("blur", async e=>{
+  const ta = e.target.closest('textarea[data-act="notesbox"]');
+  if(!ta) return;
+  const id = e.target.closest(".card").dataset.id;
+  try{ await jsend(`${API}/prospects/${id}`,"PATCH",{notes: ta.value}); }catch(err){ console.error(err); }
+}, true);
+
+$("#stage-filter").onchange = renderCrm;
+
+$("#add-btn").onclick = async ()=>{
+  const name = $("#f-name").value.trim();
+  if(!name){ $("#f-name").focus(); return; }
+  const body = {
+    name, company:$("#f-company").value.trim(), temp:$("#f-temp").value,
+    email:$("#f-email").value.trim(), phone:$("#f-phone").value.trim(),
+    source:$("#f-source").value, linkedin_url:$("#f-linkedin").value.trim(),
+    stage:"new", touch_count:0, next_touch_date: todayStr(),
+  };
+  try{
+    await jsend(API+"/prospects","POST",body);
+    ["f-name","f-company","f-email","f-phone","f-linkedin"].forEach(i=>$("#"+i).value="");
+    await loadProspects();
+  }catch(err){ alert("Error: "+err.message); }
+};
+
+// ================= KPI =================
+async function loadKpi(){
+  const day = $("#kpi-date").value || todayStr();
+  $("#kpi-date").value = day;
+  let counts = {};
+  try{ counts = await jget(`${API}/kpi?date=${day}`); }catch(e){ console.error(e); }
+  $("#kpi-grid").innerHTML = KPI_METRICS.map(m=>{
+    const v = counts[m.key]||0;
+    const pct = Math.min(100, m.target? Math.round(v/m.target*100):0);
+    const done = m.target && v>=m.target;
+    return `<div class="counter" data-key="${m.key}">
+      <div class="label">${m.label}</div>
+      <div class="num"><span class="val">${v}</span> <span class="target">/ ${m.target}</span></div>
+      <div class="bar"><i class="${done?'done':''}" style="width:${pct}%"></i></div>
+      <div class="btns"><button class="minus" data-d="-1">–</button><button class="tick" data-d="1">+</button></div>
+    </div>`;
+  }).join("");
+}
+$("#kpi-grid").addEventListener("click", async e=>{
+  const btn = e.target.closest("button[data-d]");
+  if(!btn) return;
+  const cell = e.target.closest(".counter");
+  const key = cell.dataset.key;
+  const day = $("#kpi-date").value || todayStr();
+  const cur = parseInt(cell.querySelector(".val").textContent)||0;
+  const next = Math.max(0, cur + parseInt(btn.dataset.d));
+  try{ await jsend(API+"/kpi","POST",{date:day,metric:key,value:next}); await loadKpi(); }
+  catch(err){ alert("Error: "+err.message); }
+});
+$("#kpi-today").onclick = ()=>{ $("#kpi-date").value = todayStr(); loadKpi(); };
+$("#kpi-date").onchange = loadKpi;
+
+// ---- boot ----
+$("#kpi-date").value = todayStr();
+loadProspects();
+</script>
+</body>
+</html>

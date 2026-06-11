@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from celery import Celery
 
 from branding_os.web import imagyn_router, lyra_router, social_perf_router
-from sales_os.web import instantly_router, upwork_jobs_router, upwork_router
+from sales_os.web import crm_router, instantly_router, upwork_jobs_router, upwork_router
 from settings import settings
 
 celery_client = Celery("api", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
@@ -12,6 +12,7 @@ app = FastAPI(title="DivineCore v2")
 app.include_router(upwork_router)
 app.include_router(upwork_jobs_router)
 app.include_router(instantly_router)
+app.include_router(crm_router)
 app.include_router(imagyn_router)
 app.include_router(lyra_router)
 app.include_router(social_perf_router)

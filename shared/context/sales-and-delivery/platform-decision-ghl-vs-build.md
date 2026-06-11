@@ -1,6 +1,6 @@
 # Platform Decision: GoHighLevel vs Build It Ourselves
 
-> **Status: DIRECTION LOCKED by Pang (2026-06-10) — hybrid GHL, pending ratification on the Pang + Mayank call.** Pang has committed to the hybrid approach (GHL as infrastructure, Claude as the AI conversation layer via webhook) and will advocate it on the call. Mayank's preference to build our own platform is addressed in §4. This doc lays out the question, the facts, and the recommendation. We have hot leads waiting and nothing to deliver yet, so the cost of staying undecided was real — hence the lock.
+> **Status: REVERSED (2026-06-10) — building it ourselves, NOT GHL.** Pang's first lean was hybrid-GHL (below). Mayank rebutted with client-specific (Sharon) evidence that defeats the GHL case for this narrow offer — see §10. Resolved direction: **build on Twilio + Systeme.io (or the client's existing CRM) + Claude, owned end to end.** Two guardrails attached (§10): timebox the build to the A2P/GBP wait window, and configure Twilio Advanced Opt-Out (STOP/TCPA) from day one. The §1-9 GHL analysis below is kept as the record of the reasoning; §10 is the current decision.
 
 Author: Pang. Date: 2026-06-10.
 
@@ -115,6 +115,25 @@ What we revisit and when:
 
 ## 9. Decision log
 
-- **Direction locked (Pang, 2026-06-10):** Hybrid — GHL as infrastructure layer, Claude as the AI conversation layer via webhook. Do NOT build our own SMS/CRM/payments platform now; harvest it in Phase 2 from validated patterns, paid by GHL-era revenue.
-- **Ratification with Mayank:** pending the call. (Update this line with the outcome.)
-- **First client to onboard on it:** TBD (likely the warmest reviews/referrals lead — admissions-consultant segment).
+- **Pang's first lean (2026-06-10, superseded):** Hybrid GHL + Claude webhook.
+- **REVERSED, resolved direction (2026-06-10):** Build it ourselves — Twilio + Systeme.io (or client's existing CRM) + Claude. Mayank's Sharon-specific rebuttal (§10) defeated the GHL speed argument. Owned end to end, no $100-300/mo/client overhead for unused CRM breadth.
+- **Conditions:** (1) timebox the build to the A2P + GBP approval window (~1 week of otherwise-dead time); (2) configure Twilio Advanced Opt-Out (STOP/UNSTOP/HELP) + timezone quiet-hours from day one — this is the one compliance job GHL used to absorb.
+- **Reconsider GHL only if:** we scale past ~5-10 concurrent clients and per-client maintenance/on-call becomes the bottleneck, or we start selling the full-CRM breadth GHL is actually built for.
+- **First client:** Sharon (the build is being scoped against her actual flow — course-end review trigger, upfront payment so no payment tracking needed).
+
+## 10. Mayank's rebuttal and the reversal (2026-06-10)
+
+After working the actual blockers with Sharon, Mayank argued against GHL. The points that hold:
+
+- **The speed argument was illusory.** The real bottlenecks are A2P 10DLC (3-7 days) and GBP verification (3-7 days). Both waits are identical whether we use GHL or Twilio directly — GHL just wraps the same forms/OAuth. So the build happens *during* the unavoidable approval wait, at no net time cost. This defeats the §8 "speed" case.
+- **GHL's inbuilt SMS underdelivers.** From direct client experience, GHL's native LeadConnector numbers failed repeatedly and they ended up wiring Twilio inside GHL anyway. So even on GHL you use Twilio — paying GHL on top buys nothing on the one feature we'd rent it for.
+- **GBP "native integration" is just OAuth (10 min); the wait is Google's.** No GHL advantage.
+- **Email + CRM don't need GHL.** Systeme.io handles deliverability (DKIM/warmup) out of the box; for contacts we ask the client once where their list lives and import/automate. At one client this is not ongoing complexity.
+- **Payment tracking was a mistake in this doc.** Coaching takes payment upfront; the review trigger is course-end (batch completion), not payment. Removed from scope.
+- **The math:** GHL ($100-300/mo) is priced for full-CRM breadth (widgets, social posting, pipelines) we are not selling. We'd pay for unused surface that doesn't even shorten the real blockers.
+
+**Two guardrails added on agreement (the things Mayank's "few days" estimate glosses):**
+1. **Build estimate realism / timebox.** v1 sending is easy; a reliable, repeatable, multi-client system (retries, conversation state, error handling) is where time hides. Box it to the A2P/GBP wait window; if it isn't reliably sending to a test phone by then, stop polishing.
+2. **Compliance is now ours.** STOP/opt-out/TCPA + timezone quiet-hours were handled by GHL. Replicate with **Twilio Messaging Service Advanced Opt-Out** configured day one. With that, we lose nothing GHL provided.
+
+**Resolution:** build it ourselves, owned end to end, under those two guardrails. Aligns with the harvest-don't-design principle *and* the unit economics at this stage.
