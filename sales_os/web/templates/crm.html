@@ -99,9 +99,17 @@
   .hcell.fut{opacity:.2}
   .hlegend{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin-top:6px}
   .hlegend .hcell{width:11px;height:11px}
-  .trend{display:flex;align-items:flex-end;gap:3px;height:96px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px}
-  .tbar{flex:1;background:var(--panel-2);border-radius:3px 3px 0 0;display:flex;align-items:flex-end;min-width:5px;height:100%}
-  .tbar>i{display:block;width:100%;background:var(--gold);border-radius:3px 3px 0 0;min-height:2px}
+  /* completion grid */
+  .cgrid{display:flex;flex-direction:column;gap:4px;overflow-x:auto;padding-bottom:4px}
+  .cg-row{display:grid;grid-template-columns:128px repeat(14,minmax(26px,1fr));gap:4px;align-items:center}
+  .cg-label{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
+  .cg-cell{height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--muted)}
+  .cg-cell.cg-h{height:auto;background:none;flex-direction:column;line-height:1.1}
+  .cg-cell.cg-h b{font-size:11px;color:var(--muted)}.cg-cell.cg-h span{font-size:10px;color:#5a5f73}
+  .cg-cell.hit{background:var(--green);color:#0c1f15}
+  .cg-cell.part{background:rgba(232,184,75,.18);color:var(--gold);border:1px solid var(--gold-dim)}
+  .cg-cell.miss{background:var(--panel-2)}
+  .hsub{font-size:12px;color:var(--muted);margin:-4px 0 10px}
 </style>
 </head>
 <body>
@@ -173,18 +181,17 @@
         <label class="btn ghost" style="cursor:pointer">⬆ Import old tracker backup<input id="import-file" type="file" accept="application/json" style="display:none" /></label>
       </div>
       <div id="stat-headline" class="stat-headline"></div>
+
+      <h2>Did you do everything? · last 14 days</h2>
+      <div class="hsub">Green = hit the daily target. Amber = did some. Empty = nothing that day.</div>
+      <div id="cgrid" class="cgrid"></div>
+
+      <h2 id="heat-title">Consistency · last 26 weeks</h2>
+      <div class="hsub">Each box is one day. Greener = more of that day's goals hit. Top row Sunday, bottom Saturday.</div>
+      <div id="heatmap" class="heatmap"></div>
       <div class="hlegend">Less
         <span class="hcell l0"></span><span class="hcell l1"></span><span class="hcell l2"></span><span class="hcell l3"></span><span class="hcell l4"></span>
         More</div>
-
-      <h2>Activity heatmap (last 26 weeks)</h2>
-      <div id="heatmap" class="heatmap"></div>
-
-      <h2>Last 30 days</h2>
-      <div id="trend" class="trend"></div>
-
-      <h2>Lifetime totals</h2>
-      <div id="lifetime" class="counter-grid"></div>
     </section>
   </main>
 </div>
@@ -414,66 +421,88 @@ async function loadStats(){
   }
   renderStats();
 }
-function dayMap(metricKey){
-  const map = {};
-  HISTORY.forEach(r=>{
-    if(metricKey!=="__all" && r.metric!==metricKey) return;
-    map[r.date] = (map[r.date]||0) + (r.value||0);
-  });
-  return map;
+const HABITS = ()=>KPI_METRICS.filter(m=>m.target>0);   // daily non-negotiables (have a target)
+function buildByDate(){ const bd={}; HISTORY.forEach(r=>{ (bd[r.date] ||= {})[r.metric]=r.value; }); return bd; }
+
+// completion fraction (0..1) for one day, for a metric or "__all"
+function dayScore(bd, metric, d){
+  const day = bd[d]||{};
+  if(metric==="__all"){
+    const h=HABITS(); if(!h.length) return 0;
+    return h.filter(m=>(day[m.key]||0)>=m.target).length / h.length;
+  }
+  const m=KPI_METRICS.find(x=>x.key===metric);
+  const v=day[metric]||0;
+  if(!m||!m.target) return v>0?1:0;
+  return Math.min(1, v/m.target);
 }
-function streakOf(map){
-  let s=0, d=todayStr();
-  if(!(map[d]>0)) d=addDays(d,-1);       // today not logged yet doesn't break the streak
-  while(map[d]>0){ s++; d=addDays(d,-1); }
-  return s;
-}
+function lvl(s){ return s<=0?0 : s>=1?4 : s>=0.66?3 : s>=0.33?2 : 1; }
+function card(...a){ let h=""; for(let i=0;i<a.length;i+=2) h+=`<div class="stat-card"><div class="big">${a[i]}</div><div class="cap">${a[i+1]}</div></div>`; $("#stat-headline").innerHTML=h; }
+
 function renderStats(){
   const metric = $("#stat-metric").value;
-  const map = dayMap(metric);
-  const dates = Object.keys(map);
-  const total = dates.reduce((a,d)=>a+map[d],0);
-  const activeDays = dates.filter(d=>map[d]>0).length;
-  const bestVal = dates.reduce((b,d)=>Math.max(b,map[d]),0);
-  $("#stat-headline").innerHTML = `
-    <div class="stat-card"><div class="big">${total.toLocaleString()}</div><div class="cap">total logged</div></div>
-    <div class="stat-card"><div class="big">${streakOf(map)}</div><div class="cap">day streak</div></div>
-    <div class="stat-card"><div class="big">${activeDays}</div><div class="cap">active days</div></div>
-    <div class="stat-card"><div class="big">${bestVal}</div><div class="cap">best day</div></div>`;
-  renderHeatmap(map);
-  renderTrend(map);
-  renderLifetime();
+  const bd = buildByDate();
+  if(metric==="__all") allHeadline(bd); else metricHeadline(bd, metric);
+  const lbl = metric==="__all" ? "Consistency" : (KPI_METRICS.find(m=>m.key===metric)||{}).label;
+  $("#heat-title").textContent = lbl + " · last 26 weeks";
+  renderHeatmap(bd, metric);
+  renderCompletionGrid(bd);
 }
-function renderHeatmap(map){
-  const WEEKS = 26, today = todayStr();
-  let start = addDays(today, -(WEEKS*7-1));
-  const sd = new Date(start+"T00:00:00"); start = addDays(start, -sd.getDay()); // align to Sunday
-  const max = Math.max(1, ...Object.values(map));
-  let cur = start, cols = "";
+
+function allHeadline(bd){
+  const h=HABITS(), N=h.length, today=todayStr();
+  const goalsOn=d=>h.filter(m=>((bd[d]||{})[m.key]||0)>=m.target).length;
+  const todayHit=goalsOn(today);
+  let weekHits=0; for(let i=0;i<7;i++) weekHits+=goalsOn(addDays(today,-i));
+  const weekPct=Math.round(weekHits/(N*7)*100);
+  let s=0,d=today; if(goalsOn(d)===0) d=addDays(d,-1); while(goalsOn(d)>0){ s++; d=addDays(d,-1); }
+  let best=0; Object.keys(bd).forEach(dd=>best=Math.max(best,goalsOn(dd)));
+  card(`${todayHit}/${N}`,"goals hit today", `${weekPct}%`,"this week", `${s}`,"day streak", `${best}/${N}`,"best day");
+}
+function metricHeadline(bd, metric){
+  const m=KPI_METRICS.find(x=>x.key===metric), today=todayStr();
+  const val=d=>(bd[d]||{})[metric]||0;
+  const hitOn=d=>m.target?val(d)>=m.target:val(d)>0;
+  let total=0,daysHit=0,best=0;
+  Object.keys(bd).forEach(d=>{ const v=val(d); total+=v; if(v>best)best=v; if(hitOn(d))daysHit++; });
+  let s=0,d=today; if(!hitOn(d)) d=addDays(d,-1); while(hitOn(d)){ s++; d=addDays(d,-1); }
+  card(total.toLocaleString(),"total", `${s}`,"day streak", `${daysHit}`,m.target?"days hit target":"days active", `${best}`,"best day");
+}
+
+function renderHeatmap(bd, metric){
+  const WEEKS=26, today=todayStr();
+  let start=addDays(today,-(WEEKS*7-1));
+  const sd=new Date(start+"T00:00:00"); start=addDays(start,-sd.getDay());
+  let cur=start, cols="";
   for(let w=0; w<=WEEKS; w++){
-    let cells = "";
+    let cells="";
     for(let dow=0; dow<7; dow++){
-      const v = map[cur]||0;
-      const lvl = v===0?0 : v>=max*0.75?4 : v>=max*0.5?3 : v>=max*0.25?2 : 1;
-      const fut = cur>today ? " fut" : "";
-      cells += `<div class="hcell l${lvl}${fut}" title="${cur}: ${v}"></div>`;
-      cur = addDays(cur,1);
+      const fut = cur>today;
+      const score = fut?0:dayScore(bd, metric, cur);
+      cells += `<div class="hcell l${fut?0:lvl(score)}${fut?' fut':''}" title="${cur}: ${Math.round(score*100)}% of goals"></div>`;
+      cur=addDays(cur,1);
     }
     cols += `<div class="hcol">${cells}</div>`;
   }
-  $("#heatmap").innerHTML = cols;
+  $("#heatmap").innerHTML=cols;
 }
-function renderTrend(map){
-  const today = todayStr(), vals = [];
-  for(let i=29;i>=0;i--){ const d=addDays(today,-i); vals.push([d, map[d]||0]); }
-  const max = Math.max(1, ...vals.map(v=>v[1]));
-  $("#trend").innerHTML = vals.map(([d,v])=>`<div class="tbar" title="${d}: ${v}"><i style="height:${Math.round(v/max*100)}%"></i></div>`).join("");
-}
-function renderLifetime(){
-  const totals = {};
-  HISTORY.forEach(r=>{ totals[r.metric] = (totals[r.metric]||0) + (r.value||0); });
-  $("#lifetime").innerHTML = KPI_METRICS.map(m=>
-    `<div class="counter"><div class="label">${m.label}</div><div class="num">${(totals[m.key]||0).toLocaleString()}</div></div>`).join("");
+
+function renderCompletionGrid(bd){
+  const days=[], today=todayStr(), WD=["S","M","T","W","T","F","S"];
+  for(let i=13;i>=0;i--) days.push(addDays(today,-i));
+  const head=`<div class="cg-row"><div class="cg-label"></div>`+days.map(d=>{
+    const dt=new Date(d+"T00:00:00");
+    return `<div class="cg-cell cg-h"><b>${WD[dt.getDay()]}</b><span>${dt.getDate()}</span></div>`;
+  }).join("")+`</div>`;
+  const rows=HABITS().map(m=>{
+    const cells=days.map(d=>{
+      const v=(bd[d]||{})[m.key]||0;
+      const cls=v>=m.target?"hit":v>0?"part":"miss";
+      return `<div class="cg-cell ${cls}" title="${d}: ${v}/${m.target}">${v>=m.target?"✓":(v>0?v:"")}</div>`;
+    }).join("");
+    return `<div class="cg-row"><div class="cg-label">${m.label}</div>${cells}</div>`;
+  }).join("");
+  $("#cgrid").innerHTML=head+rows;
 }
 $("#import-file").addEventListener("change", async e=>{
   const file = e.target.files[0]; if(!file) return;
