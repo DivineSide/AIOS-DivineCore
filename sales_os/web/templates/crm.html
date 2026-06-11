@@ -110,6 +110,53 @@
   .cg-cell.part{background:rgba(232,184,75,.18);color:var(--gold);border:1px solid var(--gold-dim)}
   .cg-cell.miss{background:var(--panel-2)}
   .hsub{font-size:12px;color:var(--muted);margin:-4px 0 10px}
+
+  /* ===== dialer ===== */
+  .dfilters{display:flex;gap:6px;flex-wrap:wrap}
+  .dchip{background:var(--panel-2);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px}
+  .dchip.active{color:var(--text);border-color:var(--gold-dim)}
+  .dchip span{color:var(--muted);font-size:12px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:6px 13px;font-size:13px;color:var(--muted)}
+  .chip b{color:var(--text)}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .search{min-width:220px}
+  #view-dialer table{width:100%;border-collapse:collapse;font-size:13px}
+  #view-dialer thead th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  #view-dialer tbody td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  #view-dialer tbody tr:hover{background:var(--panel)}
+  #view-dialer tr.review td{background:rgba(239,92,107,.06)}
+  .nm{font-weight:600}.biz{color:var(--muted);font-size:12px}
+  a.call{color:var(--blue);text-decoration:none;font-weight:600;white-space:nowrap}
+  a.call:hover{text-decoration:underline}
+  .warn{color:var(--red);font-size:12px}
+  .lt{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  .lt.ok{color:var(--green)}.lt.bad{color:var(--muted)}
+  .tz{color:var(--muted);font-size:12px;white-space:nowrap}
+  .blk{font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .blk.morning{color:var(--gold);border-color:var(--gold-dim)}.blk.night{color:var(--blue);border-color:var(--blue)}
+  select.status{font-weight:600}
+  .dpill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;color:var(--muted)}
+  .s-booked{color:var(--green)}.s-callback{color:var(--gold)}.s-new{color:var(--blue)}
+  .s-not_interested,.s-do_not_call,.s-wrong_number{color:var(--red)}
+  td.fu input{width:140px}
+  .exp-btn{background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px}
+  .exp-btn:hover{border-color:var(--gold-dim)}
+  #view-dialer tr.detail td{background:var(--panel-2);padding:14px}
+  .logbox{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+  .logbox textarea{flex:1;min-width:240px;min-height:38px;resize:vertical}
+  .loghist{margin-top:10px;font-size:12px;color:var(--muted)}
+  .loghist .li{padding:5px 0;border-top:1px solid var(--line)}
+  .loghist .li b{color:var(--text)}
+  .del{color:var(--muted);background:none;border:none;cursor:pointer;font-size:12px;margin-top:10px}
+  .del:hover{color:var(--red)}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:60px 16px;z-index:50}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;width:560px;max-width:100%}
+  .modal h3{margin:0 0 4px}.modal p{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .maprow{display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-bottom:8px}
+  .maprow label{font-size:13px;color:var(--muted)}.maprow select{width:100%}
+  .modal .actions{display:flex;gap:10px;margin-top:16px}
 </style>
 </head>
 <body>
@@ -120,6 +167,7 @@
       <button class="navlink active" data-view="crm">Leads CRM</button>
       <button class="navlink" data-view="kpi">KPI Tracker</button>
       <button class="navlink" data-view="stats">Stats &amp; History</button>
+      <button class="navlink" data-view="dialer">Cold Call Dialer</button>
     </nav>
     <div class="hint">Reply in 5 min. Propose 2 times, never just a link. Follow up daily until they book.</div>
   </aside>
@@ -193,11 +241,50 @@
         <span class="hcell l0"></span><span class="hcell l1"></span><span class="hcell l2"></span><span class="hcell l3"></span><span class="hcell l4"></span>
         More</div>
     </section>
+
+    <!-- ============ COLD CALL DIALER ============ -->
+    <section id="view-dialer" class="view">
+      <h1>Cold Call Dialer</h1>
+      <div class="sub">Call straight down from OpenPhone. Log every attempt. Local time tells you if it's a sane hour to dial.</div>
+      <div class="toolbar">
+        <button class="btn" id="d-import-btn">⬆ Import CSV</button>
+        <div class="dfilters">
+          <button class="dchip active" data-dview="all">All <span id="d-ct-all"></span></button>
+          <button class="dchip" data-dview="morning">🌅 Morning · US West <span id="d-ct-morning"></span></button>
+          <button class="dchip" data-dview="night">🌙 Night · Central+East <span id="d-ct-night"></span></button>
+          <button class="dchip" data-dview="due">📞 Follow-ups due <span id="d-ct-due"></span></button>
+          <button class="dchip" data-dview="review">⚠ Needs review <span id="d-ct-review"></span></button>
+        </div>
+      </div>
+      <div class="chips" id="d-chips"></div>
+      <div class="toolbar">
+        <input class="search" id="d-search" type="text" placeholder="Search name, business, phone..." />
+        <select id="d-status-filter"><option value="">All statuses</option></select>
+        <span style="flex:1"></span>
+        <span class="sub" style="margin:0" id="d-row-count"></span>
+      </div>
+      <div id="d-table-wrap"></div>
+    </section>
   </main>
 </div>
 
+<!-- dialer import modal -->
+<div class="modal-bg" id="d-modal">
+  <div class="modal">
+    <h3>Import leads CSV</h3>
+    <p>Match your columns. Phone and name are required; the rest are optional. Phones get parsed, sorted into calling blocks by US time zone, and de-duped.</p>
+    <div id="d-map-fields"></div>
+    <div class="actions">
+      <button class="btn" id="d-do-import">Import</button>
+      <button class="btn ghost" id="d-cancel-import">Cancel</button>
+    </div>
+  </div>
+</div>
+<input id="d-file-input" type="file" accept=".csv,text/csv" style="display:none" />
+
 <script>
 const API = "/crm/api";
+let dialerLoad = null;   // set by the dialer IIFE, called when its tab opens
 
 // ---- config: metric keys match the old local tracker's ids, so imports map 1:1 ----
 const KPI_METRICS = [
@@ -255,6 +342,7 @@ document.querySelectorAll(".navlink").forEach(b=>b.onclick=()=>{
   $("#view-"+b.dataset.view).classList.add("active");
   if(b.dataset.view==="kpi")loadKpi();
   if(b.dataset.view==="stats")loadStats();
+  if(b.dataset.view==="dialer" && dialerLoad)dialerLoad();
 });
 
 // ================= CRM =================
@@ -518,6 +606,180 @@ $("#import-file").addEventListener("change", async e=>{
 // ---- boot ----
 $("#kpi-date").value = todayStr();
 loadProspects();
+
+// ================= COLD CALL DIALER (scoped IIFE; reuses outer $, esc, jget, jsend) =================
+(function(){
+  const API = "/crm/api/dialer";
+  const STATUSES = [
+    {k:"new",label:"New"},{k:"dialed",label:"Dialed"},{k:"no_answer",label:"No answer"},
+    {k:"voicemail",label:"Voicemail"},{k:"not_interested",label:"Not interested"},
+    {k:"callback",label:"Callback"},{k:"booked",label:"Booked ✅"},
+    {k:"wrong_number",label:"Wrong number"},{k:"do_not_call",label:"Do not call"},
+  ];
+  const SLAB = Object.fromEntries(STATUSES.map(s=>[s.k,s.label]));
+  const MAP_FIELDS = [
+    {k:"phone",label:"Phone *"},{k:"name",label:"Name *"},{k:"business",label:"Business"},
+    {k:"email",label:"Email"},{k:"website",label:"Website"},{k:"city",label:"City"},{k:"state",label:"State"},
+  ];
+  let ALL=[], DVIEW="all", STATUSF="", SEARCH="", CSV_FILE=null, HEADERS=[];
+  const todayEnd=()=>{const d=new Date();d.setHours(23,59,59,0);return d;};
+
+  function localTime(tz){
+    if(!tz) return {txt:"—",ok:false};
+    try{
+      const now=new Date();
+      const txt=new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"numeric",minute:"2-digit",hour12:true}).format(now);
+      const h=parseInt(new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"2-digit",hour12:false}).format(now));
+      return {txt,ok:h>=9&&h<20};
+    }catch(e){ return {txt:"?",ok:false}; }
+  }
+
+  $("#d-status-filter").innerHTML=`<option value="">All statuses</option>`+STATUSES.map(s=>`<option value="${s.k}">${s.label}</option>`).join("");
+  document.querySelectorAll("#view-dialer .dchip").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll("#view-dialer .dchip").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); DVIEW=b.dataset.dview; render();
+  });
+  $("#d-search").oninput=e=>{ SEARCH=e.target.value.toLowerCase(); render(); };
+  $("#d-status-filter").onchange=e=>{ STATUSF=e.target.value; render(); };
+
+  async function load(){ try{ ALL=await jget(API+"/prospects"); }catch(e){ ALL=[]; console.error(e); } render(); }
+  function lastDisp(p){ const l=p.call_logs||[]; if(!l.length) return null; return l.slice().sort((a,b)=>(b.attempted_at||"").localeCompare(a.attempted_at||""))[0]; }
+
+  function filtered(){
+    const end=todayEnd().toISOString(); let rows=ALL.slice();
+    if(DVIEW==="morning") rows=rows.filter(p=>p.calling_block==="morning");
+    else if(DVIEW==="night") rows=rows.filter(p=>p.calling_block==="night");
+    else if(DVIEW==="due") rows=rows.filter(p=>p.next_follow_up_at&&p.next_follow_up_at<=end);
+    else if(DVIEW==="review") rows=rows.filter(p=>p.needs_review);
+    if(STATUSF) rows=rows.filter(p=>p.status===STATUSF);
+    if(SEARCH) rows=rows.filter(p=>(`${p.name} ${p.business_name} ${p.phone} ${p.raw_phone}`).toLowerCase().includes(SEARCH));
+    const pri=s=>s==="callback"?0:s==="new"?1:2;
+    rows.sort((a,b)=>{
+      if(DVIEW==="due") return (a.next_follow_up_at||"").localeCompare(b.next_follow_up_at||"");
+      const pa=pri(a.status),pb=pri(b.status); if(pa!==pb) return pa-pb;
+      const fa=a.next_follow_up_at||"9999",fb=b.next_follow_up_at||"9999"; if(fa!==fb) return fa.localeCompare(fb);
+      return (b.created_at||"").localeCompare(a.created_at||"");
+    });
+    return rows;
+  }
+
+  function renderChips(){
+    const end=todayEnd().toISOString(); const c={all:ALL.length,morning:0,night:0,due:0,review:0};
+    ALL.forEach(p=>{ if(p.calling_block==="morning")c.morning++; if(p.calling_block==="night")c.night++;
+      if(p.next_follow_up_at&&p.next_follow_up_at<=end)c.due++; if(p.needs_review)c.review++; });
+    ["all","morning","night","due","review"].forEach(k=>{ const el=$("#d-ct-"+k); if(el)el.textContent=c[k]||""; });
+    $("#d-chips").innerHTML=
+      `<div class="chip">Total <b>${c.all}</b></div>`+
+      `<div class="chip">🌅 Morning <b>${c.morning}</b></div>`+
+      `<div class="chip">🌙 Night <b>${c.night}</b></div>`+
+      `<div class="chip">📞 Due <b>${c.due}</b></div>`+
+      (c.review?`<div class="chip">⚠ Review <b>${c.review}</b></div>`:"");
+  }
+
+  function rowHtml(p){
+    const lt=localTime(p.time_zone), ld=lastDisp(p);
+    const phone=p.phone?`<a class="call" href="tel:${p.phone}">📞 ${esc(p.phone)}</a>`:`<span class="warn">⚠ ${esc(p.raw_phone||"no phone")}</span>`;
+    const st=STATUSES.map(s=>`<option value="${s.k}" ${s.k===p.status?"selected":""}>${s.label}</option>`).join("");
+    const fu=p.next_follow_up_at?p.next_follow_up_at.slice(0,10):"";
+    const blk=p.calling_block?`<span class="blk ${p.calling_block}">${p.calling_block}</span>`:"";
+    return `<tr class="${p.needs_review?'review':''}" data-id="${p.id}">
+      <td><select class="status s-${p.status}" data-act="status">${st}</select></td>
+      <td><div class="nm">${esc(p.name)}</div>${p.business_name?`<div class="biz">${esc(p.business_name)}</div>`:""}</td>
+      <td>${phone}</td>
+      <td><span class="lt ${lt.ok?'ok':'bad'}" data-tz="${esc(p.time_zone)}">${lt.txt}</span></td>
+      <td><div class="tz">${esc(p.time_zone||"—")}</div>${blk}</td>
+      <td>${ld?`<span class="dpill s-${ld.disposition}">${SLAB[ld.disposition]||ld.disposition||"—"}</span>`:'<span class="tz">—</span>'}</td>
+      <td class="fu"><input type="date" value="${fu}" data-act="followup" /></td>
+      <td><button class="exp-btn" data-act="expand">Log / notes${(p.call_logs||[]).length?` (${p.call_logs.length})`:""}</button></td>
+    </tr>`;
+  }
+
+  function render(){
+    renderChips();
+    const rows=filtered();
+    $("#d-row-count").textContent=`${rows.length} shown`;
+    if(!rows.length){ $("#d-table-wrap").innerHTML=`<div class="empty">Nothing here. Import a CSV to fill the queue.</div>`; return; }
+    $("#d-table-wrap").innerHTML=`<table><thead><tr>
+      <th>Status</th><th>Name</th><th>Phone</th><th>Local time</th><th>Time zone</th><th>Last</th><th>Next follow-up</th><th></th>
+      </tr></thead><tbody>${rows.map(rowHtml).join("")}</tbody></table>`;
+  }
+
+  function detailHtml(p){
+    const logs=(p.call_logs||[]).slice().sort((a,b)=>(b.attempted_at||"").localeCompare(a.attempted_at||""));
+    const opts=STATUSES.map(s=>`<option value="${s.k}">${s.label}</option>`).join("");
+    const hist=logs.length?logs.map(l=>`<div class="li"><b>${SLAB[l.disposition]||l.disposition||"note"}</b> · ${(l.attempted_at||"").slice(0,16).replace("T"," ")} ${l.note?"— "+esc(l.note):""}</div>`).join(""):`<div class="li">No attempts logged yet.</div>`;
+    return `<tr class="detail" data-id="${p.id}"><td colspan="8">
+      <div class="logbox">
+        <select data-act="log-disp">${opts}</select>
+        <textarea data-act="log-note" placeholder="What happened on the call?"></textarea>
+        <button class="btn" data-act="log-save">+ Log attempt</button>
+      </div>
+      <div class="loghist">${hist}</div>
+      <button class="del" data-act="del">Delete lead</button>
+    </td></tr>`;
+  }
+
+  $("#d-table-wrap").addEventListener("click", async e=>{
+    const btn=e.target.closest("[data-act]"), tr=e.target.closest("tr[data-id]");
+    if(!tr) return; const id=tr.dataset.id, p=ALL.find(x=>x.id===id); if(!p) return;
+    const act=btn&&btn.dataset.act;
+    if(act==="expand"){ const n=tr.nextElementSibling; if(n&&n.classList.contains("detail")){ n.remove(); return; } tr.insertAdjacentHTML("afterend", detailHtml(p)); return; }
+    if(act==="log-save"){
+      const disp=tr.querySelector('[data-act="log-disp"]').value, note=tr.querySelector('[data-act="log-note"]').value;
+      try{ await jsend(`${API}/prospects/${id}/log`,"POST",{disposition:disp,note}); await load(); }catch(err){ alert("Error: "+err.message); } return;
+    }
+    if(act==="del"){ if(!confirm(`Delete ${p.name}?`)) return; try{ await jsend(`${API}/prospects/${id}`,"DELETE"); await load(); }catch(err){ alert("Error: "+err.message); } return; }
+  });
+  $("#d-table-wrap").addEventListener("change", async e=>{
+    const sel=e.target.closest('[data-act="status"]'), fu=e.target.closest('[data-act="followup"]'), tr=e.target.closest("tr[data-id]");
+    if(!tr) return; const id=tr.dataset.id;
+    try{
+      if(sel){ await jsend(`${API}/prospects/${id}`,"PATCH",{status:sel.value}); await load(); }
+      else if(fu){ await jsend(`${API}/prospects/${id}`,"PATCH",{next_follow_up_at:fu.value||null}); await load(); }
+    }catch(err){ alert("Error: "+err.message); }
+  });
+
+  setInterval(()=>{
+    document.querySelectorAll("#view-dialer .lt[data-tz]").forEach(el=>{
+      const lt=localTime(el.dataset.tz); el.textContent=lt.txt; el.classList.toggle("ok",lt.ok); el.classList.toggle("bad",!lt.ok);
+    });
+  }, 30000);
+
+  // import
+  $("#d-import-btn").onclick=()=> $("#d-file-input").click();
+  $("#d-file-input").addEventListener("change", async e=>{
+    const file=e.target.files[0]; if(!file) return; CSV_FILE=file;
+    const text=await file.text(); HEADERS=parseCsvLine((text.split(/\r?\n/)[0]||""));
+    const guess=names=>{ const i=HEADERS.findIndex(h=>names.some(n=>h.toLowerCase().includes(n))); return i>=0?HEADERS[i]:""; };
+    const g={phone:guess(["phone","mobile","tel","number"]),name:guess(["name","contact","owner"]),business:guess(["business","company","org"]),email:guess(["email"]),website:guess(["website","url","site","domain"]),city:guess(["city"]),state:guess(["state","region"])};
+    $("#d-map-fields").innerHTML=MAP_FIELDS.map(f=>`<div class="maprow"><label>${f.label}</label>
+      <select data-map="${f.k}"><option value="">— skip —</option>${HEADERS.map(h=>`<option value="${esc(h)}" ${g[f.k]===h?"selected":""}>${esc(h)}</option>`).join("")}</select></div>`).join("");
+    $("#d-modal").classList.add("show"); e.target.value="";
+  });
+  $("#d-cancel-import").onclick=()=> $("#d-modal").classList.remove("show");
+  $("#d-do-import").onclick=async ()=>{
+    const mapping={}; document.querySelectorAll("#d-map-fields [data-map]").forEach(s=>{ if(s.value) mapping[s.dataset.map]=s.value; });
+    if(!mapping.phone&&!mapping.name){ alert("Map at least a phone or name column."); return; }
+    const fd=new FormData(); fd.append("file",CSV_FILE); fd.append("mapping",JSON.stringify(mapping));
+    $("#d-do-import").textContent="Importing...";
+    try{
+      const r=await fetch(API+"/import",{method:"POST",body:fd}); if(!r.ok) throw new Error(await r.text());
+      const res=await r.json(); $("#d-modal").classList.remove("show");
+      alert(`Imported ${res.imported} leads.\nDuplicates skipped: ${res.duplicates}\nNeed review (bad/non-US phone): ${res.needs_review}\nRows read: ${res.total}`);
+      await load();
+    }catch(err){ alert("Import failed: "+err.message); }
+    $("#d-do-import").textContent="Import";
+  };
+  function parseCsvLine(line){
+    const out=[]; let cur="",q=false;
+    for(let i=0;i<line.length;i++){ const c=line[i];
+      if(q){ if(c==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+      else { if(c==='"')q=true; else if(c===',') {out.push(cur.trim());cur="";} else cur+=c; } }
+    out.push(cur.trim()); return out;
+  }
+
+  dialerLoad = load;
+})();
 </script>
 </body>
 </html>

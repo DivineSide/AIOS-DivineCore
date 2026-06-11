@@ -1,14 +1,15 @@
-"""Cold Call Dialer page + API. Standalone from /crm.
+"""Cold Call Dialer API. The UI is a tab inside the /crm single-page app
+(sales_os/web/templates/crm.html); this module only serves the JSON API, all
+under the /crm/api/dialer/* prefix so nothing lives at a separate /dialer URL.
 
-GET  /dialer                          -> the single-page dialing workspace
-POST /dialer/api/import               -> CSV import (multipart: file + mapping)
-GET  /dialer/api/prospects            -> list (?block= &status= &due=today)
-POST /dialer/api/prospects            -> create one manually
-PATCH/DELETE /dialer/api/prospects/{id}
-POST /dialer/api/prospects/{id}/log   -> add a call_log (disposition + note),
-                                         also sets prospect.status
+POST /crm/api/dialer/import               -> CSV import (multipart: file + mapping)
+GET  /crm/api/dialer/prospects            -> list (?block= &status= &due=today)
+POST /crm/api/dialer/prospects            -> create one manually
+PATCH/DELETE /crm/api/dialer/prospects/{id}
+POST /crm/api/dialer/prospects/{id}/log   -> add a call_log (disposition + note),
+                                             also sets prospect.status
 
-All /dialer* routes sit behind the same Traefik basic auth as /crm and /upwork.
+All routes sit behind the same Traefik basic auth as /crm and /upwork.
 """
 
 from __future__ import annotations
@@ -18,19 +19,16 @@ import io
 import json
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 
 from sales_os.calls import supabase_writer as writer
 from sales_os.calls.phones import parse_phone
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["dialer"])
-
-_INDEX = Path(__file__).resolve().parent / "templates" / "dialer.html"
+router = APIRouter(tags=["dialer"], prefix="/crm/api/dialer")
 
 VALID_STATUS = {
     "new", "dialed", "no_answer", "voicemail", "not_interested",
@@ -38,14 +36,9 @@ VALID_STATUS = {
 }
 
 
-@router.get("/dialer", response_class=HTMLResponse)
-def dialer_page() -> HTMLResponse:
-    return HTMLResponse(_INDEX.read_text(encoding="utf-8"))
-
-
 # ---------- CSV import ----------
 
-@router.post("/dialer/api/import")
+@router.post("/import")
 async def api_import(file: UploadFile = File(...), mapping: str = Form(...)) -> JSONResponse:
     try:
         cmap = json.loads(mapping)
@@ -110,11 +103,10 @@ async def api_import(file: UploadFile = File(...), mapping: str = Form(...)) -> 
 
 # ---------- prospects ----------
 
-@router.get("/dialer/api/prospects")
+@router.get("/prospects")
 def api_list(block: str | None = None, status: str | None = None, due: str | None = None) -> JSONResponse:
     cutoff = None
     if due == "today":
-        # end of today (UTC) so anything due today or earlier shows up
         now = datetime.now(timezone.utc)
         cutoff = now.replace(hour=23, minute=59, second=59, microsecond=0).isoformat()
     try:
@@ -124,7 +116,7 @@ def api_list(block: str | None = None, status: str | None = None, due: str | Non
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.post("/dialer/api/prospects")
+@router.post("/prospects")
 def api_create(body: dict = Body(...)) -> JSONResponse:
     if not (body.get("name") or "").strip() and not (body.get("phone") or "").strip():
         raise HTTPException(status_code=400, detail="name or phone is required")
@@ -147,7 +139,7 @@ def api_create(body: dict = Body(...)) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.patch("/dialer/api/prospects/{prospect_id}")
+@router.patch("/prospects/{prospect_id}")
 def api_update(prospect_id: str, body: dict = Body(...)) -> JSONResponse:
     if "status" in body and body["status"] not in VALID_STATUS:
         raise HTTPException(status_code=400, detail=f"invalid status: {body['status']}")
@@ -158,7 +150,7 @@ def api_update(prospect_id: str, body: dict = Body(...)) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.delete("/dialer/api/prospects/{prospect_id}")
+@router.delete("/prospects/{prospect_id}")
 def api_delete(prospect_id: str) -> JSONResponse:
     try:
         writer.delete_prospect(prospect_id)
@@ -168,7 +160,7 @@ def api_delete(prospect_id: str) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.post("/dialer/api/prospects/{prospect_id}/log")
+@router.post("/prospects/{prospect_id}/log")
 def api_log(prospect_id: str, body: dict = Body(...)) -> JSONResponse:
     disposition = (body.get("disposition") or "").strip()
     if disposition and disposition not in VALID_STATUS:
@@ -176,7 +168,6 @@ def api_log(prospect_id: str, body: dict = Body(...)) -> JSONResponse:
     note = body.get("note") or ""
     try:
         log = writer.add_log(prospect_id, disposition, note)
-        # a call attempt also advances the prospect's current status
         if disposition:
             writer.update_prospect(prospect_id, {"status": disposition})
         return JSONResponse(log, status_code=201)
