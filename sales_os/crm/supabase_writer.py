@@ -110,6 +110,30 @@ def set_kpi(day: str, metric: str, value: int) -> dict[str, Any]:
     return (r.json() or [row])[0]
 
 
+def bulk_set_kpi(rows: list[dict[str, Any]]) -> int:
+    """Upsert many (date, metric, value) cells in chunks. Used by the
+    old-tracker import. merge-duplicates so a re-import overwrites, not dupes.
+    """
+    if not rows:
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    payload = [
+        {"date": r["date"], "metric": r["metric"], "value": max(0, int(r["value"])), "updated_at": now}
+        for r in rows
+    ]
+    url = f"{_rest_base()}/{KPI_TABLE}?on_conflict=date,metric"
+    for i in range(0, len(payload), 500):
+        chunk = payload[i:i + 500]
+        resp = httpx.post(
+            url,
+            headers=_headers("resolution=merge-duplicates,return=minimal"),
+            json=chunk,
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+    return len(payload)
+
+
 def kpi_history(days: int = 30) -> list[dict[str, Any]]:
     url = (
         f"{_rest_base()}/{KPI_TABLE}"

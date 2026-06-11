@@ -108,3 +108,28 @@ def api_kpi_history(days: int = 30) -> JSONResponse:
     except Exception as exc:
         logger.exception("crm: kpi history failed")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/crm/api/import")
+def api_import(body: dict = Body(...)) -> JSONResponse:
+    """Import the old local-tracker backup. Accepts {counts: {date: {metric: value}}}
+    and upserts every cell into kpi_daily. Prospects are a different (cold) pipeline
+    and are intentionally not imported here.
+    """
+    counts = body.get("counts") or {}
+    rows: list[dict] = []
+    for day, metrics in counts.items():
+        if not isinstance(metrics, dict):
+            continue
+        for metric, value in metrics.items():
+            try:
+                v = int(value)
+            except (TypeError, ValueError):
+                continue
+            rows.append({"date": str(day), "metric": str(metric), "value": v})
+    try:
+        n = supabase_writer.bulk_set_kpi(rows)
+        return JSONResponse({"cells": n})
+    except Exception as exc:
+        logger.exception("crm: import failed")
+        raise HTTPException(status_code=500, detail=str(exc))

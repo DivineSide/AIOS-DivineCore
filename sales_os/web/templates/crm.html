@@ -37,12 +37,11 @@
   input,select,textarea{background:var(--panel-2);border:1px solid var(--line);color:var(--text);
         padding:9px 11px;border-radius:8px;font-size:14px;font-family:inherit}
   input[type=date]{color-scheme:dark}
-  button{font-family:inherit}
   .btn{background:var(--gold);color:#20160a;border:none;border-radius:8px;padding:9px 15px;font-weight:600;cursor:pointer;font-size:14px}
   .btn.ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line);font-weight:500}
   .btn.ghost:hover{border-color:var(--gold-dim)}
 
-  /* kpi counters */
+  /* kpi counters / lifetime cards */
   .counter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px}
   .counter{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
   .counter .label{font-size:13px;color:var(--muted);margin-bottom:8px;min-height:18px}
@@ -87,6 +86,22 @@
   .addbar input,.addbar select{width:100%}
   .addbar .full{grid-column:1/-1}
   @media(max-width:760px){.addbar{grid-template-columns:1fr 1fr}.sidebar{width:150px}}
+
+  /* stats */
+  .stat-headline{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px 20px;min-width:118px}
+  .stat-card .big{font-size:32px;font-weight:800;color:var(--gold);line-height:1}
+  .stat-card .cap{font-size:12px;color:var(--muted);margin-top:5px}
+  .heatmap{display:flex;gap:3px;overflow-x:auto;padding:6px 0 2px}
+  .hcol{display:flex;flex-direction:column;gap:3px}
+  .hcell{width:13px;height:13px;border-radius:3px;background:var(--panel-2)}
+  .hcell.l1{background:#1e3a2c}.hcell.l2{background:#266b45}.hcell.l3{background:#31a263}.hcell.l4{background:var(--green)}
+  .hcell.fut{opacity:.2}
+  .hlegend{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin-top:6px}
+  .hlegend .hcell{width:11px;height:11px}
+  .trend{display:flex;align-items:flex-end;gap:3px;height:96px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px}
+  .tbar{flex:1;background:var(--panel-2);border-radius:3px 3px 0 0;display:flex;align-items:flex-end;min-width:5px;height:100%}
+  .tbar>i{display:block;width:100%;background:var(--gold);border-radius:3px 3px 0 0;min-height:2px}
 </style>
 </head>
 <body>
@@ -96,6 +111,7 @@
     <nav>
       <button class="navlink active" data-view="crm">Leads CRM</button>
       <button class="navlink" data-view="kpi">KPI Tracker</button>
+      <button class="navlink" data-view="stats">Stats &amp; History</button>
     </nav>
     <div class="hint">Reply in 5 min. Propose 2 times, never just a link. Follow up daily until they book.</div>
   </aside>
@@ -146,21 +162,49 @@
       </div>
       <div class="counter-grid" id="kpi-grid"></div>
     </section>
+
+    <!-- ============ STATS & HISTORY ============ -->
+    <section id="view-stats" class="view">
+      <h1>Stats &amp; History</h1>
+      <div class="sub">Everything you've ever logged, pulled from Supabase. Pick a metric to see its story.</div>
+      <div class="row" style="margin-bottom:16px">
+        <select id="stat-metric"></select>
+        <span class="spacer"></span>
+        <label class="btn ghost" style="cursor:pointer">⬆ Import old tracker backup<input id="import-file" type="file" accept="application/json" style="display:none" /></label>
+      </div>
+      <div id="stat-headline" class="stat-headline"></div>
+      <div class="hlegend">Less
+        <span class="hcell l0"></span><span class="hcell l1"></span><span class="hcell l2"></span><span class="hcell l3"></span><span class="hcell l4"></span>
+        More</div>
+
+      <h2>Activity heatmap (last 26 weeks)</h2>
+      <div id="heatmap" class="heatmap"></div>
+
+      <h2>Last 30 days</h2>
+      <div id="trend" class="trend"></div>
+
+      <h2>Lifetime totals</h2>
+      <div id="lifetime" class="counter-grid"></div>
+    </section>
   </main>
 </div>
 
 <script>
 const API = "/crm/api";
 
-// ---- config ----
+// ---- config: metric keys match the old local tracker's ids, so imports map 1:1 ----
 const KPI_METRICS = [
-  {key:"connections", label:"Connection requests", target:20},
-  {key:"comments",    label:"Engagement comments", target:10},
-  {key:"cold_dms",    label:"Cold DMs",            target:6},
-  {key:"replies",     label:"Warm replies handled",target:5},
-  {key:"calls",       label:"Warm calls made",     target:3},
-  {key:"looms",       label:"Looms / audits sent", target:2},
-  {key:"booked",      label:"Calls booked",        target:1},
+  {key:"li_posts",     label:"LinkedIn posts",         target:1},
+  {key:"x_posts",      label:"X tweets",               target:5},
+  {key:"li_comments",  label:"Engagement comments",    target:10},
+  {key:"x_replies",    label:"X quality replies",      target:20},
+  {key:"conn_sent",    label:"Connection requests",    target:20},
+  {key:"cold_dms",     label:"Cold DMs",               target:10},
+  {key:"cold_emails",  label:"Cold emails",            target:214},
+  {key:"dials",        label:"Cold call dials",        target:50},
+  {key:"calls_conn",   label:"Calls connected",        target:0},
+  {key:"looms",        label:"Looms sent",             target:0},
+  {key:"disco_booked", label:"Discovery calls booked", target:0},
 ];
 
 const STAGES = [
@@ -194,6 +238,7 @@ const todayStr = ()=>{const d=new Date();return new Date(d.getTime()-d.getTimezo
 function addDays(iso, n){const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);}
 async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(await r.text());return r.json();}
 async function jsend(u,m,b){const r=await fetch(u,{method:m,headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error(await r.text());return r.status===204?null:r.json();}
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
 // ---- nav ----
 document.querySelectorAll(".navlink").forEach(b=>b.onclick=()=>{
@@ -202,6 +247,7 @@ document.querySelectorAll(".navlink").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
   $("#view-"+b.dataset.view).classList.add("active");
   if(b.dataset.view==="kpi")loadKpi();
+  if(b.dataset.view==="stats")loadStats();
 });
 
 // ================= CRM =================
@@ -246,7 +292,6 @@ function cardHtml(p){
     <textarea class="notes" data-act="notesbox" placeholder="Notes...">${esc(p.notes||"")}</textarea>
   </div>`;
 }
-function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
 function renderCrm(){
   const today = todayStr();
@@ -260,7 +305,6 @@ function renderCrm(){
   $("#pipeline").innerHTML = list.length ? list.map(cardHtml).join("") : `<div class="empty">No leads yet. Add one above.</div>`;
 }
 
-// delegated card actions
 $("#view-crm").addEventListener("click", async e=>{
   const btn = e.target.closest("[data-act]");
   const card = e.target.closest(".card");
@@ -289,7 +333,6 @@ $("#view-crm").addEventListener("click", async e=>{
   }catch(err){ alert("Error: "+err.message); }
 });
 
-// stage select + notes blur
 $("#view-crm").addEventListener("change", async e=>{
   const sel = e.target.closest('select[data-act="stage"]');
   if(!sel) return;
@@ -357,6 +400,91 @@ $("#kpi-grid").addEventListener("click", async e=>{
 });
 $("#kpi-today").onclick = ()=>{ $("#kpi-date").value = todayStr(); loadKpi(); };
 $("#kpi-date").onchange = loadKpi;
+
+// ================= STATS =================
+let HISTORY = [];
+
+async function loadStats(){
+  try{ HISTORY = await jget(API+"/kpi/history?days=400"); }catch(e){ HISTORY=[]; console.error(e); }
+  const sel = $("#stat-metric");
+  if(!sel.dataset.init){
+    sel.innerHTML = `<option value="__all">All activity</option>` + KPI_METRICS.map(m=>`<option value="${m.key}">${m.label}</option>`).join("");
+    sel.dataset.init = "1";
+    sel.onchange = renderStats;
+  }
+  renderStats();
+}
+function dayMap(metricKey){
+  const map = {};
+  HISTORY.forEach(r=>{
+    if(metricKey!=="__all" && r.metric!==metricKey) return;
+    map[r.date] = (map[r.date]||0) + (r.value||0);
+  });
+  return map;
+}
+function streakOf(map){
+  let s=0, d=todayStr();
+  if(!(map[d]>0)) d=addDays(d,-1);       // today not logged yet doesn't break the streak
+  while(map[d]>0){ s++; d=addDays(d,-1); }
+  return s;
+}
+function renderStats(){
+  const metric = $("#stat-metric").value;
+  const map = dayMap(metric);
+  const dates = Object.keys(map);
+  const total = dates.reduce((a,d)=>a+map[d],0);
+  const activeDays = dates.filter(d=>map[d]>0).length;
+  const bestVal = dates.reduce((b,d)=>Math.max(b,map[d]),0);
+  $("#stat-headline").innerHTML = `
+    <div class="stat-card"><div class="big">${total.toLocaleString()}</div><div class="cap">total logged</div></div>
+    <div class="stat-card"><div class="big">${streakOf(map)}</div><div class="cap">day streak</div></div>
+    <div class="stat-card"><div class="big">${activeDays}</div><div class="cap">active days</div></div>
+    <div class="stat-card"><div class="big">${bestVal}</div><div class="cap">best day</div></div>`;
+  renderHeatmap(map);
+  renderTrend(map);
+  renderLifetime();
+}
+function renderHeatmap(map){
+  const WEEKS = 26, today = todayStr();
+  let start = addDays(today, -(WEEKS*7-1));
+  const sd = new Date(start+"T00:00:00"); start = addDays(start, -sd.getDay()); // align to Sunday
+  const max = Math.max(1, ...Object.values(map));
+  let cur = start, cols = "";
+  for(let w=0; w<=WEEKS; w++){
+    let cells = "";
+    for(let dow=0; dow<7; dow++){
+      const v = map[cur]||0;
+      const lvl = v===0?0 : v>=max*0.75?4 : v>=max*0.5?3 : v>=max*0.25?2 : 1;
+      const fut = cur>today ? " fut" : "";
+      cells += `<div class="hcell l${lvl}${fut}" title="${cur}: ${v}"></div>`;
+      cur = addDays(cur,1);
+    }
+    cols += `<div class="hcol">${cells}</div>`;
+  }
+  $("#heatmap").innerHTML = cols;
+}
+function renderTrend(map){
+  const today = todayStr(), vals = [];
+  for(let i=29;i>=0;i--){ const d=addDays(today,-i); vals.push([d, map[d]||0]); }
+  const max = Math.max(1, ...vals.map(v=>v[1]));
+  $("#trend").innerHTML = vals.map(([d,v])=>`<div class="tbar" title="${d}: ${v}"><i style="height:${Math.round(v/max*100)}%"></i></div>`).join("");
+}
+function renderLifetime(){
+  const totals = {};
+  HISTORY.forEach(r=>{ totals[r.metric] = (totals[r.metric]||0) + (r.value||0); });
+  $("#lifetime").innerHTML = KPI_METRICS.map(m=>
+    `<div class="counter"><div class="label">${m.label}</div><div class="num">${(totals[m.key]||0).toLocaleString()}</div></div>`).join("");
+}
+$("#import-file").addEventListener("change", async e=>{
+  const file = e.target.files[0]; if(!file) return;
+  try{
+    const data = JSON.parse(await file.text());
+    const res = await jsend(API+"/import","POST",{counts:data.counts||{}});
+    alert(`Imported ${res.cells} day/metric counts from your old tracker.`);
+    await loadStats();
+  }catch(err){ alert("Import failed: "+err.message); }
+  e.target.value = "";
+});
 
 // ---- boot ----
 $("#kpi-date").value = todayStr();
