@@ -10,6 +10,7 @@ Behind the same Traefik basic auth as /crm.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Body, HTTPException
@@ -46,6 +47,20 @@ def _stage_date(history: list | None, stage: str) -> str | None:
         if isinstance(h, dict) and h.get("stage") == stage:
             d = h.get("date")
     return d
+
+
+def _name_from_url(url: str) -> str:
+    """Local tracker prospects are added by URL with no name. Derive a readable
+    name from the /in/<slug>, dropping a trailing LinkedIn id token."""
+    if not url:
+        return ""
+    m = re.search(r"/in/([^/?#]+)", url)
+    if not m:
+        return ""
+    parts = [p for p in m.group(1).split("-") if p]
+    if len(parts) > 1 and re.fullmatch(r"[0-9a-f]{6,}", parts[-1] or ""):
+        parts = parts[:-1]
+    return " ".join(parts).replace("_", " ").title()
 
 
 def _next_action_date(p: dict) -> str | None:
@@ -138,16 +153,18 @@ def api_import(body: dict = Body(...)) -> JSONResponse:
         if not isinstance(p, dict):
             skipped += 1
             continue
-        name = (p.get("name") or "").strip()
-        if not name:
+        url = (p.get("url") or "").strip()
+        name = (p.get("name") or "").strip() or _name_from_url(url)
+        if not name and not url:
             skipped += 1
             continue
-        url = (p.get("url") or "").strip()
         if url and (url in existing or url in seen):
             dupes += 1
             continue
         if url:
             seen.add(url)
+        if not name:
+            name = "(no name)"
         stage = p.get("stage") if p.get("stage") in VALID_STAGE else "commented"
         tier = p.get("tier") if p.get("tier") in VALID_TIER else "A"
         rows.append({
