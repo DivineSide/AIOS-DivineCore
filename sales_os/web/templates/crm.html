@@ -274,6 +274,9 @@
     <section id="view-linkedin" class="view">
       <h1>LinkedIn Outreach</h1>
       <div class="sub">Engage-first pipeline (§14). Comment first, the app waits 2 days, then surfaces the connection request. Work the "needs attention" list daily.</div>
+      <div class="row" style="margin-bottom:14px">
+        <label class="btn ghost" style="cursor:pointer">⬆ Import from local tracker backup<input id="li-import-file" type="file" accept="application/json" style="display:none" /></label>
+      </div>
       <div class="addbar">
         <input id="li-name" type="text" placeholder="Name *" />
         <input id="li-url" type="text" placeholder="LinkedIn profile URL" />
@@ -936,6 +939,17 @@ loadProspects();
     const id=e.target.closest(".card").dataset.id, p=LI.find(x=>x.id===id); if(p) p.notes=ta.value;
     jsend(`${API}/prospects/${id}`,"PATCH",{notes:ta.value}).catch(err=>console.error(err));
   }, true);
+
+  $("#li-import-file").addEventListener("change", async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    try{
+      const data=JSON.parse(await file.text());
+      const res=await jsend(API+"/import","POST",{prospects:data.prospects||[]});
+      alert(`Imported ${res.imported} LinkedIn prospects.\nDuplicates skipped: ${res.duplicates}\nSkipped (no name): ${res.skipped}\nTotal in file: ${res.total}`);
+      await loadLi();
+    }catch(err){ alert("Import failed: "+err.message); }
+    e.target.value="";
+  });
 })();
 </script>
 </body>

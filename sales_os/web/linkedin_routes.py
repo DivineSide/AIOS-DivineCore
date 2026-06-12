@@ -10,6 +10,7 @@ Behind the same Traefik basic auth as /crm.
 from __future__ import annotations
 
 import logging
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse
@@ -25,6 +26,45 @@ VALID_STAGE = {
     "loom_sent", "engaged", "in_convo", "won", "dead",
 }
 VALID_TIER = {"A", "B", "C"}
+
+# §14 DUE offsets: days from when a stage was entered until its action is due.
+_DUE = {"commented": 2, "accepted": 0, "first_msg": 3, "loom_sent": 7, "engaged": 30}
+
+
+def _add_days(ymd: str | None, n: int) -> str | None:
+    if not ymd:
+        return None
+    try:
+        return (date.fromisoformat(ymd[:10]) + timedelta(days=n)).isoformat()
+    except ValueError:
+        return None
+
+
+def _stage_date(history: list | None, stage: str) -> str | None:
+    d = None
+    for h in history or []:
+        if isinstance(h, dict) and h.get("stage") == stage:
+            d = h.get("date")
+    return d
+
+
+def _next_action_date(p: dict) -> str | None:
+    """Reconstruct the due date the local tracker would have shown, from the
+    prospect's stage + history. replied stops the silence cadence."""
+    stage = p.get("stage")
+    replied = bool(p.get("replied"))
+    hist = p.get("history")
+    if stage == "commented":
+        return _add_days(_stage_date(hist, "commented"), 2)
+    if stage == "accepted":
+        return _stage_date(hist, "accepted")
+    if stage == "first_msg" and not replied:
+        return _add_days(_stage_date(hist, "first_msg"), 3)
+    if stage == "loom_sent" and not replied:
+        return _add_days(_stage_date(hist, "loom_sent"), 7)
+    if stage == "engaged" and not replied:
+        return _add_days(_stage_date(hist, "engaged"), 30)
+    return None
 
 
 @router.get("/prospects")
@@ -72,3 +112,62 @@ def api_delete(prospect_id: str) -> JSONResponse:
     except Exception as exc:
         logger.exception("li: delete failed")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/import")
+def api_import(body: dict = Body(...)) -> JSONResponse:
+    """Import the local tracker backup's `prospects` array into li_prospects.
+    Maps url->linkedin_url, keeps stage/tier/replied/notes, reconstructs
+    next_action_date from each prospect's history, dedupes on linkedin_url.
+    """
+    items = body.get("prospects") or []
+    if not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="prospects must be a list")
+
+    try:
+        existing = writer.existing_urls()
+    except Exception as exc:
+        logger.exception("li: import preflight failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    seen: set[str] = set()
+    rows: list[dict] = []
+    dupes = skipped = 0
+
+    for p in items:
+        if not isinstance(p, dict):
+            skipped += 1
+            continue
+        name = (p.get("name") or "").strip()
+        if not name:
+            skipped += 1
+            continue
+        url = (p.get("url") or "").strip()
+        if url and (url in existing or url in seen):
+            dupes += 1
+            continue
+        if url:
+            seen.add(url)
+        stage = p.get("stage") if p.get("stage") in VALID_STAGE else "commented"
+        tier = p.get("tier") if p.get("tier") in VALID_TIER else "A"
+        rows.append({
+            "name": name,
+            "linkedin_url": url,
+            "tier": tier,
+            "stage": stage,
+            "replied": bool(p.get("replied")),
+            "notes": p.get("notes") or "",
+            "next_action_date": _next_action_date(p),
+            "source": "import",
+        })
+
+    try:
+        imported = writer.bulk_insert(rows)
+    except Exception as exc:
+        logger.exception("li: import insert failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return JSONResponse({
+        "imported": imported, "duplicates": dupes,
+        "skipped": skipped, "total": len(items),
+    })

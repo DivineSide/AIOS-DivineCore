@@ -65,3 +65,24 @@ def delete_prospect(prospect_id: str) -> None:
     url = f"{_rest_base()}/{TABLE}?id=eq.{prospect_id}"
     r = httpx.delete(url, headers=_headers(), timeout=30.0)
     r.raise_for_status()
+
+
+def existing_urls() -> set[str]:
+    url = f"{_rest_base()}/{TABLE}?select=linkedin_url&linkedin_url=neq."
+    r = httpx.get(url, headers=_headers(), timeout=30.0)
+    r.raise_for_status()
+    return {row["linkedin_url"] for row in (r.json() or []) if row.get("linkedin_url")}
+
+
+def bulk_insert(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    payload = [{**_clean(r), "updated_at": now} for r in rows]
+    url = f"{_rest_base()}/{TABLE}"
+    inserted = 0
+    for i in range(0, len(payload), 500):
+        resp = httpx.post(url, headers=_headers("return=representation"), json=payload[i:i + 500], timeout=60.0)
+        resp.raise_for_status()
+        inserted += len(resp.json() or [])
+    return inserted
