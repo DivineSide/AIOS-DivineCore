@@ -139,6 +139,9 @@
   .dpill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;color:var(--muted)}
   .s-booked{color:var(--green)}.s-callback{color:var(--gold)}.s-new{color:var(--blue)}
   .s-not_interested,.s-do_not_call,.s-wrong_number{color:var(--red)}
+  .pill.tier-A{color:var(--green);border-color:var(--green)}
+  .pill.tier-B{color:var(--gold);border-color:var(--gold-dim)}
+  .pill.tier-C{color:var(--muted)}
   td.fu input{width:140px}
   .exp-btn{background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px}
   .exp-btn:hover{border-color:var(--gold-dim)}
@@ -168,6 +171,7 @@
       <button class="navlink" data-view="kpi">KPI Tracker</button>
       <button class="navlink" data-view="stats">Stats &amp; History</button>
       <button class="navlink" data-view="dialer">Cold Call Dialer</button>
+      <button class="navlink" data-view="linkedin">LinkedIn Outreach</button>
     </nav>
     <div class="hint">Reply in 5 min. Propose 2 times, never just a link. Follow up daily until they book.</div>
   </aside>
@@ -265,6 +269,29 @@
       </div>
       <div id="d-table-wrap"></div>
     </section>
+
+    <!-- ============ LINKEDIN OUTREACH ============ -->
+    <section id="view-linkedin" class="view">
+      <h1>LinkedIn Outreach</h1>
+      <div class="sub">Engage-first pipeline (§14). Comment first, the app waits 2 days, then surfaces the connection request. Work the "needs attention" list daily.</div>
+      <div class="addbar">
+        <input id="li-name" type="text" placeholder="Name *" />
+        <input id="li-url" type="text" placeholder="LinkedIn profile URL" />
+        <select id="li-tier">
+          <option value="A">Tier A (posts regularly)</option>
+          <option value="B">Tier B (comments only)</option>
+          <option value="C">Tier C (barely on)</option>
+        </select>
+        <button class="btn full" id="li-add">Add — commented today, connect in 2 days</button>
+      </div>
+      <h2>Needs attention today <span id="li-due-count" class="muted"></span></h2>
+      <div id="li-due-list"></div>
+      <h2>Pipeline</h2>
+      <div class="row" style="margin-bottom:12px">
+        <select id="li-filter"><option value="active">Active only</option><option value="all">All stages</option></select>
+      </div>
+      <div id="li-pipeline"></div>
+    </section>
   </main>
 </div>
 
@@ -285,6 +312,7 @@
 <script>
 const API = "/crm/api";
 let dialerLoad = null;   // set by the dialer IIFE, called when its tab opens
+let liLoad = null;       // set by the LinkedIn IIFE
 
 // ---- config: metric keys match the old local tracker's ids, so imports map 1:1 ----
 const KPI_METRICS = [
@@ -343,6 +371,7 @@ document.querySelectorAll(".navlink").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="kpi")loadKpi();
   if(b.dataset.view==="stats")loadStats();
   if(b.dataset.view==="dialer" && dialerLoad)dialerLoad();
+  if(b.dataset.view==="linkedin" && liLoad)liLoad();
 });
 
 // ================= CRM =================
@@ -797,6 +826,116 @@ loadProspects();
   }
 
   dialerLoad = load;
+})();
+
+// ================= LINKEDIN OUTREACH (scoped IIFE) =================
+(function(){
+  const API = "/crm/api/li";
+  // §14 cadence. offset = days until this stage's action is due; next = stage it advances to.
+  const FLOW = {
+    commented:    {label:"Commented",       action:"Send connection request", offset:2,    next:"connect_sent"},
+    connect_sent: {label:"Connect sent",    action:"Mark accepted",           offset:null, next:"accepted"},
+    accepted:     {label:"Accepted",        action:"Send first message",      offset:0,    next:"first_msg"},
+    first_msg:    {label:"First msg sent",  action:"Send Loom video",         offset:3,    next:"loom_sent"},
+    loom_sent:    {label:"Loom sent",       action:"Stay visible (comment)",  offset:7,    next:"engaged"},
+    engaged:      {label:"Re-engaged",      action:"Re-approach w/ question", offset:30,   next:"in_convo"},
+    in_convo:     {label:"In conversation", action:null, offset:null, next:null},
+    won:          {label:"Won",             action:null, offset:null, next:null},
+    dead:         {label:"Dead",            action:null, offset:null, next:null},
+  };
+  const ORDER = ["commented","connect_sent","accepted","first_msg","loom_sent","engaged","in_convo","won","dead"];
+  const TERMINAL = new Set(["won","dead"]);
+  const nextDateFor = stage => { const o=(FLOW[stage]||{}).offset; return o!=null?addDays(todayStr(),o):null; };
+
+  let LI = [];
+  async function loadLi(){ try{ LI=await jget(API+"/prospects"); }catch(e){ LI=[]; console.error(e); } renderLi(); }
+  liLoad = loadLi;
+
+  function liCard(p){
+    const today=todayStr();
+    const due = p.next_action_date && p.next_action_date<=today;
+    const overdue = p.next_action_date && p.next_action_date<today;
+    const closed = TERMINAL.has(p.stage);
+    const flow = FLOW[p.stage]||{};
+    const badge = (!closed&&overdue)?`<span class="badge over">overdue</span>`:(!closed&&due)?`<span class="badge today">today</span>`:"";
+    const action = (flow.action && !closed) ? `<div class="suggest">→ ${flow.action}${p.next_action_date?` · due ${p.next_action_date}`:""}</div>` : "";
+    const stageOpts = ORDER.map(k=>`<option value="${k}" ${k===p.stage?"selected":""}>${FLOW[k].label}</option>`).join("");
+    const tierOpts = ["A","B","C"].map(t=>`<option value="${t}" ${t===p.tier?"selected":""}>Tier ${t}</option>`).join("");
+    const url = p.linkedin_url?`<a href="${esc(p.linkedin_url)}" target="_blank">profile</a> · `:"";
+    const advBtn = (flow.action && !closed) ? `<button class="primary" data-act="advance">${flow.action} ✓</button>` : "";
+    const repBtn = (!closed && p.stage!=="in_convo") ? `<button data-act="replied">Replied →</button>` : "";
+    return `<div class="card ${overdue&&!closed?'overdue':due&&!closed?'due':''}" data-id="${p.id}">
+      <div class="top">
+        <span class="name">${esc(p.name)}</span>
+        <span class="pill tier-${p.tier}">Tier ${esc(p.tier)}</span>
+        <span class="pill">${flow.label||p.stage}</span>
+        ${p.replied?'<span class="pill" style="color:var(--green);border-color:var(--green)">replied</span>':''}
+        ${badge}
+      </div>
+      ${action}
+      <div class="meta">${url}${p.notes?'has notes':'no notes yet'}</div>
+      <div class="acts">
+        ${advBtn}${repBtn}
+        <select data-act="stage">${stageOpts}</select>
+        <select data-act="tier">${tierOpts}</select>
+        <button data-act="notes">Notes</button>
+        <button class="danger" data-act="del">Delete</button>
+      </div>
+      <textarea class="notes" data-act="notesbox" placeholder="Notes...">${esc(p.notes||"")}</textarea>
+    </div>`;
+  }
+
+  function renderLi(){
+    const today=todayStr();
+    const due = LI.filter(p=>!TERMINAL.has(p.stage) && p.next_action_date && p.next_action_date<=today)
+                  .sort((a,b)=>(a.next_action_date||"").localeCompare(b.next_action_date||""));
+    $("#li-due-list").innerHTML = due.length?due.map(liCard).join(""):`<div class="empty">Nothing due. Comment on prospects' posts to fill the pipeline.</div>`;
+    $("#li-due-count").textContent = due.length?`(${due.length})`:"";
+    let list = LI.slice();
+    if($("#li-filter").value==="active") list=list.filter(p=>!TERMINAL.has(p.stage));
+    list.sort((a,b)=>{ const fa=a.next_action_date||"9999",fb=b.next_action_date||"9999"; if(fa!==fb)return fa.localeCompare(fb); return (b.created_at||"").localeCompare(a.created_at||""); });
+    $("#li-pipeline").innerHTML = list.length?list.map(liCard).join(""):`<div class="empty">No prospects yet. Add one above.</div>`;
+  }
+
+  $("#li-filter").onchange = renderLi;
+
+  $("#li-add").onclick = ()=>{
+    const name=$("#li-name").value.trim(); if(!name){ $("#li-name").focus(); return; }
+    const body={name, linkedin_url:$("#li-url").value.trim(), tier:$("#li-tier").value, stage:"commented", next_action_date:addDays(todayStr(),2), source:"manual"};
+    const tmp="tmp-"+Math.round(performance.now())+"-"+LI.length;
+    LI.unshift({...body, id:tmp}); renderLi();
+    ["li-name","li-url"].forEach(i=>$("#"+i).value=""); $("#li-name").focus();
+    jsend(API+"/prospects","POST",body)
+      .then(row=>{ const i=LI.findIndex(x=>x.id===tmp); if(i>=0)LI[i]=row; renderLi(); })
+      .catch(err=>{ alert("Add failed: "+err.message); LI=LI.filter(x=>x.id!==tmp); renderLi(); });
+  };
+
+  $("#view-linkedin").addEventListener("click", e=>{
+    const btn=e.target.closest("[data-act]"), card=e.target.closest(".card"); if(!card||!btn) return;
+    const id=card.dataset.id, p=LI.find(x=>x.id===id); if(!p) return; const act=btn.dataset.act;
+    if(act==="notes"){ card.querySelector(".notes").classList.toggle("show"); return; }
+    if(act==="del"){ if(!confirm(`Delete ${p.name}?`)) return; LI=LI.filter(x=>x.id!==id); renderLi(); jsend(`${API}/prospects/${id}`,"DELETE").catch(err=>{ alert("Delete failed: "+err.message); loadLi(); }); return; }
+    let patch;
+    if(act==="advance"){ const nx=(FLOW[p.stage]||{}).next; if(!nx) return; patch={stage:nx, next_action_date:nextDateFor(nx)}; }
+    else if(act==="replied"){ patch={stage:"in_convo", replied:true, next_action_date:null}; }
+    else return;
+    Object.assign(p,patch); renderLi();
+    jsend(`${API}/prospects/${id}`,"PATCH",patch).catch(err=>{ alert("Save failed: "+err.message); loadLi(); });
+  });
+  $("#view-linkedin").addEventListener("change", e=>{
+    const st=e.target.closest('[data-act="stage"]'), ti=e.target.closest('[data-act="tier"]'), card=e.target.closest(".card"); if(!card) return;
+    const id=card.dataset.id, p=LI.find(x=>x.id===id); if(!p) return; let patch;
+    if(st){ patch={stage:st.value, next_action_date:nextDateFor(st.value)}; }
+    else if(ti){ patch={tier:ti.value}; }
+    else return;
+    Object.assign(p,patch); renderLi();
+    jsend(`${API}/prospects/${id}`,"PATCH",patch).catch(err=>{ alert("Save failed: "+err.message); loadLi(); });
+  });
+  $("#view-linkedin").addEventListener("blur", e=>{
+    const ta=e.target.closest('textarea[data-act="notesbox"]'); if(!ta) return;
+    const id=e.target.closest(".card").dataset.id, p=LI.find(x=>x.id===id); if(p) p.notes=ta.value;
+    jsend(`${API}/prospects/${id}`,"PATCH",{notes:ta.value}).catch(err=>console.error(err));
+  }, true);
 })();
 </script>
 </body>
