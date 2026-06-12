@@ -93,8 +93,11 @@ def api_list() -> JSONResponse:
 
 @router.post("/prospects")
 def api_create(body: dict = Body(...)) -> JSONResponse:
+    url = (body.get("linkedin_url") or "").strip()
     if not (body.get("name") or "").strip():
-        raise HTTPException(status_code=400, detail="name is required")
+        if not url:
+            raise HTTPException(status_code=400, detail="linkedin_url or name is required")
+        body["name"] = _name_from_url(url) or "(no name)"
     if body.get("tier") and body["tier"] not in VALID_TIER:
         raise HTTPException(status_code=400, detail=f"invalid tier: {body['tier']}")
     if body.get("stage") and body["stage"] not in VALID_STAGE:

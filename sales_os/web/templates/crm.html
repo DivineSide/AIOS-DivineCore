@@ -278,14 +278,18 @@
         <label class="btn ghost" style="cursor:pointer">⬆ Import from local tracker backup<input id="li-import-file" type="file" accept="application/json" style="display:none" /></label>
       </div>
       <div class="addbar">
-        <input id="li-name" type="text" placeholder="Name *" />
-        <input id="li-url" type="text" placeholder="LinkedIn profile URL" />
+        <input id="li-url" type="text" placeholder="LinkedIn profile URL *" />
+        <input id="li-name" type="text" placeholder="Name (optional — auto from URL)" />
         <select id="li-tier">
           <option value="A">Tier A (posts regularly)</option>
           <option value="B">Tier B (comments only)</option>
           <option value="C">Tier C (barely on)</option>
         </select>
-        <button class="btn full" id="li-add">Add — commented today, connect in 2 days</button>
+        <select id="li-entry">
+          <option value="commented">Just commented (connect in 2 days)</option>
+          <option value="connect_sent">Already sent connection</option>
+        </select>
+        <button class="btn full" id="li-add">Add lead</button>
       </div>
       <h2>Needs attention today <span id="li-due-count" class="muted"></span></h2>
       <div id="li-due-list"></div>
@@ -923,12 +927,22 @@ loadProspects();
   $("#li-stage-filter").onchange = renderLi;
   $("#li-search").oninput = renderLi;
 
+  function nameFromUrl(url){
+    const m=(url||"").match(/\/in\/([^/?#]+)/); if(!m) return "";
+    let parts=m[1].split("-").filter(Boolean);
+    if(parts.length>1 && /^[0-9a-f]{6,}$/.test(parts[parts.length-1])) parts=parts.slice(0,-1);
+    return parts.join(" ").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+  }
   $("#li-add").onclick = ()=>{
-    const name=$("#li-name").value.trim(); if(!name){ $("#li-name").focus(); return; }
-    const body={name, linkedin_url:$("#li-url").value.trim(), tier:$("#li-tier").value, stage:"commented", next_action_date:addDays(todayStr(),2), source:"manual"};
+    const urlv=$("#li-url").value.trim();
+    let name=$("#li-name").value.trim();
+    if(!urlv && !name){ $("#li-url").focus(); return; }
+    if(!name) name = nameFromUrl(urlv) || "(no name)";
+    const stage = $("#li-entry").value==="connect_sent" ? "connect_sent" : "commented";
+    const body={name, linkedin_url:urlv, tier:$("#li-tier").value, stage, next_action_date: stage==="commented"?addDays(todayStr(),2):null, source:"manual"};
     const tmp="tmp-"+Math.round(performance.now())+"-"+LI.length;
     LI.unshift({...body, id:tmp}); renderLi();
-    ["li-name","li-url"].forEach(i=>$("#"+i).value=""); $("#li-name").focus();
+    ["li-name","li-url"].forEach(i=>$("#"+i).value=""); $("#li-url").focus();
     jsend(API+"/prospects","POST",body)
       .then(row=>{ const i=LI.findIndex(x=>x.id===tmp); if(i>=0)LI[i]=row; renderLi(); })
       .catch(err=>{ alert("Add failed: "+err.message); LI=LI.filter(x=>x.id!==tmp); renderLi(); });
