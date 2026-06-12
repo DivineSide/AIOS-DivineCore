@@ -400,55 +400,58 @@ function renderCrm(){
   $("#pipeline").innerHTML = list.length ? list.map(cardHtml).join("") : `<div class="empty">No leads yet. Add one above.</div>`;
 }
 
-$("#view-crm").addEventListener("click", async e=>{
+// All mutations below are OPTIMISTIC: update the in-memory object + re-render
+// instantly, then save in the background. No blocking refetch. On error we
+// resync with loadProspects().
+$("#view-crm").addEventListener("click", e=>{
   const btn = e.target.closest("[data-act]");
   const card = e.target.closest(".card");
-  if(!card) return;
+  if(!card || !btn) return;
   const id = card.dataset.id;
   const p = PROSPECTS.find(x=>x.id===id);
-  if(!p || !btn) return;
+  if(!p) return;
   const act = btn.dataset.act;
-  try{
-    if(act==="touch"){
-      const tc = (p.touch_count||0);
-      const patch = {touch_count: tc+1, last_touch_at: new Date().toISOString(), next_touch_date: addDays(todayStr(), CADENCE[Math.min(tc,CADENCE.length-1)])};
-      if(p.stage==="new") patch.stage="contacted";
-      await jsend(`${API}/prospects/${id}`,"PATCH",patch);
-    } else if(act==="temp"){
-      await jsend(`${API}/prospects/${id}`,"PATCH",{temp: p.temp==='hot'?'warm':'hot'});
-    } else if(act==="snooze"){
-      await jsend(`${API}/prospects/${id}`,"PATCH",{next_touch_date: addDays(p.next_touch_date||todayStr(),1)});
-    } else if(act==="notes"){
-      card.querySelector(".notes").classList.toggle("show"); return;
-    } else if(act==="del"){
-      if(!confirm(`Delete ${p.name}?`)) return;
-      await jsend(`${API}/prospects/${id}`,"DELETE");
-    } else return;
-    await loadProspects();
-  }catch(err){ alert("Error: "+err.message); }
+  if(act==="notes"){ card.querySelector(".notes").classList.toggle("show"); return; }
+  if(act==="del"){
+    if(!confirm(`Delete ${p.name}?`)) return;
+    PROSPECTS = PROSPECTS.filter(x=>x.id!==id); renderCrm();
+    jsend(`${API}/prospects/${id}`,"DELETE").catch(err=>{ alert("Delete failed: "+err.message); loadProspects(); });
+    return;
+  }
+  let patch;
+  if(act==="touch"){
+    const tc = p.touch_count||0;
+    patch = {touch_count: tc+1, last_touch_at: new Date().toISOString(), next_touch_date: addDays(todayStr(), CADENCE[Math.min(tc,CADENCE.length-1)])};
+    if(p.stage==="new") patch.stage = "contacted";
+  } else if(act==="temp"){ patch = {temp: p.temp==='hot'?'warm':'hot'}; }
+  else if(act==="snooze"){ patch = {next_touch_date: addDays(p.next_touch_date||todayStr(),1)}; }
+  else return;
+  Object.assign(p, patch); renderCrm();
+  jsend(`${API}/prospects/${id}`,"PATCH",patch).catch(err=>{ alert("Save failed: "+err.message); loadProspects(); });
 });
 
-$("#view-crm").addEventListener("change", async e=>{
+$("#view-crm").addEventListener("change", e=>{
   const sel = e.target.closest('select[data-act="stage"]');
   if(!sel) return;
   const id = e.target.closest(".card").dataset.id;
-  const p = PROSPECTS.find(x=>x.id===id);
+  const p = PROSPECTS.find(x=>x.id===id); if(!p) return;
   const patch = {stage: sel.value};
   if(CLOSED.has(sel.value)) patch.next_touch_date = null;
   else if(sel.value==="call_booked" && !p.next_touch_date) patch.next_touch_date = todayStr();
-  try{ await jsend(`${API}/prospects/${id}`,"PATCH",patch); await loadProspects(); }
-  catch(err){ alert("Error: "+err.message); }
+  Object.assign(p, patch); renderCrm();
+  jsend(`${API}/prospects/${id}`,"PATCH",patch).catch(err=>{ alert("Save failed: "+err.message); loadProspects(); });
 });
-$("#view-crm").addEventListener("blur", async e=>{
+$("#view-crm").addEventListener("blur", e=>{
   const ta = e.target.closest('textarea[data-act="notesbox"]');
   if(!ta) return;
   const id = e.target.closest(".card").dataset.id;
-  try{ await jsend(`${API}/prospects/${id}`,"PATCH",{notes: ta.value}); }catch(err){ console.error(err); }
+  const p = PROSPECTS.find(x=>x.id===id); if(p) p.notes = ta.value;
+  jsend(`${API}/prospects/${id}`,"PATCH",{notes: ta.value}).catch(err=>console.error(err));
 }, true);
 
 $("#stage-filter").onchange = renderCrm;
 
-$("#add-btn").onclick = async ()=>{
+$("#add-btn").onclick = ()=>{
   const name = $("#f-name").value.trim();
   if(!name){ $("#f-name").focus(); return; }
   const body = {
@@ -457,11 +460,13 @@ $("#add-btn").onclick = async ()=>{
     source:$("#f-source").value, linkedin_url:$("#f-linkedin").value.trim(),
     stage:"new", touch_count:0, next_touch_date: todayStr(),
   };
-  try{
-    await jsend(API+"/prospects","POST",body);
-    ["f-name","f-company","f-email","f-phone","f-linkedin"].forEach(i=>$("#"+i).value="");
-    await loadProspects();
-  }catch(err){ alert("Error: "+err.message); }
+  const tmpId = "tmp-"+Math.round(performance.now())+"-"+PROSPECTS.length;
+  PROSPECTS.unshift({...body, id:tmpId, call_logs:[]}); renderCrm();   // instant
+  ["f-name","f-company","f-email","f-phone","f-linkedin"].forEach(i=>$("#"+i).value="");
+  $("#f-name").focus();
+  jsend(API+"/prospects","POST",body)
+    .then(row=>{ const i=PROSPECTS.findIndex(x=>x.id===tmpId); if(i>=0) PROSPECTS[i]=row; renderCrm(); })
+    .catch(err=>{ alert("Add failed: "+err.message); PROSPECTS=PROSPECTS.filter(x=>x.id!==tmpId); renderCrm(); });
 };
 
 // ================= KPI =================
@@ -482,7 +487,7 @@ async function loadKpi(){
     </div>`;
   }).join("");
 }
-$("#kpi-grid").addEventListener("click", async e=>{
+$("#kpi-grid").addEventListener("click", e=>{
   const btn = e.target.closest("button[data-d]");
   if(!btn) return;
   const cell = e.target.closest(".counter");
@@ -490,8 +495,13 @@ $("#kpi-grid").addEventListener("click", async e=>{
   const day = $("#kpi-date").value || todayStr();
   const cur = parseInt(cell.querySelector(".val").textContent)||0;
   const next = Math.max(0, cur + parseInt(btn.dataset.d));
-  try{ await jsend(API+"/kpi","POST",{date:day,metric:key,value:next}); await loadKpi(); }
-  catch(err){ alert("Error: "+err.message); }
+  const m = KPI_METRICS.find(x=>x.key===key);
+  // optimistic: bump the number + bar instantly, save in the background
+  cell.querySelector(".val").textContent = next;
+  const bar = cell.querySelector(".bar>i");
+  bar.style.width = Math.min(100, m.target?Math.round(next/m.target*100):0)+"%";
+  bar.classList.toggle("done", !!(m.target && next>=m.target));
+  jsend(API+"/kpi","POST",{date:day,metric:key,value:next}).catch(err=>{ alert("Save failed: "+err.message); loadKpi(); });
 });
 $("#kpi-today").onclick = ()=>{ $("#kpi-date").value = todayStr(); loadKpi(); };
 $("#kpi-date").onchange = loadKpi;
@@ -719,24 +729,32 @@ loadProspects();
     </td></tr>`;
   }
 
-  $("#d-table-wrap").addEventListener("click", async e=>{
+  // optimistic: update local + re-render instantly, save in the background
+  $("#d-table-wrap").addEventListener("click", e=>{
     const btn=e.target.closest("[data-act]"), tr=e.target.closest("tr[data-id]");
     if(!tr) return; const id=tr.dataset.id, p=ALL.find(x=>x.id===id); if(!p) return;
     const act=btn&&btn.dataset.act;
     if(act==="expand"){ const n=tr.nextElementSibling; if(n&&n.classList.contains("detail")){ n.remove(); return; } tr.insertAdjacentHTML("afterend", detailHtml(p)); return; }
     if(act==="log-save"){
       const disp=tr.querySelector('[data-act="log-disp"]').value, note=tr.querySelector('[data-act="log-note"]').value;
-      try{ await jsend(`${API}/prospects/${id}/log`,"POST",{disposition:disp,note}); await load(); }catch(err){ alert("Error: "+err.message); } return;
+      p.call_logs=p.call_logs||[]; p.call_logs.push({disposition:disp, note, attempted_at:new Date().toISOString()});
+      if(disp) p.status=disp;
+      render();
+      jsend(`${API}/prospects/${id}/log`,"POST",{disposition:disp,note}).catch(err=>{ alert("Save failed: "+err.message); load(); });
+      return;
     }
-    if(act==="del"){ if(!confirm(`Delete ${p.name}?`)) return; try{ await jsend(`${API}/prospects/${id}`,"DELETE"); await load(); }catch(err){ alert("Error: "+err.message); } return; }
+    if(act==="del"){
+      if(!confirm(`Delete ${p.name}?`)) return;
+      ALL=ALL.filter(x=>x.id!==id); render();
+      jsend(`${API}/prospects/${id}`,"DELETE").catch(err=>{ alert("Delete failed: "+err.message); load(); });
+      return;
+    }
   });
-  $("#d-table-wrap").addEventListener("change", async e=>{
+  $("#d-table-wrap").addEventListener("change", e=>{
     const sel=e.target.closest('[data-act="status"]'), fu=e.target.closest('[data-act="followup"]'), tr=e.target.closest("tr[data-id]");
-    if(!tr) return; const id=tr.dataset.id;
-    try{
-      if(sel){ await jsend(`${API}/prospects/${id}`,"PATCH",{status:sel.value}); await load(); }
-      else if(fu){ await jsend(`${API}/prospects/${id}`,"PATCH",{next_follow_up_at:fu.value||null}); await load(); }
-    }catch(err){ alert("Error: "+err.message); }
+    if(!tr) return; const id=tr.dataset.id, p=ALL.find(x=>x.id===id); if(!p) return;
+    if(sel){ p.status=sel.value; render(); jsend(`${API}/prospects/${id}`,"PATCH",{status:sel.value}).catch(err=>{ alert("Save failed: "+err.message); load(); }); }
+    else if(fu){ p.next_follow_up_at=fu.value||null; render(); jsend(`${API}/prospects/${id}`,"PATCH",{next_follow_up_at:fu.value||null}).catch(err=>{ alert("Save failed: "+err.message); load(); }); }
   });
 
   setInterval(()=>{
