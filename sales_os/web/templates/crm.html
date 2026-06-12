@@ -290,8 +290,21 @@
       <h2>Needs attention today <span id="li-due-count" class="muted"></span></h2>
       <div id="li-due-list"></div>
       <h2>Pipeline</h2>
-      <div class="row" style="margin-bottom:12px">
-        <select id="li-filter"><option value="active">Active only</option><option value="all">All stages</option></select>
+      <div class="toolbar" style="margin-bottom:12px">
+        <input class="search" id="li-search" type="text" placeholder="Search name or URL..." />
+        <select id="li-tier-filter">
+          <option value="">All tiers</option>
+          <option value="A">Tier A</option>
+          <option value="B">Tier B</option>
+          <option value="C">Tier C</option>
+        </select>
+        <select id="li-stage-filter"><option value="">All stages</option></select>
+        <select id="li-filter">
+          <option value="active">Active only</option>
+          <option value="all">Include won/dead</option>
+        </select>
+        <span style="flex:1"></span>
+        <span class="sub" style="margin:0" id="li-count"></span>
       </div>
       <div id="li-pipeline"></div>
     </section>
@@ -896,11 +909,19 @@ loadProspects();
     $("#li-due-count").textContent = due.length?`(${due.length})`:"";
     let list = LI.slice();
     if($("#li-filter").value==="active") list=list.filter(p=>!TERMINAL.has(p.stage));
+    const tier=$("#li-tier-filter").value; if(tier) list=list.filter(p=>p.tier===tier);
+    const stage=$("#li-stage-filter").value; if(stage) list=list.filter(p=>p.stage===stage);
+    const q=($("#li-search").value||"").trim().toLowerCase(); if(q) list=list.filter(p=>(`${p.name} ${p.linkedin_url}`).toLowerCase().includes(q));
     list.sort((a,b)=>{ const fa=a.next_action_date||"9999",fb=b.next_action_date||"9999"; if(fa!==fb)return fa.localeCompare(fb); return (b.created_at||"").localeCompare(a.created_at||""); });
-    $("#li-pipeline").innerHTML = list.length?list.map(liCard).join(""):`<div class="empty">No prospects yet. Add one above.</div>`;
+    $("#li-count").textContent = `${list.length} shown`;
+    $("#li-pipeline").innerHTML = list.length?list.map(liCard).join(""):`<div class="empty">No prospects match these filters.</div>`;
   }
 
+  $("#li-stage-filter").innerHTML = `<option value="">All stages</option>`+ORDER.map(k=>`<option value="${k}">${FLOW[k].label}</option>`).join("");
   $("#li-filter").onchange = renderLi;
+  $("#li-tier-filter").onchange = renderLi;
+  $("#li-stage-filter").onchange = renderLi;
+  $("#li-search").oninput = renderLi;
 
   $("#li-add").onclick = ()=>{
     const name=$("#li-name").value.trim(); if(!name){ $("#li-name").focus(); return; }
