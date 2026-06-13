@@ -109,7 +109,10 @@
   .cg-cell.hit{background:var(--green);color:#0c1f15}
   .cg-cell.part{background:rgba(232,184,75,.18);color:var(--gold);border:1px solid var(--gold-dim)}
   .cg-cell.miss{background:var(--panel-2)}
+  .cg-cell.rest{background:repeating-linear-gradient(45deg,var(--panel-2),var(--panel-2) 3px,transparent 3px,transparent 6px);opacity:.5}
   .hsub{font-size:12px;color:var(--muted);margin:-4px 0 10px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel-2);border:1px solid var(--gold-dim);color:var(--text);padding:11px 18px;border-radius:10px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   /* ===== dialer ===== */
   .dfilters{display:flex;gap:6px;flex-wrap:wrap}
@@ -328,6 +331,7 @@
   </div>
 </div>
 <input id="d-file-input" type="file" accept=".csv,text/csv" style="display:none" />
+<div class="toast" id="toast"></div>
 
 <script>
 const API = "/crm/api";
@@ -341,12 +345,10 @@ const KPI_METRICS = [
   {key:"li_comments",  label:"Engagement comments",    target:10},
   {key:"x_replies",    label:"X quality replies",      target:20},
   {key:"conn_sent",    label:"Connection requests",    target:20},
-  {key:"cold_dms",     label:"Cold DMs",               target:10},
-  {key:"cold_emails",  label:"Cold emails",            target:214},
+  {key:"cold_emails",  label:"Cold emails",            target:214, weekdays:true},  // no weekend target
   {key:"dials",        label:"Cold call dials",        target:50},
   {key:"calls_conn",   label:"Calls connected",        target:0},
-  {key:"looms",        label:"Looms sent",             target:0},
-  {key:"disco_booked", label:"Discovery calls booked", target:0},
+  {key:"disco_booked", label:"Discovery calls booked", weekly:4},   // weekly target, not daily
 ];
 
 const STAGES = [
@@ -381,6 +383,12 @@ function addDays(iso, n){const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()
 async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(await r.text());return r.json();}
 async function jsend(u,m,b){const r=await fetch(u,{method:m,headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error(await r.text());return r.status===204?null:r.json();}
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function toast(msg){ const t=$("#toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),1900); }
+function isWeekend(d){ const g=new Date(d+"T00:00:00").getDay(); return g===0||g===6; }
+// is this metric an actual goal on day d? (weekly metrics + weekend cold-emails are not daily goals)
+function appliesDay(m,d){ if(m.weekly||!m.target) return false; if(m.weekdays && isWeekend(d)) return false; return true; }
+function weekDates(d){ const base=new Date(d+"T00:00:00"); const g=(base.getDay()+6)%7; const mon=new Date(base); mon.setDate(base.getDate()-g);
+  return Array.from({length:7},(_,i)=>{ const x=new Date(mon); x.setDate(mon.getDate()+i); return new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10); }); }
 
 // ---- nav ----
 document.querySelectorAll(".navlink").forEach(b=>b.onclick=()=>{
@@ -522,15 +530,30 @@ $("#add-btn").onclick = ()=>{
 async function loadKpi(){
   const day = $("#kpi-date").value || todayStr();
   $("#kpi-date").value = day;
-  let counts = {};
-  try{ counts = await jget(`${API}/kpi?date=${day}`); }catch(e){ console.error(e); }
+  let rows = [];
+  try{ rows = await jget(`${API}/kpi/history?days=21`); }catch(e){ console.error(e); }
+  const bd = {}; rows.forEach(r=>{ (bd[r.date] ||= {})[r.metric]=r.value; });
+  const counts = bd[day]||{};
+  const wk = weekDates(day);
   $("#kpi-grid").innerHTML = KPI_METRICS.map(m=>{
-    const v = counts[m.key]||0;
-    const pct = Math.min(100, m.target? Math.round(v/m.target*100):0);
-    const done = m.target && v>=m.target;
-    return `<div class="counter" data-key="${m.key}">
+    const todayVal = counts[m.key]||0;
+    if(m.weekly){
+      const wkSum = wk.reduce((s,d)=>s+((bd[d]||{})[m.key]||0),0);
+      const pct = Math.min(100, Math.round(wkSum/m.weekly*100)), done = wkSum>=m.weekly;
+      return `<div class="counter" data-key="${m.key}" data-today="${todayVal}" data-weekly="1">
+        <div class="label">${m.label} · this week</div>
+        <div class="num"><span class="val">${wkSum}</span> <span class="target">/ ${m.weekly}/wk</span></div>
+        <div class="bar"><i class="${done?'done':''}" style="width:${pct}%"></i></div>
+        <div class="btns"><button class="minus" data-d="-1">–</button><button class="tick" data-d="1">+</button></div>
+      </div>`;
+    }
+    const rest = m.weekdays && isWeekend(day);
+    const tgt = rest?0:(m.target||0);
+    const pct = Math.min(100, tgt?Math.round(todayVal/tgt*100):0), done = tgt && todayVal>=tgt;
+    const tlabel = rest ? `<span class="target">rest day</span>` : `<span class="target">/ ${m.target||0}</span>`;
+    return `<div class="counter" data-key="${m.key}" data-today="${todayVal}">
       <div class="label">${m.label}</div>
-      <div class="num"><span class="val">${v}</span> <span class="target">/ ${m.target}</span></div>
+      <div class="num"><span class="val">${todayVal}</span> ${tlabel}</div>
       <div class="bar"><i class="${done?'done':''}" style="width:${pct}%"></i></div>
       <div class="btns"><button class="minus" data-d="-1">–</button><button class="tick" data-d="1">+</button></div>
     </div>`;
@@ -542,15 +565,23 @@ $("#kpi-grid").addEventListener("click", e=>{
   const cell = e.target.closest(".counter");
   const key = cell.dataset.key;
   const day = $("#kpi-date").value || todayStr();
-  const cur = parseInt(cell.querySelector(".val").textContent)||0;
-  const next = Math.max(0, cur + parseInt(btn.dataset.d));
   const m = KPI_METRICS.find(x=>x.key===key);
-  // optimistic: bump the number + bar instantly, save in the background
-  cell.querySelector(".val").textContent = next;
-  const bar = cell.querySelector(".bar>i");
-  bar.style.width = Math.min(100, m.target?Math.round(next/m.target*100):0)+"%";
-  bar.classList.toggle("done", !!(m.target && next>=m.target));
-  jsend(API+"/kpi","POST",{date:day,metric:key,value:next}).catch(err=>{ alert("Save failed: "+err.message); loadKpi(); });
+  const delta = parseInt(btn.dataset.d);
+  const todayVal = parseInt(cell.dataset.today)||0;
+  const newToday = Math.max(0, todayVal+delta);
+  cell.dataset.today = newToday;
+  const valEl = cell.querySelector(".val"), bar = cell.querySelector(".bar>i");
+  // optimistic display: weekly cards show the week total, daily cards show today
+  if(cell.dataset.weekly){
+    const wk = Math.max(0, (parseInt(valEl.textContent)||0) + (newToday-todayVal));
+    valEl.textContent = wk;
+    bar.style.width = Math.min(100, Math.round(wk/m.weekly*100))+"%"; bar.classList.toggle("done", wk>=m.weekly);
+  } else {
+    valEl.textContent = newToday;
+    const tgt = (m.weekdays && isWeekend(day))?0:(m.target||0);
+    bar.style.width = Math.min(100, tgt?Math.round(newToday/tgt*100):0)+"%"; bar.classList.toggle("done", !!(tgt && newToday>=tgt));
+  }
+  jsend(API+"/kpi","POST",{date:day,metric:key,value:newToday}).catch(err=>{ alert("Save failed: "+err.message); loadKpi(); });
 });
 $("#kpi-today").onclick = ()=>{ $("#kpi-date").value = todayStr(); loadKpi(); };
 $("#kpi-date").onchange = loadKpi;
@@ -575,7 +606,7 @@ function buildByDate(){ const bd={}; HISTORY.forEach(r=>{ (bd[r.date] ||= {})[r.
 function dayScore(bd, metric, d){
   const day = bd[d]||{};
   if(metric==="__all"){
-    const h=HABITS(); if(!h.length) return 0;
+    const h=HABITS().filter(m=>appliesDay(m,d)); if(!h.length) return 0;
     return h.filter(m=>(day[m.key]||0)>=m.target).length / h.length;
   }
   const m=KPI_METRICS.find(x=>x.key===metric);
@@ -597,14 +628,15 @@ function renderStats(){
 }
 
 function allHeadline(bd){
-  const h=HABITS(), N=h.length, today=todayStr();
-  const goalsOn=d=>h.filter(m=>((bd[d]||{})[m.key]||0)>=m.target).length;
-  const todayHit=goalsOn(today);
-  let weekHits=0; for(let i=0;i<7;i++) weekHits+=goalsOn(addDays(today,-i));
-  const weekPct=Math.round(weekHits/(N*7)*100);
-  let s=0,d=today; if(goalsOn(d)===0) d=addDays(d,-1); while(goalsOn(d)>0){ s++; d=addDays(d,-1); }
+  const today=todayStr();
+  const goalsOn=d=>HABITS().filter(m=>appliesDay(m,d)).filter(m=>((bd[d]||{})[m.key]||0)>=m.target).length;
+  const possOn=d=>HABITS().filter(m=>appliesDay(m,d)).length;
+  const N=possOn(today), todayHit=goalsOn(today);
+  let hits=0,poss=0; for(let i=0;i<7;i++){ const d=addDays(today,-i); hits+=goalsOn(d); poss+=possOn(d); }
+  const weekPct=poss?Math.round(hits/poss*100):0;
+  let s=0,d=today; if(goalsOn(d)===0 && possOn(d)>0) d=addDays(d,-1); while(goalsOn(d)>0){ s++; d=addDays(d,-1); }
   let best=0; Object.keys(bd).forEach(dd=>best=Math.max(best,goalsOn(dd)));
-  card(`${todayHit}/${N}`,"goals hit today", `${weekPct}%`,"this week", `${s}`,"day streak", `${best}/${N}`,"best day");
+  card(`${todayHit}/${N}`,"goals hit today", `${weekPct}%`,"this week", `${s}`,"day streak", `${best}`,"best day");
 }
 function metricHeadline(bd, metric){
   const m=KPI_METRICS.find(x=>x.key===metric), today=todayStr();
@@ -618,6 +650,7 @@ function metricHeadline(bd, metric){
 
 function renderHeatmap(bd, metric){
   const WEEKS=26, today=todayStr();
+  const m = metric!=="__all" ? KPI_METRICS.find(x=>x.key===metric) : null;
   let start=addDays(today,-(WEEKS*7-1));
   const sd=new Date(start+"T00:00:00"); start=addDays(start,-sd.getDay());
   let cur=start, cols="";
@@ -625,8 +658,10 @@ function renderHeatmap(bd, metric){
     let cells="";
     for(let dow=0; dow<7; dow++){
       const fut = cur>today;
-      const score = fut?0:dayScore(bd, metric, cur);
-      cells += `<div class="hcell l${fut?0:lvl(score)}${fut?' fut':''}" title="${cur}: ${Math.round(score*100)}% of goals"></div>`;
+      const skip = m && m.weekdays && isWeekend(cur);   // cold emails: weekends are rest days
+      const neutral = fut||skip;
+      const score = neutral?0:dayScore(bd, metric, cur);
+      cells += `<div class="hcell l${neutral?0:lvl(score)}${neutral?' fut':''}" title="${cur}: ${skip?'rest day':Math.round(score*100)+'%'}"></div>`;
       cur=addDays(cur,1);
     }
     cols += `<div class="hcol">${cells}</div>`;
@@ -643,6 +678,7 @@ function renderCompletionGrid(bd){
   }).join("")+`</div>`;
   const rows=HABITS().map(m=>{
     const cells=days.map(d=>{
+      if(!appliesDay(m,d)) return `<div class="cg-cell rest" title="${d}: rest day"></div>`;
       const v=(bd[d]||{})[m.key]||0;
       const cls=v>=m.target?"hit":v>0?"part":"miss";
       return `<div class="cg-cell ${cls}" title="${d}: ${v}/${m.target}">${v>=m.target?"✓":(v>0?v:"")}</div>`;
@@ -866,6 +902,11 @@ loadProspects();
   const ORDER = ["commented","connect_sent","accepted","first_msg","loom_sent","engaged","in_convo","won","dead"];
   const TERMINAL = new Set(["won","dead"]);
   const nextDateFor = stage => { const o=(FLOW[stage]||{}).offset; return o!=null?addDays(todayStr(),o):null; };
+  // entering these stages auto-ticks a KPI counter (today)
+  const STAGE_KPI = {commented:"li_comments", connect_sent:"conn_sent"};
+  const KPI_LABEL = {li_comments:"comment", conn_sent:"connection request"};
+  const kpiForStage = stage => STAGE_KPI[stage]||null;
+  function bumpKpi(metric){ if(metric) jsend("/crm/api/kpi/bump","POST",{date:todayStr(),metric,delta:1}).catch(e=>console.error(e)); }
 
   let LI = [];
   async function loadLi(){ try{ LI=await jget(API+"/prospects"); }catch(e){ LI=[]; console.error(e); } renderLi(); }
@@ -942,6 +983,8 @@ loadProspects();
     const body={name, linkedin_url:urlv, tier:$("#li-tier").value, stage, next_action_date: stage==="commented"?addDays(todayStr(),2):null, source:"manual"};
     const tmp="tmp-"+Math.round(performance.now())+"-"+LI.length;
     LI.unshift({...body, id:tmp}); renderLi();
+    const k=kpiForStage(stage); if(k) bumpKpi(k);
+    toast(k ? `Lead added · +1 ${KPI_LABEL[k]} logged ✓` : "Lead added ✓");
     ["li-name","li-url"].forEach(i=>$("#"+i).value=""); $("#li-url").focus();
     jsend(API+"/prospects","POST",body)
       .then(row=>{ const i=LI.findIndex(x=>x.id===tmp); if(i>=0)LI[i]=row; renderLi(); })
@@ -952,12 +995,16 @@ loadProspects();
     const btn=e.target.closest("[data-act]"), card=e.target.closest(".card"); if(!card||!btn) return;
     const id=card.dataset.id, p=LI.find(x=>x.id===id); if(!p) return; const act=btn.dataset.act;
     if(act==="notes"){ card.querySelector(".notes").classList.toggle("show"); return; }
-    if(act==="del"){ if(!confirm(`Delete ${p.name}?`)) return; LI=LI.filter(x=>x.id!==id); renderLi(); jsend(`${API}/prospects/${id}`,"DELETE").catch(err=>{ alert("Delete failed: "+err.message); loadLi(); }); return; }
-    let patch;
-    if(act==="advance"){ const nx=(FLOW[p.stage]||{}).next; if(!nx) return; patch={stage:nx, next_action_date:nextDateFor(nx)}; }
-    else if(act==="replied"){ patch={stage:"in_convo", replied:true, next_action_date:null}; }
+    if(act==="del"){ if(!confirm(`Delete ${p.name}?`)) return; LI=LI.filter(x=>x.id!==id); renderLi(); toast("Lead deleted"); jsend(`${API}/prospects/${id}`,"DELETE").catch(err=>{ alert("Delete failed: "+err.message); loadLi(); }); return; }
+    let patch, msg;
+    if(act==="advance"){
+      const cur=FLOW[p.stage]||{}; const nx=cur.next; if(!nx) return;
+      patch={stage:nx, next_action_date:nextDateFor(nx)};
+      const k=kpiForStage(nx); if(k) bumpKpi(k);
+      msg = k ? `${cur.action} ✓ · +1 ${KPI_LABEL[k]} logged` : `${cur.action} ✓`;
+    } else if(act==="replied"){ patch={stage:"in_convo", replied:true, next_action_date:null}; msg="Marked replied ✓"; }
     else return;
-    Object.assign(p,patch); renderLi();
+    Object.assign(p,patch); renderLi(); toast(msg);
     jsend(`${API}/prospects/${id}`,"PATCH",patch).catch(err=>{ alert("Save failed: "+err.message); loadLi(); });
   });
   $("#view-linkedin").addEventListener("change", e=>{
@@ -966,7 +1013,7 @@ loadProspects();
     if(st){ patch={stage:st.value, next_action_date:nextDateFor(st.value)}; }
     else if(ti){ patch={tier:ti.value}; }
     else return;
-    Object.assign(p,patch); renderLi();
+    Object.assign(p,patch); renderLi(); toast("Updated ✓");
     jsend(`${API}/prospects/${id}`,"PATCH",patch).catch(err=>{ alert("Save failed: "+err.message); loadLi(); });
   });
   $("#view-linkedin").addEventListener("blur", e=>{

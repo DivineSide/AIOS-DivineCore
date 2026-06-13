@@ -101,6 +101,20 @@ def api_set_kpi(body: dict = Body(...)) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/crm/api/kpi/bump")
+def api_bump_kpi(body: dict = Body(...)) -> JSONResponse:
+    day = body.get("date")
+    metric = body.get("metric")
+    delta = int(body.get("delta", 1))
+    if not day or not metric:
+        raise HTTPException(status_code=400, detail="date and metric are required")
+    try:
+        return JSONResponse(supabase_writer.bump_kpi(day, metric, delta))
+    except Exception as exc:
+        logger.exception("crm: bump kpi failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/crm/api/kpi/history")
 def api_kpi_history(days: int = 30) -> JSONResponse:
     try:

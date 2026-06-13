@@ -110,6 +110,14 @@ def set_kpi(day: str, metric: str, value: int) -> dict[str, Any]:
     return (r.json() or [row])[0]
 
 
+def bump_kpi(day: str, metric: str, delta: int) -> dict[str, Any]:
+    """Increment one (date, metric) cell by delta (read current + set). Used by
+    cross-module auto-logging (e.g. a LinkedIn comment ticks the comments KPI)."""
+    rows = get_kpi_for_date(day)
+    cur = next((int(r.get("value") or 0) for r in rows if r.get("metric") == metric), 0)
+    return set_kpi(day, metric, max(0, cur + delta))
+
+
 def bulk_set_kpi(rows: list[dict[str, Any]]) -> int:
     """Upsert many (date, metric, value) cells in chunks. Used by the
     old-tracker import. merge-duplicates so a re-import overwrites, not dupes.
