@@ -330,7 +330,7 @@ Rebuilt 2026-06-07 (niche pivot: education / coaching). Update here if profile c
 >
 > ====
 >
-> 19. CS student at Wuhan University. Malaysian. Building DivineSide in public, every system, every number, every week. Follow along.
+> 19. CS student at Wuhan University. Malaysian. Building DivineSide in public, every system, every number, every day. Follow along.
 
 > **Profile discipline.** Guarantee numbers and retainer pricing omitted until the offer is locked. DM keyword is **SYSTEM**. Prior work (RM365, Cracked.ai, OuterSignal) lives in the About body, not as separate Experience entries. Mayank co-founder mention dropped from body — name-dropping the partner in conversational copy violates the persona discipline in [pang.md](../identity/pang.md) Constant Reinforcement.
 
