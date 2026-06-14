@@ -17,6 +17,15 @@ from settings import settings
 
 PROSPECTS_TABLE = "crm_prospects"
 KPI_TABLE = "kpi_daily"
+CONTENT_TABLE = "content_posts"
+
+# Columns the content import is allowed to write (mirrors the tracker CSV).
+CONTENT_WRITABLE = {
+    "post_id", "platform", "posted_at", "url", "post_type", "framework",
+    "funnel_stage", "topic", "format", "differentiator", "hook", "closing",
+    "content", "views", "likes", "comments", "reposts", "bookmarks", "notes",
+}
+_CONTENT_INT_COLS = {"views", "likes", "comments", "reposts", "bookmarks"}
 
 # Columns a client request is allowed to write. Anything else is ignored so a
 # malformed/hostile body can't set arbitrary fields.
@@ -130,6 +139,54 @@ def bulk_set_kpi(rows: list[dict[str, Any]]) -> int:
         for r in rows
     ]
     url = f"{_rest_base()}/{KPI_TABLE}?on_conflict=date,metric"
+    for i in range(0, len(payload), 500):
+        chunk = payload[i:i + 500]
+        resp = httpx.post(
+            url,
+            headers=_headers("resolution=merge-duplicates,return=minimal"),
+            json=chunk,
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+    return len(payload)
+
+
+# ---------- content posts ----------
+
+def list_content_posts() -> list[dict[str, Any]]:
+    url = (
+        f"{_rest_base()}/{CONTENT_TABLE}"
+        "?select=*&order=posted_at.desc.nullslast"
+    )
+    r = httpx.get(url, headers=_headers(), timeout=30.0)
+    r.raise_for_status()
+    return r.json() or []
+
+
+def _clean_content(row: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for k, v in row.items():
+        if k not in CONTENT_WRITABLE:
+            continue
+        if k in _CONTENT_INT_COLS:
+            # blank / non-numeric -> NULL so "no impressions yet" stays distinct from 0.
+            s = str(v).strip().replace(",", "") if v is not None else ""
+            out[k] = int(float(s)) if s else None
+        else:
+            out[k] = v
+    return out
+
+
+def bulk_upsert_content_posts(rows: list[dict[str, Any]]) -> int:
+    """Upsert many posts by post_id (merge-duplicates, so re-syncing the CSV
+    overwrites metrics instead of duplicating). Used by the tracker -> CRM sync."""
+    payload = [_clean_content(r) for r in rows if (r.get("post_id") or "").strip()]
+    if not payload:
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    for row in payload:
+        row["updated_at"] = now
+    url = f"{_rest_base()}/{CONTENT_TABLE}?on_conflict=post_id"
     for i in range(0, len(payload), 500):
         chunk = payload[i:i + 500]
         resp = httpx.post(

@@ -124,6 +124,32 @@ def api_kpi_history(days: int = 30) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/crm/api/content")
+def api_list_content() -> JSONResponse:
+    """All tracked posts, newest first — the Content dashboard computes its
+    views (this-week plan, mix, top posts/hooks, reach buckets) client-side."""
+    try:
+        return JSONResponse(supabase_writer.list_content_posts())
+    except Exception as exc:
+        logger.exception("crm: list content failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/crm/api/content/import")
+def api_import_content(body: dict = Body(...)) -> JSONResponse:
+    """Upsert posts synced up from tools/social-tracker/posts.csv. Accepts
+    {posts: [ {post_id, ...} ]} and merges by post_id (re-sync overwrites)."""
+    posts = body.get("posts") or []
+    if not isinstance(posts, list):
+        raise HTTPException(status_code=400, detail="posts must be a list")
+    try:
+        n = supabase_writer.bulk_upsert_content_posts(posts)
+        return JSONResponse({"upserted": n})
+    except Exception as exc:
+        logger.exception("crm: content import failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/crm/api/import")
 def api_import(body: dict = Body(...)) -> JSONResponse:
     """Import the old local-tracker backup. Accepts {counts: {date: {metric: value}}}

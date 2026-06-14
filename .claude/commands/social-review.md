@@ -40,7 +40,13 @@ hand-edit `posts.csv`.
    format / topic, and the actual-vs-target content mix (against the 40/30/20/10
    target from linkedin-playbook §12.1).
 
-4. **Interpret it for the user** — this is the real value, don't just dump the
+4. **Regenerate the dashboard** so the glanceable view reflects the new metrics:
+   ```
+   python tools/social-tracker/build_dashboard.py --open
+   ```
+   This rewrites `dashboard.html` (this-week plan + reach rankings) and opens it.
+
+5. **Interpret it for the user** — this is the real value, don't just dump the
    table. Give a short, decisive readout:
    - **Do more of:** the post types / formats / topics / hooks with the highest
      median engagement (and views, where present).

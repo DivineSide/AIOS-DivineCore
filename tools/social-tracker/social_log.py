@@ -193,7 +193,12 @@ def cmd_set_metrics(args: argparse.Namespace) -> int:
 
 def cmd_pending(args: argparse.Namespace) -> int:
     rows = _read_rows()
-    pend = [r for r in rows if not (r.get("views") or r.get("likes"))]
+    # A post is pending if it's missing impressions/views OR engagement (likes).
+    # Bulk imports fill likes (reactions) but never views (LinkedIn impressions
+    # aren't scrapeable), so the old "missing BOTH" check hid the whole backlog.
+    pend = [r for r in rows
+            if not (r.get("views") or "").strip()
+            or not (r.get("likes") or "").strip()]
     if not pend:
         print("nothing pending - every logged post has metrics.")
         return 0

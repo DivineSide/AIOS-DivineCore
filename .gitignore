@@ -31,3 +31,6 @@ tools/outreach-tracker/data/
 tools/social-tracker/posts.csv
 tools/social-tracker/.inbox.txt
 tools/social-tracker/.import-*.json
+tools/social-tracker/.impressions-fill.txt
+tools/social-tracker/dashboard.html
+tools/social-tracker/.crm-preview.html

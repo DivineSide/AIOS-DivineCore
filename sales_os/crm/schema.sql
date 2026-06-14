@@ -40,3 +40,37 @@ create table if not exists kpi_daily (
 );
 
 create index if not exists kpi_daily_date_idx on kpi_daily (date);
+
+-- ---------------------------------------------------------------------------
+-- content_posts: one row per published LinkedIn/X post. Mirrors the manual
+-- tracker CSV (tools/social-tracker/posts.csv) so the /crm "Content" dashboard
+-- can render the reach-first view (this-week plan, mix, top posts/hooks).
+-- Synced up from the CSV via POST /crm/api/content/import (impressions are
+-- author-only analytics, can't be scraped, so they're entered by hand first).
+-- ---------------------------------------------------------------------------
+create table if not exists content_posts (
+  post_id        text primary key,            -- stable id from the CSV (e.g. li-... / linkedin-YYYYMMDD-n)
+  platform       text not null default 'linkedin',   -- linkedin | x
+  posted_at      date,
+  url            text default '',
+  post_type      text default '',             -- authority | educational | personal | social-proof
+  framework      text default '',             -- PAS | SLA | case-study | BAB
+  funnel_stage   text default '',             -- top | middle | bottom
+  topic          text default '',
+  format         text default '',             -- list | story | insight | question | case-study | hot-take | tutorial | announcement | other
+  differentiator text default '',
+  hook           text default '',
+  closing        text default '',
+  content        text default '',
+  views          int,                         -- impressions (the metric we optimize)
+  likes          int,
+  comments       int,
+  reposts        int,
+  bookmarks      int,
+  notes          text default '',
+  updated_at     timestamptz default now()
+);
+
+create index if not exists content_posts_posted_idx   on content_posts (posted_at desc nulls last);
+create index if not exists content_posts_platform_idx on content_posts (platform);
+create index if not exists content_posts_type_idx     on content_posts (post_type);

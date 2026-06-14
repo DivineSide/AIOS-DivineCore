@@ -163,6 +163,99 @@
   .maprow{display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-bottom:8px}
   .maprow label{font-size:13px;color:var(--muted)}.maprow select{width:100%}
   .modal .actions{display:flex;gap:10px;margin-top:16px}
+
+  /* ===== content dashboard ===== */
+  /* post-type colour system, reused across pills / bars / plan */
+  .ct-authority{--c:#5aa9ff}.ct-educational{--c:#3ecf8e}.ct-personal{--c:#e8b84b}.ct-social-proof{--c:#b98bff}.ct-none{--c:#5a5f73}
+  .tpill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;
+         color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+  .tpill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c)}
+
+  /* hero: today's call to action, top-left, biggest thing on the page */
+  .c-hero{display:grid;grid-template-columns:minmax(280px,1.3fr) repeat(3,minmax(120px,1fr));gap:12px;margin-bottom:8px}
+  @media(max-width:820px){.c-hero{grid-template-columns:1fr 1fr}}
+  .c-today{background:linear-gradient(150deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden}
+  .c-today::after{content:"";position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:50%;background:color-mix(in srgb,var(--c,#5aa9ff) 16%,transparent);filter:blur(8px)}
+  .c-today .k{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px}
+  .c-today .big{font-size:30px;font-weight:800;line-height:1.05;margin-bottom:10px;position:relative;z-index:1}
+  .c-today .why{font-size:13px;color:var(--muted);line-height:1.5;position:relative;z-index:1}
+  .c-today .why b{color:var(--text)}
+  .c-kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;justify-content:center}
+  .c-kpi .n{font-size:28px;font-weight:800;line-height:1}
+  .c-kpi .n.gold{color:var(--gold)}.c-kpi .n.blue{color:var(--blue)}.c-kpi .n.green{color:var(--green)}
+  .c-kpi .l{font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* week plan strip */
+  .c-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .c-day{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;min-height:92px;display:flex;flex-direction:column;gap:7px}
+  .c-day.today{border-color:var(--gold-dim);box-shadow:0 0 0 1px var(--gold-dim) inset}
+  .c-day.past{opacity:.55}
+  .c-day .dh{font-size:12px;color:var(--muted);font-weight:600;display:flex;justify-content:space-between}
+  .c-day .dh .dd{color:#5a5f73}
+  .c-day .done{font-size:12px;color:var(--green);display:flex;align-items:center;gap:5px}
+  .c-day .rec{margin-top:auto}
+  .c-day .flex{font-size:12px;color:#5a5f73;margin-top:auto}
+
+  /* mix bars */
+  .c-mix{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+  .c-mrow{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px}
+  .c-mrow .mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+  .c-mrow .mh .ct{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .c-mrow .mbar{height:7px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+  .c-mrow .mbar>i{display:block;height:100%;background:var(--c);border-radius:4px;transition:width .25s}
+  .c-mrow.hit{border-color:color-mix(in srgb,var(--green) 45%,var(--line))}
+
+  /* two-column lower area */
+  .c-cols{display:grid;grid-template-columns:1.35fr 1fr;gap:22px;align-items:start}
+  @media(max-width:900px){.c-cols{grid-template-columns:1fr}}
+  #view-content table{width:100%;border-collapse:collapse;font-size:13px}
+  #view-content th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:7px 9px;border-bottom:1px solid var(--line)}
+  #view-content td{padding:9px;border-bottom:1px solid var(--line);vertical-align:top}
+  #view-content tr.prow{cursor:pointer}#view-content tr.prow:hover td{background:var(--panel)}
+  #view-content .vbig{font-weight:800;color:var(--blue);font-variant-numeric:tabular-nums;white-space:nowrap}
+  #view-content tr.pbody{display:none}#view-content tr.pbody.show{display:table-row}
+  #view-content tr.pbody td{background:var(--panel-2);white-space:pre-wrap;color:#c8cee0;font-size:13px;line-height:1.55;padding:14px 16px}
+  .c-hooktxt{display:block;max-width:520px}
+  .c-rank{color:#5a5f73;font-weight:700;width:22px}
+  /* reach bars */
+  .c-reach .rrow{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .c-reach .rl{width:96px;font-size:12px;color:var(--muted);text-transform:capitalize;text-align:right;flex-shrink:0}
+  .c-reach .rt{flex:1;background:var(--panel-2);border-radius:5px;height:20px;overflow:hidden}
+  .c-reach .rt>i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),#7cc0ff);border-radius:5px}
+  .c-reach .rv{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .c-note{font-size:12px;color:#5a5f73;margin:4px 0 0}
+
+  /* category breakdown — all-time counts per dimension */
+  .c-breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .c-bd{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .c-bd .bdh{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:11px;display:flex;justify-content:space-between}
+  .c-bd .bdh .bdn{color:#5a5f73}
+  .c-bd .brow{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+  .c-bd .brow:last-child{margin-bottom:0}
+  .c-bd .bl{width:84px;font-size:12px;color:var(--text);text-transform:capitalize;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .c-bd .bt{flex:1;background:var(--panel-2);border-radius:4px;height:14px;overflow:hidden}
+  .c-bd .bt>i{display:block;height:100%;background:var(--c,var(--gold-dim));border-radius:4px}
+  .c-bd .bc{font-size:12px;color:var(--muted);width:30px;text-align:right;font-variant-numeric:tabular-nums}
+
+  /* writing guide — collapsed accordions, invisible until you draft */
+  .c-guide{max-width:820px}
+  .c-guide details{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+  .c-guide summary{cursor:pointer;padding:12px 16px;font-weight:600;font-size:14px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  .c-guide summary::-webkit-details-marker{display:none}
+  .c-guide summary .stag{color:#5a5f73;font-size:12px;font-weight:500}
+  .c-guide summary::after{content:"+";color:var(--muted);font-size:17px;margin-left:10px}
+  .c-guide details[open]>summary::after{content:"–"}
+  .c-guide details[open]>summary{border-bottom:1px solid var(--line)}
+  .c-guide .gbody{padding:13px 16px 16px;font-size:13px;color:#c8cee0;line-height:1.62}
+  .c-guide .gbody b{color:var(--text)}
+  .c-guide .gbody .step{margin:12px 0 4px;color:var(--gold);font-weight:600;font-size:13px}
+  .c-guide .gbody ul{margin:5px 0 0;padding-left:18px}.c-guide .gbody li{margin:3px 0}
+  .c-guide .gbody .q{border-left:2px solid var(--gold-dim);padding:3px 0 3px 12px;margin:9px 0;color:var(--text);font-style:italic}
+  .c-check{background:color-mix(in srgb,var(--gold) 9%,var(--panel));border:1px solid var(--gold-dim);border-radius:10px;padding:13px 16px;margin-bottom:14px}
+  .c-check .ch{color:var(--gold);font-weight:600;font-size:13px;margin-bottom:8px}
+  .c-check ol{margin:0;padding-left:20px;font-size:13px;color:#c8cee0;line-height:1.6}
+  .c-guide .src{font-size:12px;color:#5a5f73;margin:0 0 14px}
+  .c-guide .src code{background:var(--panel-2);padding:1px 6px;border-radius:5px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -175,6 +268,7 @@
       <button class="navlink" data-view="stats">Stats &amp; History</button>
       <button class="navlink" data-view="dialer">Cold Call Dialer</button>
       <button class="navlink" data-view="linkedin">LinkedIn Outreach</button>
+      <button class="navlink" data-view="content">Content</button>
     </nav>
     <div class="hint">Reply in 5 min. Propose 2 times, never just a link. Follow up daily until they book.</div>
   </aside>
@@ -315,6 +409,99 @@
       </div>
       <div id="li-pipeline"></div>
     </section>
+
+    <!-- ============ CONTENT ============ -->
+    <section id="view-content" class="view">
+      <h1>Content</h1>
+      <div class="sub">Reach-first. What to post today, how the week's mix is tracking, and which posts &amp; hooks pull the most impressions.</div>
+
+      <div id="c-hero" class="c-hero"></div>
+
+      <h2>This week's plan</h2>
+      <div class="hsub" style="margin-bottom:12px">Hit the 40/30/20/10 mix across the week. ✓ = posted, otherwise the type to write that day.</div>
+      <div id="c-week" class="c-week"></div>
+
+      <h2>Mix this week vs target</h2>
+      <div id="c-mix" class="c-mix"></div>
+
+      <div class="c-cols" style="margin-top:30px">
+        <div>
+          <h2 style="margin-top:0">Top posts by impressions</h2>
+          <div class="hsub" style="margin-bottom:10px">Click a row for the full post.</div>
+          <div id="c-top"></div>
+        </div>
+        <div>
+          <h2 style="margin-top:0">Best hooks</h2>
+          <div class="hsub" style="margin-bottom:10px">Openers ranked by reach — riff on these.</div>
+          <div id="c-hooks"></div>
+        </div>
+      </div>
+
+      <div class="c-cols" style="margin-top:30px">
+        <div class="c-reach">
+          <h2 style="margin-top:0">Reach by post type</h2>
+          <div id="c-by-type"></div>
+        </div>
+        <div class="c-reach">
+          <h2 style="margin-top:0">Reach by format</h2>
+          <div id="c-by-format"></div>
+        </div>
+      </div>
+
+      <h2>Your library <span id="c-lib-n" class="muted" style="text-transform:none;letter-spacing:0"></span></h2>
+      <div class="hsub" style="margin-bottom:12px">Everything you've posted, counted by category. Spot what you over- and under-write.</div>
+      <div id="c-breakdown" class="c-breakdown"></div>
+
+      <h2>Writing guide</h2>
+      <div class="hsub" style="margin-bottom:12px">Re-read before drafting. Collapsed by design — open what you need.</div>
+      <div class="c-guide">
+        <p class="src">Condensed from <code>linkedin-playbook.md §13</code> — the source of truth. Update there too.</p>
+
+        <div class="c-check">
+          <div class="ch">⚡ Pre-post check — if a draft is weak, it's one of these</div>
+          <ol>
+            <li>The insight isn't interesting → rework the <b>insight</b></li>
+            <li>The idea isn't original (copied) → find <b>your own</b> angle</li>
+            <li>The <b>hook</b> is weak → rewrite the opening</li>
+            <li>The body is <b>hard to read</b> → simpler structure, shorter sentences</li>
+          </ol>
+        </div>
+
+        <details>
+          <summary>Core principle — story, not features <span class="stag">§13.1</span></summary>
+          <div class="gbody">
+            Don't list features. Make the reader <b>envision the experience</b> they'll have if they apply what you're teaching, and the feeling that comes with it.<br><br>
+            The most powerful posts follow an <b>ordinary-to-extraordinary arc</b>: a normal person levels up and transforms against the odds. Before-and-after.<br><br>
+            If your audience has a problem, package the insight as a <b>story about the problem</b>, not a checklist about the solution.
+          </div>
+        </details>
+
+        <details>
+          <summary>The 6-step construction process <span class="stag">§13.2</span></summary>
+          <div class="gbody">
+            <div class="step">1 · Come up with the INSIGHT (not the topic)</div>
+            Don't copy others' insights — you become a copycat and lose the texture only you can write. Mine your own: talk to clients/prospects (their problems, questions, dreams); take notes on what you do daily, especially building in public; analyse your back story.
+            <div class="step">2 · Clarify the idea</div>
+            One post = one idea. Never two — if you have two, write two posts. Package the insight as a story, not a feature list.
+            <div class="step">3 · Choose the structure</div>
+            People skim, they don't read. Short, clear sentences. Pick the framework: <b>PAS</b> (Problem-Agitate-Solution, educational top-of-funnel) · <b>SLA</b> (Story-Lesson-Application, personal transformation) · <b>Before-After-Bridge</b>. Body in 3-4 visible sections: <b>Set the scene → Problem → Journey → Resolution</b>. Reading level 5th-7th grade — if you wouldn't say it to a friend, rewrite it.
+            <div class="step">4 · Write the hook</div>
+            Strongest formula: start with something the audience wants, then <b>"how I [achieved it]"</b> — but only if you actually achieved it, or credibility collapses. A good hook triggers interest, says what the post is about, makes them care, and hands them something usable. Levers: specific numbers · talk to "you" · state + agitate a problem · a surprising fact.
+            <div class="step">5 · Write the body + CTA</div>
+            Deliver what the hook promised. Simple sentences. Write for <b>ICP fit, not raw reach</b>. End with a <b>specific question</b> tied to the post (never "Thoughts?"). When someone in your ICP engages, DM them: acknowledge their work, no pitch.
+            <div class="step">6 · Pick the image</div>
+            In priority: 1) before-and-after photos · 2) an authentic photo of you capturing the win (bright, vibrant) · 3) infographic/graph/screenshot with a title overlay that doubles as the hook. Carousels work for step-by-step / framework posts.
+          </div>
+        </details>
+
+        <details>
+          <summary>Content multiplication — double down on what works <span class="stag">§13.3</span></summary>
+          <div class="gbody">
+            When a topic goes viral, the audience told you what they want. Don't move on — <b>double down</b>. For one validated topic: write 10 posts on it, each a different story; then 10 more variations per format (text, video, photo, carousel). That's <b>50 posts from one validated topic</b>.
+          </div>
+        </details>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -337,6 +524,7 @@
 const API = "/crm/api";
 let dialerLoad = null;   // set by the dialer IIFE, called when its tab opens
 let liLoad = null;       // set by the LinkedIn IIFE
+let contentLoad = null;  // set by the Content dashboard IIFE
 
 // ---- config: metric keys match the old local tracker's ids, so imports map 1:1 ----
 const KPI_METRICS = [
@@ -400,6 +588,7 @@ document.querySelectorAll(".navlink").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="stats")loadStats();
   if(b.dataset.view==="dialer" && dialerLoad)dialerLoad();
   if(b.dataset.view==="linkedin" && liLoad)liLoad();
+  if(b.dataset.view==="content" && contentLoad)contentLoad();
 });
 
 // ================= CRM =================
@@ -1032,6 +1221,166 @@ loadProspects();
     }catch(err){ alert("Import failed: "+err.message); }
     e.target.value="";
   });
+})();
+
+// ================= CONTENT DASHBOARD (scoped IIFE) =================
+(function(){
+  const WEEKLY_TARGET = {authority:3, educational:2, personal:1, "social-proof":1};
+  const TYPE_ORDER = ["authority","educational","personal","social-proof"];
+  const TLABEL = {authority:"Authority", educational:"Educational", personal:"Personal", "social-proof":"Social proof"};
+  const WD = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  let POSTS = [];
+
+  const vnum = p => { const v=p.views; return (v===null||v===undefined||v==="")?null:Number(v); };
+  const withV = ()=> POSTS.filter(p=>vnum(p)!==null);
+  const tpill = t => `<span class="tpill ct-${t||'none'}">${TLABEL[t]||t||"—"}</span>`;
+  const median = arr => { if(!arr.length) return 0; const s=arr.slice().sort((a,b)=>a-b),m=s.length>>1; return s.length%2?s[m]:Math.round((s[m-1]+s[m])/2); };
+  const bestFor = t => { const c=POSTS.filter(p=>p.post_type===t && vnum(p)!==null); if(!c.length) return null;
+    const b=c.reduce((x,y)=>vnum(y)>vnum(x)?y:x); return {hook:(b.hook||b.content||"").slice(0,150), views:vnum(b), format:b.format||"?"}; };
+
+  function planWeek(){
+    const wk = weekDates(todayStr());                 // [Mon..Sun] iso
+    const today = todayStr();
+    const inWk = POSTS.filter(p=>p.platform!=="x" && wk.includes(p.posted_at));
+    const byType={}, byDay={};
+    inWk.forEach(p=>{ const t=p.post_type||"none"; byType[t]=(byType[t]||0)+1; (byDay[p.posted_at]||(byDay[p.posted_at]=[])).push(t); });
+    // deficit queue, biggest-priority types first
+    const q=[]; TYPE_ORDER.forEach(t=>{ const need=Math.max(0,(WEEKLY_TARGET[t]||0)-(byType[t]||0)); for(let i=0;i<need;i++) q.push(t); });
+    const days = wk.map((iso,i)=>{
+      const done = byDay[iso]||[];
+      let rec=null;
+      if(!done.length && iso>=today && q.length) rec=q.shift();
+      return {iso, name:WD[i], dd:new Date(iso+"T00:00:00").getDate(), isToday:iso===today, isPast:iso<today, done, rec};
+    });
+    return {wk, days, byType, leftover:q};
+  }
+
+  function renderHero(plan){
+    const posted = plan.days.reduce((s,d)=>s+d.done.length,0);
+    const vs = withV().map(vnum);
+    const med = median(vs), top = vs.length?Math.max(...vs):0;
+    const todayCell = plan.days.find(d=>d.isToday);
+    let heroType, heroK, heroBig, heroWhy;
+    if(todayCell && todayCell.done.length){
+      heroType="none"; heroK="Today — done ✓";
+      heroBig=`Posted ${todayCell.done.map(t=>TLABEL[t]||t).join(" + ")}`;
+      const nextRec = plan.days.find(d=>!d.isPast && !d.done.length && d.rec);
+      heroWhy = nextRec ? `Next up <b>${nextRec.name}</b>: write <b>${TLABEL[nextRec.rec]}</b>.` : `Week's mix is covered. Anything more is a bonus.`;
+    } else {
+      const t = (todayCell && todayCell.rec) || plan.leftover[0] || TYPE_ORDER[0];
+      heroType=t; heroK="Post today"; heroBig=TLABEL[t]||t;
+      const ex = bestFor(t);
+      heroWhy = ex ? `Your best ${esc(ex.format)} pulled <b>${ex.views} views</b>. Riff on: "${esc(ex.hook)}…"`
+                   : `Aim for a ${TLABEL[t].toLowerCase()} angle to hit the mix.`;
+    }
+    $("#c-hero").innerHTML =
+      `<div class="c-today ct-${heroType}">
+         <div class="k">${heroK}</div>
+         <div class="big">${heroBig}</div>
+         <div class="why">${heroWhy}</div>
+       </div>
+       <div class="c-kpi"><div class="n ${posted>=7?'green':'gold'}">${posted}<span style="font-size:15px;color:var(--muted)">/7</span></div><div class="l">posts this week</div></div>
+       <div class="c-kpi"><div class="n blue">${med.toLocaleString()}</div><div class="l">median impressions</div></div>
+       <div class="c-kpi"><div class="n">${top.toLocaleString()}</div><div class="l">best post</div></div>`;
+  }
+
+  function renderWeek(plan){
+    $("#c-week").innerHTML = plan.days.map(d=>{
+      let body;
+      if(d.done.length) body = d.done.map(t=>`<div class="done">✓ ${TLABEL[t]||t}</div>`).join("");
+      else if(d.rec) body = `<div class="rec">${tpill(d.rec)}</div>`;
+      else if(d.isPast) body = `<div class="flex">—</div>`;
+      else body = `<div class="flex">free / flex</div>`;
+      return `<div class="c-day ${d.isToday?'today':''} ${d.isPast?'past':''}">
+        <div class="dh"><span>${d.name}${d.isToday?' · today':''}</span><span class="dd">${d.dd}</span></div>
+        ${body}</div>`;
+    }).join("");
+  }
+
+  function renderMix(plan){
+    $("#c-mix").innerHTML = TYPE_ORDER.map(t=>{
+      const have=plan.byType[t]||0, want=WEEKLY_TARGET[t], pct=Math.min(100,Math.round(have/want*100)), hit=have>=want;
+      return `<div class="c-mrow ct-${t} ${hit?'hit':''}">
+        <div class="mh">${tpill(t)}<span class="ct">${have}/${want}${hit?' ✓':''}</span></div>
+        <div class="mbar"><i style="width:${pct}%"></i></div></div>`;
+    }).join("");
+  }
+
+  function renderTop(){
+    const rows = withV().sort((a,b)=>vnum(b)-vnum(a)).slice(0,12);
+    if(!rows.length){ $("#c-top").innerHTML=`<div class="empty">No posts with impressions yet. Sync the tracker.</div>`; return; }
+    $("#c-top").innerHTML = `<table><thead><tr><th></th><th>Views</th><th>Type</th><th>Hook</th></tr></thead><tbody>`+
+      rows.map((p,i)=>`<tr class="prow" data-b="cb${i}">
+        <td class="c-rank">${i+1}</td>
+        <td class="vbig">${vnum(p).toLocaleString()}</td>
+        <td>${tpill(p.post_type)}<div class="c-note">${esc(p.format||"")} · ${esc(p.posted_at||"")}</div></td>
+        <td><span class="c-hooktxt">${esc((p.hook||p.content||"").slice(0,110))}…</span></td>
+       </tr>
+       <tr class="pbody" id="cb${i}"><td colspan="4">${esc(p.content||p.hook||"")}</td></tr>`).join("")+
+      `</tbody></table>`;
+  }
+
+  function renderHooks(){
+    const rows = withV().sort((a,b)=>vnum(b)-vnum(a)).slice(0,10);
+    if(!rows.length){ $("#c-hooks").innerHTML=`<div class="empty">—</div>`; return; }
+    $("#c-hooks").innerHTML = `<table><tbody>`+
+      rows.map(p=>`<tr><td class="vbig" style="width:54px">${vnum(p).toLocaleString()}</td>
+        <td>${esc((p.hook||"").slice(0,90))}<div class="c-note">${tpill(p.post_type)}</div></td></tr>`).join("")+
+      `</tbody></table>`;
+  }
+
+  function reachBars(elId, key){
+    const groups={};
+    withV().forEach(p=>{ const k=(p[key]||"(none)"); (groups[k]||(groups[k]=[])).push(vnum(p)); });
+    const data=Object.entries(groups).map(([k,vs])=>({k, med:median(vs), n:vs.length})).sort((a,b)=>b.med-a.med);
+    const mx=Math.max(...data.map(d=>d.med),1);
+    $("#"+elId).innerHTML = data.map(d=>`<div class="rrow">
+      <div class="rl">${esc(d.k)}</div>
+      <div class="rt"><i style="width:${Math.round(d.med/mx*100)}%"></i></div>
+      <div class="rv">${d.med.toLocaleString()} · n${d.n}</div></div>`).join("");
+  }
+
+  function renderBreakdown(){
+    const total = POSTS.length;
+    $("#c-lib-n").textContent = `· ${total} posts`;
+    const dims = [
+      {key:"post_type", title:"Post type", colored:true},
+      {key:"format",    title:"Format"},
+      {key:"framework", title:"Framework"},
+      {key:"differentiator", title:"Angle"},
+    ];
+    $("#c-breakdown").innerHTML = dims.map(d=>{
+      const g={}; POSTS.forEach(p=>{ const k=(p[d.key]||"(none)"); g[k]=(g[k]||0)+1; });
+      const data=Object.entries(g).map(([k,n])=>({k,n})).sort((a,b)=>b.n-a.n);
+      const mx=Math.max(...data.map(x=>x.n),1);
+      const rows=data.map(x=>{
+        const c = d.colored ? `ct-${x.k}` : "";
+        const lab = d.colored ? (TLABEL[x.k]||x.k) : x.k;
+        return `<div class="brow ${c}">
+          <div class="bl" title="${esc(lab)}">${esc(lab)}</div>
+          <div class="bt"><i style="width:${Math.round(x.n/mx*100)}%"></i></div>
+          <div class="bc">${x.n}</div></div>`;
+      }).join("");
+      return `<div class="c-bd"><div class="bdh"><span>${d.title}</span><span class="bdn">${data.length}</span></div>${rows}</div>`;
+    }).join("");
+  }
+
+  function render(){
+    if(!POSTS.length){ $("#c-hero").innerHTML=`<div class="empty" style="grid-column:1/-1">No posts synced yet. Push the tracker: <code>python tools/social-tracker/sync_to_crm.py</code></div>`;
+      ["c-week","c-mix","c-top","c-hooks","c-by-type","c-by-format","c-breakdown"].forEach(i=>$("#"+i).innerHTML=""); $("#c-lib-n").textContent=""; return; }
+    const plan=planWeek();
+    renderHero(plan); renderWeek(plan); renderMix(plan);
+    renderTop(); renderHooks(); reachBars("c-by-type","post_type"); reachBars("c-by-format","format");
+    renderBreakdown();
+  }
+
+  $("#c-top").addEventListener("click", e=>{
+    const tr=e.target.closest("tr.prow"); if(!tr) return;
+    const b=document.getElementById(tr.dataset.b); if(b) b.classList.toggle("show");
+  });
+
+  async function load(){ try{ POSTS=await jget("/crm/api/content"); }catch(e){ POSTS=[]; console.error(e); } render(); }
+  contentLoad = load;
 })();
 </script>
 </body>
