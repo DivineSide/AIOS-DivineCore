@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from celery import Celery
 
@@ -16,6 +20,16 @@ from settings import settings
 celery_client = Celery("api", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
 app = FastAPI(title="DivineCore v2")
+
+# Serve the unified dashboard at /
+_frontend = Path(__file__).parent.parent.parent / "frontend"
+if _frontend.exists():
+    app.mount("/static", StaticFiles(directory=str(_frontend)), name="static")
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard():
+    return (_frontend / "index.html").read_text()
+
 app.include_router(upwork_router)
 app.include_router(upwork_jobs_router)
 app.include_router(instantly_router)
@@ -31,9 +45,9 @@ class EchoRequest(BaseModel):
     message: str
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root():
-    return {"status": "ok", "service": "DivineCore v2 API"}
+    return (_frontend / "index.html").read_text()
 
 
 @app.post("/tasks/echo")

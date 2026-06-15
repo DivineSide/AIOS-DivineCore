@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="purple">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DivineSide Operating System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&family=Saira+Condensed:ital,wght@0,400;0,600;1,500&family=Orbitron:wght@500;700;900&family=Zen+Dots&display=swap" rel="stylesheet" />
+<style>
+/* ════════════════════════════════════════════════════════════
+   DIVINECORE · cosmic glassmorphism · sidebar OS
+   default skin: PURPLE (Zen Dots) · alternates: green, blue
+════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+html { font-size: 14px; }
+a { text-decoration: none; color: inherit; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+
+/* ───── PALETTES ───── */
+[data-theme="purple"]{
+  --acc:#b07cff; --acc2:#8b5cf6; --acc-ink:#e9ddff;
+  --glow:rgba(150,90,255,.55); --glow2:rgba(90,60,200,.35); --quasar:rgba(190,140,255,.6);
+  --void:#070512; --void2:#0b0820; --star:#cdbcff;
+  --disp:'Zen Dots', sans-serif;
+}
+[data-theme="green"]{
+  --acc:#76ff8f; --acc2:#34d058; --acc-ink:#d6ffe0;
+  --glow:rgba(60,230,120,.45); --glow2:rgba(30,160,90,.30); --quasar:rgba(150,255,180,.5);
+  --void:#04100a; --void2:#061a10; --star:#bdffd0;
+  --disp:'Orbitron', sans-serif;
+}
+[data-theme="blue"]{
+  --acc:#5db4ff; --acc2:#3b82f6; --acc-ink:#dcefff;
+  --glow:rgba(70,150,255,.50); --glow2:rgba(40,90,200,.32); --quasar:rgba(150,200,255,.55);
+  --void:#04081a; --void2:#070d26; --star:#bcd6ff;
+  --disp:'Saira Condensed', sans-serif;
+}
+:root{
+  --text:#e8e9f2; --muted:#9a9cb8; --faint:#5a5c7a; --dim:#3a3c54;
+  /* glass: properly opaque dark frost (Hermes-grade), tinted toward the void */
+  --glass:rgba(14,12,28,0.62); --glass-2:rgba(28,24,52,0.55);
+  --glass-line:rgba(255,255,255,.07); --glass-line-2:rgba(255,255,255,.13);
+  --ui:'Inter', sans-serif; --mono:'JetBrains Mono', monospace;
+  --good:#3ecf8e; --warn:#e8b84b;
+}
+
+body{
+  font-family: var(--ui); color: var(--text);
+  background: var(--void);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ════════ COSMIC BACKGROUND — full universe ════════ */
+.cosmos{ position: fixed; inset: 0; z-index: 0; overflow: hidden; transition: background .6s; }
+.cosmos .void{
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg, var(--void) 0%, var(--void2) 55%, var(--void) 100%);
+}
+
+/* ── DEEP NEBULA — layered drifting gas clouds (cinematic depth) ── */
+.nebula{ position:absolute; inset:-25%; pointer-events:none; }
+.nebula::before, .nebula::after{ content:''; position:absolute; border-radius:50%; }
+.nebula::before{ top:2%; left:48%; width:60%; height:70%; filter: blur(90px);
+  background:
+    radial-gradient(circle at 40% 40%, var(--glow) 0%, transparent 55%),
+    radial-gradient(circle at 70% 60%, var(--quasar) 0%, transparent 50%);
+  opacity:.34; animation: neb1 44s ease-in-out infinite alternate; }
+.nebula::after{ bottom:-6%; left:-2%; width:55%; height:62%; filter: blur(100px);
+  background:
+    radial-gradient(circle at 50% 50%, var(--glow2) 0%, transparent 60%),
+    radial-gradient(circle at 30% 70%, var(--glow) 0%, transparent 45%);
+  opacity:.22; animation: neb2 52s ease-in-out infinite alternate; }
+@keyframes neb1 { from{transform:translate(0,0) scale(1)} to{transform:translate(-4%,3%) scale(1.12)} }
+@keyframes neb2 { from{transform:translate(0,0) scale(1)} to{transform:translate(5%,-3%) scale(1.1)} }
+
+/* extra deep color wash so the void isn't flat */
+.deepwash{ position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background:
+    radial-gradient(ellipse 50% 40% at 78% 22%, var(--glow2) 0%, transparent 60%),
+    radial-gradient(ellipse 45% 38% at 18% 78%, var(--quasar) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 50% 50%, transparent 30%, var(--void) 100%); }
+
+/* ── MILKY-WAY GALAXY BAND — diagonal dust lane of stars ── */
+.galaxy{ position:absolute; top:-20%; left:-10%; width:140%; height:140%;
+  transform: rotate(-26deg); opacity:.5; pointer-events:none; animation: galdrift 300s linear infinite;
+  background:
+    radial-gradient(ellipse 90% 9% at 50% 50%, var(--glow) 0%, var(--glow2) 24%, transparent 60%),
+    radial-gradient(ellipse 80% 5% at 50% 50%, var(--star) 0%, transparent 55%); filter: blur(6px); }
+/* tiny dense stars packed in the band */
+.galaxy::after{ content:''; position:absolute; inset:0;
+  background-image:
+    radial-gradient(.6px .6px at 30% 49%, #fff, transparent),
+    radial-gradient(.6px .6px at 45% 51%, var(--star), transparent),
+    radial-gradient(.6px .6px at 55% 48%, #fff, transparent),
+    radial-gradient(.6px .6px at 62% 52%, var(--acc-ink), transparent),
+    radial-gradient(.6px .6px at 70% 50%, #fff, transparent),
+    radial-gradient(.6px .6px at 38% 50%, #fff, transparent);
+  background-size: 100% 100%; opacity:.8; }
+@keyframes galdrift { from{transform:rotate(-26deg) translateX(0)} to{transform:rotate(-26deg) translateX(-4%)} }
+
+/* ── STARFIELDS — many layers, dense, twinkling ── */
+.stars{ position: absolute; inset: -60%; background-repeat: repeat; }
+/* fine distant dust */
+.stars.s1{ background-image:
+  radial-gradient(.8px .8px at 12% 18%, var(--star), transparent),
+  radial-gradient(.8px .8px at 27% 64%, #fff, transparent),
+  radial-gradient(.8px .8px at 41% 9%, var(--star), transparent),
+  radial-gradient(.8px .8px at 53% 88%, #fff, transparent),
+  radial-gradient(.8px .8px at 66% 33%, var(--star), transparent),
+  radial-gradient(.8px .8px at 78% 72%, #fff, transparent),
+  radial-gradient(.8px .8px at 88% 21%, var(--star), transparent),
+  radial-gradient(.8px .8px at 7% 81%, #fff, transparent),
+  radial-gradient(.8px .8px at 95% 55%, var(--star), transparent),
+  radial-gradient(.8px .8px at 19% 41%, #fff, transparent);
+  background-size: 260px 260px; opacity:.55; animation: drift1 160s linear infinite; }
+/* mid stars */
+.stars.s2{ background-image:
+  radial-gradient(1.2px 1.2px at 22% 30%, #fff, transparent),
+  radial-gradient(1.2px 1.2px at 58% 12%, var(--acc-ink), transparent),
+  radial-gradient(1.2px 1.2px at 73% 58%, #fff, transparent),
+  radial-gradient(1.4px 1.4px at 40% 76%, var(--star), transparent),
+  radial-gradient(1.2px 1.2px at 86% 40%, #fff, transparent),
+  radial-gradient(1.2px 1.2px at 15% 90%, var(--acc-ink), transparent);
+  background-size: 400px 400px; opacity:.5; animation: drift2 240s linear infinite, twinkle 5s ease-in-out infinite; }
+/* bright foreground stars w/ glow */
+.stars.s3{ background-image:
+  radial-gradient(2px 2px at 35% 28%, #fff, transparent),
+  radial-gradient(2.2px 2.2px at 68% 66%, var(--acc-ink), transparent),
+  radial-gradient(1.8px 1.8px at 84% 18%, #fff, transparent),
+  radial-gradient(2px 2px at 12% 56%, var(--star), transparent);
+  background-size: 560px 560px; opacity:.7; animation: drift1 340s linear infinite reverse, twinkle 7s ease-in-out infinite; }
+@keyframes drift1 { from{transform:translate(0,0)} to{transform:translate(-300px,-160px)} }
+@keyframes drift2 { from{transform:translate(0,0)} to{transform:translate(240px,-300px)} }
+@keyframes twinkle { 0%,100%{opacity:.5} 50%{opacity:.85} }
+
+/* ── HERO STARS with diffraction spikes (the 'real photo' tell) ── */
+.hero-star{ position:absolute; width:3px; height:3px; border-radius:50%; background:#fff; pointer-events:none;
+  box-shadow: 0 0 6px 2px #fff, 0 0 14px 4px var(--glow); animation: starpulse 6s ease-in-out infinite; }
+.hero-star::before, .hero-star::after{ content:''; position:absolute; left:50%; top:50%; background:linear-gradient(var(--star), transparent); transform:translate(-50%,-50%); }
+.hero-star::before{ width:1px; height:46px; background:linear-gradient(180deg, transparent, #fff 50%, transparent); }
+.hero-star::after{ width:46px; height:1px; background:linear-gradient(90deg, transparent, #fff 50%, transparent); }
+.hero-star.hs1{ top:18%; left:62%; } .hero-star.hs2{ top:70%; left:30%; animation-delay:2s } .hero-star.hs3{ top:40%; left:85%; animation-delay:4s; transform:scale(.8) }
+@keyframes starpulse{ 0%,100%{ opacity:.7 } 50%{ opacity:1 } }
+/* readability veil + vignette for depth (Hermes trick: dark corners) */
+.cosmos .veil{ position:absolute; inset:0; background:
+  radial-gradient(ellipse 120% 90% at 50% 0%, transparent 42%, rgba(0,0,0,.40) 100%),
+  radial-gradient(ellipse 100% 80% at 50% 100%, transparent 50%, rgba(0,0,0,.30) 100%),
+  radial-gradient(ellipse 70% 60% at 30% 50%, transparent 0%, rgba(0,0,0,.18) 95%); }
+/* fractal-noise grain overlay — the texture that sells "expensive" */
+.cosmos .noise{ position:absolute; inset:0; pointer-events:none; opacity:.03; mix-blend-mode:overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px; }
+.cosmos::after{ content:''; position:absolute; inset:0; background-image: repeating-linear-gradient(0deg, transparent 0 2px, rgba(255,255,255,.010) 2px 3px); pointer-events:none; }
+
+/* performance + accessibility: weak GPU / reduced motion → calm it down */
+@supports not (backdrop-filter: blur(1px)){
+  .side,.topbar,.stat,.card,.placeholder{ background: var(--void2) !important; }
+}
+@media (prefers-reduced-motion: reduce){
+  .stars,.galaxy,.nebula::before,.nebula::after,.hero-star{ animation: none !important; }
+  *,*::before,*::after{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+
+/* ════════ APP SHELL ════════ */
+.app{ position: relative; z-index: 1; display: grid; grid-template-columns: 248px 1fr; height: 100vh; }
+
+/* ───── SIDEBAR ───── */
+.side{
+  display: flex; flex-direction: column;
+  background: var(--glass); backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  border-right: 1px solid var(--glass-line);
+  box-shadow: 1px 0 24px rgba(0,0,0,.35);
+}
+.brand{ display: flex; align-items: center; gap: 11px; padding: 20px 18px 18px; border-bottom: 1px solid var(--glass-line); }
+.brand .mk{
+  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #0b0614; font-weight: 700; font-size: 16px;
+  box-shadow: 0 0 22px var(--glow); font-family: var(--disp);
+}
+.brand .nm{ font-family: var(--disp); font-size: 13px; letter-spacing: .02em; color: var(--text); line-height: 1.3; }
+.brand .nm span{ color: var(--acc); }
+.brand .tg{ font-family: var(--mono); font-size: 8px; color: var(--faint); letter-spacing: .14em; margin-top: 2px; }
+
+.nav{ flex: 1; padding: 14px 12px; overflow-y: auto; }
+.nav-sec{ font-family: var(--mono); font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: var(--faint); margin: 14px 10px 8px; }
+.nav-sec:first-child{ margin-top: 2px; }
+.navlink{
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 9px 11px; border-radius: 9px; color: var(--muted); font-size: 13px; font-weight: 500;
+  margin-bottom: 2px; border: 1px solid transparent; transition: all .15s; position: relative;
+}
+.navlink .ic{ width: 17px; text-align: center; font-size: 13px; opacity: .8; flex-shrink: 0; }
+.navlink .ct{ margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--faint); }
+.navlink:hover{ color: var(--text); background: var(--glass-2); }
+.navlink.active{ color: var(--acc-ink); background: var(--glass-2); border-color: var(--glass-line-2); }
+.navlink.active::before{ content:''; position:absolute; left:-12px; top:50%; transform: translateY(-50%); width:3px; height:18px; border-radius:3px; background: var(--acc); box-shadow: 0 0 10px var(--acc); }
+
+/* sidebar system footer (Hermes-style) */
+.sysfoot{ padding: 14px 16px; border-top: 1px solid var(--glass-line); font-family: var(--mono); }
+.sysfoot .sf-h{ font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: var(--faint); margin-bottom: 9px; }
+.sysrow{ display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+.sysrow b{ color: var(--good); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.sysrow b .pd{ width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 7px var(--good); animation: blink 2.4s infinite; }
+@keyframes blink{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.sf-act{ display: flex; gap: 8px; margin-top: 10px; }
+.sf-act button{ flex: 1; font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--glass-line); border-radius: 7px; padding: 7px; transition: all .15s; }
+.sf-act button:hover{ color: var(--acc); border-color: var(--acc2); background: var(--glass-2); }
+
+/* theme switch in sidebar */
+.tsw{ display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--glass-line); }
+.tsw .lab{ font-family: var(--mono); font-size: 8px; color: var(--faint); letter-spacing: .14em; }
+.swatch{ width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--glass-line-2); cursor: pointer; transition: transform .15s; }
+.swatch:hover{ transform: scale(1.2); }
+.swatch.s-purple{background:#b07cff} .swatch.s-green{background:#76ff8f} .swatch.s-blue{background:#5db4ff}
+.swatch.active{ border-color:#fff; box-shadow: 0 0 0 2px var(--void), 0 0 10px currentColor; }
+.swatch.s-purple.active{color:#b07cff} .swatch.s-green.active{color:#76ff8f} .swatch.s-blue.active{color:#5db4ff}
+
+/* ───── MAIN ───── */
+.main{ display: flex; flex-direction: column; overflow: hidden; }
+.topbar{
+  display: flex; align-items: center; gap: 16px; padding: 0 24px; height: 60px; flex-shrink: 0;
+  background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--glass-line);
+}
+.crumb{ font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .05em; }
+.crumb b{ color: var(--acc); }
+.search{ margin-left: auto; display: flex; align-items: center; gap: 9px; background: var(--glass); border: 1px solid var(--glass-line); border-radius: 9px; padding: 8px 13px; min-width: 220px; }
+.search input{ background: none; border: none; outline: none; color: var(--text); font-family: var(--ui); font-size: 12px; width: 100%; }
+.search input::placeholder{ color: var(--faint); }
+.search .k{ font-family: var(--mono); font-size: 9px; color: var(--faint); }
+.clock{ font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .06em; }
+
+.content{ flex: 1; overflow-y: auto; padding: 28px 30px 40px; }
+
+/* view switching */
+.view{ display: none; animation: fade .35s ease; }
+.view.active{ display: block; }
+@keyframes fade{ from{opacity:0; transform: translateY(8px)} to{opacity:1; transform: translateY(0)} }
+
+/* module-view hero (smaller) */
+.vhead{ margin-bottom: 24px; }
+.vhead .eb{ font-family: var(--mono); font-size: 9px; letter-spacing: .3em; text-transform: uppercase; color: var(--acc); margin-bottom: 12px; }
+.vhead h1{ font-family: var(--disp); font-size: 30px; font-weight: 700; letter-spacing: -.01em; line-height: 1.1; margin-bottom: 10px; }
+.vhead h1 .c{ color: var(--acc); text-shadow: 0 0 28px var(--glow); }
+.vhead p{ font-size: 13.5px; color: var(--muted); max-width: 560px; line-height: 1.6; }
+
+/* ── HOME HERO (cinematic) ── */
+.hero-home{ position: relative; text-align: center; padding: 46px 20px 44px; margin-bottom: 30px; overflow: hidden; }
+.hh-glow{ position:absolute; top:30%; left:50%; transform:translate(-50%,-50%); width:560px; height:300px;
+  background: radial-gradient(ellipse, var(--glow) 0%, transparent 65%); opacity:.4; filter: blur(30px); pointer-events:none; z-index:0; }
+.hh-eb{ position:relative; z-index:1; font-family: var(--mono); font-size: 10px; letter-spacing: .36em; text-transform: uppercase; color: var(--acc);
+  margin-bottom: 22px; opacity:0; animation: rise .7s ease .1s forwards; }
+.hh-eb::before, .hh-eb::after{ content:''; display:inline-block; width:26px; height:1px; background:var(--acc2); vertical-align:middle; margin:0 12px; opacity:.6; }
+.hh-title{ position:relative; z-index:1; font-family: var(--disp); line-height: 1.0; letter-spacing: -.01em; margin-bottom: 20px; }
+.hh-title .l1{ display:block; font-size: 30px; font-weight: 700; color: var(--muted); letter-spacing:.12em; text-transform:uppercase;
+  opacity:0; animation: rise .7s ease .25s forwards; }
+.hh-title .l2{ display:block; font-size: 64px; font-weight: 700; color: var(--text); text-shadow: 0 0 40px var(--glow); margin-top: 6px;
+  opacity:0; animation: rise .8s ease .4s forwards; }
+.hh-title .l2 .c{ color: var(--acc); }
+.hh-sub{ position:relative; z-index:1; font-size: 15px; color: var(--muted); max-width: 600px; margin: 0 auto; line-height: 1.7; font-weight: 300;
+  opacity:0; animation: rise .8s ease .6s forwards; }
+@keyframes rise{ from{ opacity:0; transform: translateY(16px) } to{ opacity:1; transform: translateY(0) } }
+
+/* stat strip */
+.stats{ display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 30px; }
+.stat{ background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-line); border-radius: 13px; padding: 18px 16px; position: relative; overflow: hidden; transition: border-color .2s, transform .2s, box-shadow .2s; }
+.stat:hover{ border-color: var(--acc2); transform: translateY(-2px); box-shadow: 0 12px 30px -16px var(--glow); }
+.stat::before{ content:''; position:absolute; top:0; left:0; right:0; height:1px; background: linear-gradient(90deg, transparent, var(--glass-line-2), transparent); }
+.stat .n{ font-family: var(--disp); font-size: 26px; font-weight: 700; line-height: 1; }
+.stat .n.a{ color: var(--acc); text-shadow: 0 0 20px var(--glow); }
+.stat .l{ font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .12em; text-transform: uppercase; margin-top: 9px; }
+
+/* module grid */
+.gh{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.gh .t{ font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.gh .c{ font-family: var(--mono); font-size: 10px; color: var(--faint); }
+.grid{ display: grid; grid-template-columns: repeat(12,1fr); gap: 13px; }
+.m-sales{grid-column:span 7}.m-brand{grid-column:span 5}.m-ops{grid-column:span 4}.m-pulse{grid-column:span 4}.m-net{grid-column:span 4}
+
+.card{
+  background: var(--glass); backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border: 1px solid var(--glass-line); border-radius: 15px; padding: 19px; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; transition: border-color .2s, transform .2s, box-shadow .2s;
+  animation: cin .5s ease both;
+}
+.card:nth-child(1){animation-delay:.05s}.card:nth-child(2){animation-delay:.1s}.card:nth-child(3){animation-delay:.15s}.card:nth-child(4){animation-delay:.2s}.card:nth-child(5){animation-delay:.25s}
+@keyframes cin{ from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+.card:hover{ border-color: var(--acc2); transform: translateY(-3px); box-shadow: 0 14px 40px -16px var(--glow); }
+.card::after{ content:''; position:absolute; top:0; left:0; right:0; height:2px; background: var(--glass-line); transition:.2s; }
+.card.on::after{ background: linear-gradient(90deg, var(--acc), transparent); }
+.chead{ display: flex; align-items: center; gap: 12px; margin-bottom: 13px; }
+.cicon{ width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; background: var(--glass-2); border: 1px solid var(--glass-line); }
+.on .cicon{ box-shadow: inset 0 0 18px -6px var(--glow); border-color: var(--acc2); }
+.cname{ font-family: var(--disp); font-size: 15px; font-weight: 700; line-height: 1; margin-bottom: 7px; }
+.cidx{ position: absolute; top: 16px; right: 18px; font-family: var(--mono); font-size: 9px; color: var(--faint); }
+.badge{ display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; padding: 3px 8px; border-radius: 7px; font-weight: 500; }
+.badge::before{ content:''; width: 5px; height: 5px; border-radius: 50%; }
+.b-on{ background: var(--glass-2); color: var(--acc); border: 1px solid var(--glass-line); }
+.b-on::before{ background: var(--acc); box-shadow: 0 0 6px var(--acc); }
+.b-build{ background: var(--glass); color: var(--faint); border: 1px solid var(--glass-line); }
+.b-build::before{ background: var(--faint); }
+.cdesc{ font-size: 12.5px; line-height: 1.65; color: var(--muted); margin-bottom: 16px; flex: 1; }
+.cdiv{ height: 1px; background: var(--glass-line); margin-bottom: 14px; }
+.clinks{ display: flex; flex-wrap: wrap; gap: 7px; }
+.clink{ display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); background: var(--glass); border: 1px solid var(--glass-line); border-radius: 8px; padding: 7px 11px; letter-spacing: .03em; transition: all .15s; }
+.clink:hover{ color: var(--acc); border-color: var(--acc2); background: var(--glass-2); }
+.clink.pri{ color: var(--acc); border-color: var(--acc2); }
+
+/* generic module placeholder view */
+.placeholder{ background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--glass-line); border-radius: 15px; padding: 40px; text-align: center; }
+.placeholder .pi{ font-size: 34px; margin-bottom: 14px; }
+.placeholder h2{ font-family: var(--disp); font-size: 18px; margin-bottom: 8px; }
+.placeholder p{ color: var(--muted); font-size: 13px; max-width: 440px; margin: 0 auto 18px; line-height: 1.6; }
+.placeholder .sublinks{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+
+/* ── icon sizing ── */
+.navlink .ic{ display:flex; align-items:center; justify-content:center; }
+.navlink .ic svg{ width:16px; height:16px; color: currentColor; }
+.cicon svg{ width:20px; height:20px; color: var(--acc); }
+.placeholder .pi{ display:flex; align-items:center; justify-content:center; color: var(--acc); }
+.placeholder .pi svg{ width:34px; height:34px; }
+
+/* scrollbars */
+::-webkit-scrollbar{ width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb{ background: var(--glass-line-2); border-radius: 6px; }
+::-webkit-scrollbar-track{ background: transparent; }
+
+@media (max-width: 1000px){
+  .app{ grid-template-columns: 64px 1fr; }
+  .brand .nm,.brand .tg,.nav-sec,.navlink .ct,.sysfoot,.tsw .lab{ display:none; }
+  .navlink{ justify-content:center; } .navlink .ic{ width:auto; }
+  .stats{ grid-template-columns: repeat(2,1fr); }
+  .m-sales,.m-brand,.m-ops,.m-pulse,.m-net{ grid-column: span 12; }
+}
+</style>
+</head>
+<body>
+
+<!-- COSMIC BACKGROUND -->
+<div class="cosmos">
+  <div class="void"></div>
+  <div class="deepwash"></div>
+  <div class="nebula"></div>
+  <div class="galaxy"></div>
+  <div class="stars s1"></div>
+  <div class="stars s2"></div>
+  <div class="stars s3"></div>
+  <div class="hero-star hs1"></div>
+  <div class="hero-star hs2"></div>
+  <div class="hero-star hs3"></div>
+  <div class="veil"></div>
+  <div class="noise"></div>
+</div>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand">
+      <div class="mk">◈</div>
+      <div><div class="nm">DIVINE<span>CORE</span></div><div class="tg">AI OPERATING SYSTEM · v2</div></div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-sec">Overview</div>
+      <button class="navlink active" data-view="home"><span class="ic" data-i="home"></span>Home</button>
+
+      <div class="nav-sec">Modules</div>
+      <button class="navlink" data-view="sales"><span class="ic" data-i="sales"></span>Sales OS<span class="ct">4</span></button>
+      <button class="navlink" data-view="branding"><span class="ic" data-i="branding"></span>Branding OS<span class="ct">3</span></button>
+      <button class="navlink" data-view="ops"><span class="ic" data-i="ops"></span>Ops OS<span class="ct">1</span></button>
+      <button class="navlink" data-view="pulse"><span class="ic" data-i="pulse"></span>Pulse<span class="ct">1</span></button>
+      <button class="navlink" data-view="networking"><span class="ic" data-i="net"></span>Networking<span class="ct">1</span></button>
+
+      <div class="nav-sec">System</div>
+      <button class="navlink" data-view="api"><span class="ic" data-i="api"></span>API Health</button>
+      <button class="navlink" data-view="logs"><span class="ic" data-i="logs"></span>Logs</button>
+    </nav>
+
+    <div class="sysfoot">
+      <div class="sf-h">System</div>
+      <div class="sysrow"><span>Gateway</span><b><span class="pd"></span>Running</b></div>
+      <div class="sysrow"><span>Active Modules</span><span style="color:var(--text)">3 / 5</span></div>
+      <div class="sysrow"><span>Runtime</span><span style="color:var(--text)">DivineCore v2</span></div>
+      <div class="sf-act">
+        <button>↻ Restart</button>
+        <button>↓ Update</button>
+      </div>
+    </div>
+
+    <div class="tsw">
+      <span class="lab">THEME</span>
+      <div class="swatch s-purple active" data-theme="purple" title="Cosmic Purple"></div>
+      <div class="swatch s-green" data-theme="green" title="Nebula Green"></div>
+      <div class="swatch s-blue" data-theme="blue" title="Deep Blue"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">DIVINECORE <b id="crumb-loc">/ HOME</b></div>
+      <div class="search"><span style="color:var(--faint)">⌕</span><input placeholder="Search modules, tools, logs…" /><span class="k">⌘K</span></div>
+      <div class="clock" id="clock">--:--:-- UTC</div>
+    </div>
+
+    <div class="content">
+
+      <!-- HOME -->
+      <section class="view active" data-view="home">
+        <div class="hero-home">
+          <div class="hh-eb">Internal Control Panel · Authorized Access</div>
+          <h1 class="hh-title"><span class="l1">DivineSide</span><span class="l2">Operating <span class="c">System</span></span></h1>
+          <p class="hh-sub">Five autonomous modules, one cosmic runtime. Sales, branding, operations, awareness, and networking — orchestrated across the void. Divinity in the architecture. Freedom in the execution.</p>
+          <div class="hh-glow"></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="n">05</div><div class="l">Modules</div></div>
+          <div class="stat"><div class="n a">03</div><div class="l">Active</div></div>
+          <div class="stat"><div class="n">V2</div><div class="l">Runtime</div></div>
+          <div class="stat"><div class="n">VPS</div><div class="l">Deployed</div></div>
+          <div class="stat"><div class="n a">24/7</div><div class="l">Uptime</div></div>
+        </div>
+
+        <div class="gh"><div class="t">// OS Modules</div><div class="c">[ 05 SYSTEMS ]</div></div>
+        <div class="grid">
+          <div class="card on m-sales">
+            <span class="cidx">01/05</span>
+            <div class="chead"><div class="cicon" data-i="sales"></div><div><div class="cname">Sales OS</div><span class="badge b-on">Active</span></div></div>
+            <p class="cdesc">Revenue system. Full outbound pipeline — Upwork proposals, cold email via Instantly, LinkedIn engage-first workflow, CRM with KPI tracking, and a timezone-aware cold-call dialer.</p>
+            <div class="cdiv"></div>
+            <div class="clinks"><a class="clink pri" href="/crm">CRM & KPI</a><a class="clink" href="/outreach">Outreach</a><a class="clink" href="/upwork">Upwork</a><a class="clink" href="/upwork-jobs">Job Queue</a></div>
+          </div>
+          <div class="card on m-brand">
+            <span class="cidx">02/05</span>
+            <div class="chead"><div class="cicon" data-i="branding"></div><div><div class="cname">Branding OS</div><span class="badge b-on">Active</span></div></div>
+            <p class="cdesc">Creative intelligence layer. IMAGYN drives visual generation, LYRA drives copy & voice. Social performance dashboard tracks content analytics across platforms.</p>
+            <div class="cdiv"></div>
+            <div class="clinks"><a class="clink pri" href="/imagyn">IMAGYN</a><a class="clink" href="/lyra">LYRA</a><a class="clink" href="/social-perf">Social Perf</a></div>
+          </div>
+          <div class="card m-ops">
+            <span class="cidx">03/05</span>
+            <div class="chead"><div class="cicon" data-i="ops"></div><div><div class="cname">Ops OS</div><span class="badge b-build">In Build</span></div></div>
+            <p class="cdesc">Execution & gap detection. Fathom polling ingests recordings every 10 min, upserts summaries to Supabase, creates Pulse task rows.</p>
+            <div class="cdiv"></div>
+            <div class="clinks"><a class="clink" href="/ops">Ops Dashboard</a></div>
+          </div>
+          <div class="card on m-pulse">
+            <span class="cidx">04/05</span>
+            <div class="chead"><div class="cicon" data-i="pulse"></div><div><div class="cname">Pulse</div><span class="badge b-on">Active</span></div></div>
+            <p class="cdesc">Alert & awareness system. Live in production via n8n. Monitors signals across all modules and routes alerts to Discord in real time.</p>
+            <div class="cdiv"></div>
+            <div class="clinks"><a class="clink pri" href="/pulse">Pulse Monitor</a></div>
+          </div>
+          <div class="card m-net">
+            <span class="cidx">05/05</span>
+            <div class="chead"><div class="cicon" data-i="net"></div><div><div class="cname">Networking OS</div><span class="badge b-build">In Build</span></div></div>
+            <p class="cdesc">Networking & recruitment pipeline. Relationship building, talent sourcing, and partnership development across all active channels.</p>
+            <div class="cdiv"></div>
+            <div class="clinks"><a class="clink" href="/networking">Networking</a></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODULE VIEWS (generated) -->
+      <section class="view" data-view="sales">
+        <div class="vhead"><div class="eb">Module 01 · Revenue System</div><h1><span class="c">Sales</span> OS</h1><p>Full outbound revenue pipeline. Pick a tool to open its dashboard.</p></div>
+        <div class="grid" id="sales-tools"></div>
+      </section>
+      <section class="view" data-view="branding">
+        <div class="vhead"><div class="eb">Module 02 · Creative Intelligence</div><h1><span class="c">Branding</span> OS</h1><p>Visual generation, copy, voice, and content analytics.</p></div>
+        <div class="grid" id="branding-tools"></div>
+      </section>
+      <section class="view" data-view="ops">
+        <div class="vhead"><div class="eb">Module 03 · Execution</div><h1><span class="c">Ops</span> OS</h1><p>Meeting ingestion, gap detection, and task routing.</p></div>
+        <div class="placeholder"><div class="pi" data-i="ops"></div><h2>Ops OS — In Build</h2><p>Fathom polling ingests recordings every 10 minutes, upserts summaries to Supabase, and creates Pulse task rows. Dashboard coming online.</p><div class="sublinks"><a class="clink pri" href="/ops">Open Ops Dashboard</a></div></div>
+      </section>
+      <section class="view" data-view="pulse">
+        <div class="vhead"><div class="eb">Module 04 · Awareness</div><h1><span class="c">Pulse</span></h1><p>Real-time alert and signal monitoring across all modules.</p></div>
+        <div class="placeholder"><div class="pi" data-i="pulse"></div><h2>Pulse Monitor</h2><p>Live in production via n8n. Monitors signals across all modules and routes alerts to Discord in real time.</p><div class="sublinks"><a class="clink pri" href="/pulse">Open Pulse Monitor</a></div></div>
+      </section>
+      <section class="view" data-view="networking">
+        <div class="vhead"><div class="eb">Module 05 · Networking</div><h1><span class="c">Networking</span> OS</h1><p>Relationship building, talent sourcing, partnership development.</p></div>
+        <div class="placeholder"><div class="pi" data-i="net"></div><h2>Networking OS — In Build</h2><p>Networking and recruitment pipeline across all active channels. Dashboard coming online.</p><div class="sublinks"><a class="clink" href="/networking">Open Networking</a></div></div>
+      </section>
+      <section class="view" data-view="api">
+        <div class="vhead"><div class="eb">System</div><h1><span class="c">API</span> Health</h1><p>FastAPI + Celery + Redis runtime status.</p></div>
+        <div class="placeholder"><div class="pi" data-i="api"></div><h2>Gateway Running</h2><p>FastAPI on :8000 · Celery worker healthy · Redis broker connected · Beat heartbeat every 30s.</p><div class="sublinks"><a class="clink pri" href="/tasks/echo">Ping /tasks/echo</a></div></div>
+      </section>
+      <section class="view" data-view="logs">
+        <div class="vhead"><div class="eb">System</div><h1><span class="c">Logs</span></h1><p>Recent system events across modules.</p></div>
+        <div class="placeholder"><div class="pi" data-i="logs"></div><h2>Log Stream</h2><p>Centralized log view coming online. For now, logs route to Discord #deploys and the VPS journal.</p></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── clock ──
+  function clk(){ const n=new Date(),p=x=>String(x).padStart(2,'0');
+    document.getElementById('clock').textContent=`${p(n.getUTCHours())}:${p(n.getUTCMinutes())}:${p(n.getUTCSeconds())} UTC`; }
+  clk(); setInterval(clk,1000);
+
+  // ── build sub-tool cards for sales & branding ──
+  const tools = {
+    sales: [
+      ['crm','CRM & KPI','/crm','Leads CRM, KPI counters, and pipeline dashboard. Supabase-backed.'],
+      ['mail','Outreach','/outreach','Instantly cold-email campaign reporting and reply tracking.'],
+      ['doc','Upwork','/upwork','Proposal generator — 2 LLM calls + Google Docs mail-merge.'],
+      ['queue','Job Queue','/upwork-jobs','Daily Apify scrape review queue with on-demand proposals.'],
+    ],
+    branding: [
+      ['image','IMAGYN','/imagyn','Visual generation agent. Active.'],
+      ['pen','LYRA','/lyra','Copy & voice agent. Loads identity/voice context.'],
+      ['chart','Social Perf','/social-perf','Cross-platform content analytics dashboard.'],
+    ],
+  };
+  function makeCards(list){
+    return list.map((t,i)=>`
+      <div class="card on" style="grid-column:span 4">
+        <span class="cidx">${String(i+1).padStart(2,'0')}</span>
+        <div class="chead"><div class="cicon" data-i="${t[0]}"></div><div><div class="cname">${t[1]}</div><span class="badge b-on">Active</span></div></div>
+        <p class="cdesc">${t[3]}</p>
+        <div class="cdiv"></div>
+        <div class="clinks"><a class="clink pri" href="${t[2]}">Open</a></div>
+      </div>`).join('');
+  }
+  document.getElementById('sales-tools').innerHTML = makeCards(tools.sales);
+  document.getElementById('branding-tools').innerHTML = makeCards(tools.branding);
+
+  // ── clean line-icon system (no emojis) ──
+  const ICONS = {
+    home:  '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/>',
+    sales: '<rect x="3" y="7" width="18" height="13" rx="1.5"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>',
+    branding:'<circle cx="12" cy="12" r="8"/><circle cx="9" cy="9" r="1.4"/><path d="M5 16c2-3 5-3 7-1.5S18 16 19 14"/>',
+    ops:   '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+    pulse: '<path d="M2 12h5l2-6 4 12 2-6h7"/>',
+    net:   '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 7.5 16 16.5M16.5 6H9M18 8.5v7"/>',
+    api:   '<path d="M9 3 4 12l5 9M15 3l5 9-5 9"/>',
+    logs:  '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    mail:  '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="m3 7 9 6 9-6"/>',
+    doc:   '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/>',
+    queue: '<rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="8.5" cy="9" r="1.6"/><path d="m4 18 5-5 4 4 3-3 4 4"/>',
+    pen:   '<path d="M4 20 18 6l-2-2L2 18z" transform="translate(2 0)"/><path d="M14 4l4 4"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  };
+  function paintIcons(scope){
+    (scope||document).querySelectorAll('[data-i]:not([data-painted])').forEach(el=>{
+      const k = el.getAttribute('data-i'); if(!ICONS[k]) return;
+      el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
+      el.setAttribute('data-painted','1');
+    });
+  }
+  paintIcons();
+
+  // ── view routing ──
+  const links = document.querySelectorAll('.navlink');
+  const views = document.querySelectorAll('.view');
+  const crumb = document.getElementById('crumb-loc');
+  links.forEach(l=>l.addEventListener('click',()=>{
+    const v=l.dataset.view;
+    links.forEach(x=>x.classList.toggle('active',x===l));
+    views.forEach(x=>x.classList.toggle('active',x.dataset.view===v));
+    crumb.textContent='/ '+l.textContent.replace(/\d+$/,'').trim().toUpperCase();
+    document.querySelector('.content').scrollTop=0;
+  }));
+
+  // ── theme switch ──
+  const root=document.documentElement;
+  const saved=localStorage.getItem('divinecore-theme');
+  if(saved) setTheme(saved);
+  function setTheme(t){ root.setAttribute('data-theme',t);
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.toggle('active',s.dataset.theme===t));
+    localStorage.setItem('divinecore-theme',t); }
+  document.querySelectorAll('.swatch').forEach(s=>s.addEventListener('click',()=>setTheme(s.dataset.theme)));
+</script>
+
+</body>
+</html>
