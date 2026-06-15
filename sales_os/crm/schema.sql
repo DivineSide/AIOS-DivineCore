@@ -41,6 +41,24 @@ create table if not exists kpi_daily (
 
 create index if not exists kpi_daily_date_idx on kpi_daily (date);
 
+-- kpi_bump: atomically add delta to one (date, metric) cell, creating the row
+-- if it's missing. The whole read-add-write happens inside a single statement
+-- under PostgreSQL's row lock, so rapid concurrent bumps (e.g. clicking many
+-- "connection request sent" buttons in a row, each firing its own request)
+-- all land instead of clobbering each other. Called via PostgREST /rpc/kpi_bump.
+-- Floored at 0 so a negative delta can't drive the count below zero.
+create or replace function kpi_bump(p_date date, p_metric text, p_delta int)
+returns kpi_daily
+language sql
+as $$
+  insert into kpi_daily (date, metric, value, updated_at)
+  values (p_date, p_metric, greatest(0, p_delta), now())
+  on conflict (date, metric) do update
+    set value      = greatest(0, kpi_daily.value + p_delta),
+        updated_at = now()
+  returning *;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- content_posts: one row per published LinkedIn/X post. Mirrors the manual
 -- tracker CSV (tools/social-tracker/posts.csv) so the /crm "Content" dashboard

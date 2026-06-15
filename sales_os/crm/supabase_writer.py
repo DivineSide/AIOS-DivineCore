@@ -120,11 +120,25 @@ def set_kpi(day: str, metric: str, value: int) -> dict[str, Any]:
 
 
 def bump_kpi(day: str, metric: str, delta: int) -> dict[str, Any]:
-    """Increment one (date, metric) cell by delta (read current + set). Used by
-    cross-module auto-logging (e.g. a LinkedIn comment ticks the comments KPI)."""
-    rows = get_kpi_for_date(day)
-    cur = next((int(r.get("value") or 0) for r in rows if r.get("metric") == metric), 0)
-    return set_kpi(day, metric, max(0, cur + delta))
+    """Atomically increment one (date, metric) cell by delta via the kpi_bump
+    Postgres function. Used by cross-module auto-logging (e.g. a LinkedIn comment
+    ticks the comments KPI, a connection request ticks conn_sent).
+
+    The increment runs in a single SQL statement under a row lock, so rapid
+    concurrent bumps (clicking many "connection request sent" buttons fast, each
+    a fire-and-forget request) all land. The old read-then-set version lost
+    updates whenever two requests read the same value before either wrote back.
+    """
+    url = f"{_rest_base()}/rpc/kpi_bump"
+    r = httpx.post(
+        url,
+        headers=_headers(),
+        json={"p_date": day, "p_metric": metric, "p_delta": int(delta)},
+        timeout=30.0,
+    )
+    r.raise_for_status()
+    data = r.json()
+    return data[0] if isinstance(data, list) else data
 
 
 def bulk_set_kpi(rows: list[dict[str, Any]]) -> int:
