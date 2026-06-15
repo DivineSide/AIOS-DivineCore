@@ -41,6 +41,6 @@ When deploying to VPS:
 ssh root@srv1445995.hstgr.cloud "cd /root/divinecore-v2 && docker compose pull && docker compose up -d"
 ```
 
-Smoke test: `curl https://upwork.srv1445995.hstgr.cloud/api/health` or run `/tasks/echo` test.
+Smoke test: `curl https://upwork.srv1445995.hstgr.cloud/` (returns `{"status":"ok",...}`) or run `/tasks/echo` test.
 
 Check logs: `docker compose -f /root/divinecore-v2/docker-compose.prod.yml logs -f`.

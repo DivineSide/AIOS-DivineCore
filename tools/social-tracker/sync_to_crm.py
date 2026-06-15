@@ -28,7 +28,7 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_URL = "https://upwork.srv1445995.hostinger.cloud"
+DEFAULT_URL = "https://upwork.srv1445995.hstgr.cloud"
 
 _spec = importlib.util.spec_from_file_location("social_log", HERE / "social_log.py")
 sl = importlib.util.module_from_spec(_spec)
@@ -43,13 +43,21 @@ FIELDS = [
 
 
 def _auth() -> str:
+    # Priority: env var, then env user/pass, then a gitignored creds file. The
+    # file path keeps the secret off the command line (and out of shell history /
+    # logs) — drop `user:pass` on one line in tools/social-tracker/.crm-auth.
     pair = os.environ.get("CRM_AUTH")
     if not pair:
         u, p = os.environ.get("CRM_USER"), os.environ.get("CRM_PASS")
         if u and p:
             pair = f"{u}:{p}"
     if not pair:
-        sys.exit("Missing creds. Set CRM_AUTH=user:pass (or CRM_USER + CRM_PASS). "
+        cred_file = Path(os.environ.get("CRM_AUTH_FILE", HERE / ".crm-auth"))
+        if cred_file.exists():
+            pair = cred_file.read_text(encoding="utf-8").strip()
+    if not pair:
+        sys.exit("Missing creds. Put `user:pass` in tools/social-tracker/.crm-auth "
+                 "(gitignored), or set CRM_AUTH / CRM_USER+CRM_PASS. "
                  "These are the /crm basic-auth credentials (see infrastructure/README.md).")
     return "Basic " + base64.b64encode(pair.encode()).decode()
 

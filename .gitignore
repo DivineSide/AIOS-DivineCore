@@ -14,6 +14,7 @@ token.json
 
 # Lead lists / scraped prospect data — real PII, never commit (repo is PUBLIC)
 divinecore-v2/worker/sales_os/Clients/divinecore/data/
+sales_os/calls/data/
 *verified-leads*.csv
 
 # Local Claude Code state (machine-specific, not shared)
@@ -34,3 +35,4 @@ tools/social-tracker/.import-*.json
 tools/social-tracker/.impressions-fill.txt
 tools/social-tracker/dashboard.html
 tools/social-tracker/.crm-preview.html
+tools/social-tracker/.crm-auth

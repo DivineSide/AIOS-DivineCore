@@ -55,6 +55,7 @@ Topics Pang wants to write LinkedIn posts on. Strike through or remove the entry
 - How an AI system handles 200 parent update messages a week without a staff member
 - The difference between an AI chatbot and an AI system for an education business
 - Building in public: week 1 with our first coaching institute client
+- How to build an AI system that pushes back instead of yes-manning employees (drafting target 2026-06-16 — see Example 4 for the reference post)
 
 ### Example 1 — Auditing autonomous AI agents
 
@@ -175,6 +176,73 @@ Topics Pang wants to write LinkedIn posts on. Strike through or remove the entry
 > - The DM keyword CTA pattern (adjust keyword to fit current offer)
 >
 > **Transfers to:** LinkedIn (native fit), X (would split into 4-5 standalone tweets: the framing tweet, one tweet per competitor scenario, the closer).
+
+### Example 4 — AI sycophancy + the "give AI to staff and pray" anti-pattern
+
+> **Source / author:** *(unattributed; pasted by Pang 2026-06-15)*
+> **Posted / logged:** 2026-06-15
+> **Topic intent:** Pang wants to write his own version with a **2026-06-16 draft target**: how to build an AI system that actually pushes back, instead of yes-manning the team into bad decisions. The post's angle is the system-design fix. Businesses are handing raw AI to employees, watching it pat them on the back, then doing "AI layoffs" and finally hiring expensive forward-deployed-engineer consultants who pat them on the back in person. The DivineSide answer is the brain-layer + specialist-workflow split he has already introduced in earlier posts — that structure is what stops the sycophancy loop.
+>
+> ---
+>
+> I've worked with some great businesses lately and...
+>
+> There's a lot of people busy doing f*ck all with AI.
+>
+> AI just constantly patting employees on the back...
+>
+> "You're right to question that"
+> "You're absolutely right"
+> "This is a great idea"
+> "You're doing great"
+> "Incredible idea"
+> "This is the one"
+>
+> The problem is they are just giving employees AI and being like:
+>
+> "be more productive and make us more money"
+>
+> If only it were that easy right?
+>
+> Then they'll do 'AI layoffs'
+>
+> And I'm like...
+>
+> "If you can't make AI work with a bunch of talented employees how on earth do you expect to make it work without them?"
+>
+> What's funny is...
+>
+> They'll just hire a bunch of expensive AI consultants (AKA forward deployed engineers) who will pat them on the back in person.
+>
+> Look what happened when Uber fudged it up with AI 🥴
+>
+> ===
+>
+> My next newsletter I send will show you a free AI strategy to make LinkedIn 1000x easier for you, without using AI to write a single word of content.
+>
+> ---
+>
+> **What works:**
+> - **Sycophancy quotes are the hook.** Six recognisable AI yes-man phrases stacked together. Anyone who has used ChatGPT or Claude for real work pattern-matches instantly.
+> - **"Be more productive and make us more money" lampoon.** Captures how most companies actually adopt AI in one quote. Specific enough to feel real.
+> - **The forcing-question line.** *"If you can't make AI work with talented employees, how do you expect it to work without them?"* lands the AI-layoffs argument in one sentence.
+> - **Forward-deployed-engineer call-out.** Names the consultant class by its industry term. Insider credibility + a fresh target most LinkedIn posts don't touch.
+> - **Loose, voice-y rhythm.** "And I'm like..." reads like a tweet thread compressed into a LinkedIn post.
+>
+> **Watch out for (when adapting for Pang's voice):**
+> - **Six period-stacked one-liner quotes.** That's the AI-tell staccato rhythm. Pang can use 2-3 of the quotes inline in one flowing sentence instead of six fragments stacked.
+> - **"f*ck all"** — Pang doesn't lead with profanity in posts. Use "very little" or similar.
+> - **"Look what happened when Uber fudged it up with AI 🥴"** — name-drops a specific failure with no source. Pang only references things he can verify. Replace with a coaching/education example he has actually seen, or drop.
+> - **One-line-per-paragraph throughout.** Reads casual on first scan but compounds visual noise on LinkedIn. Pang's posts use the 4-part body structure (Set scene → Problem → Journey → Resolution). Apply it.
+> - **Emoji 🥴** drop.
+>
+> **Adaptation angles worth keeping:**
+> - **Stack 2-3 sycophancy quotes inline** as the hook to anchor recognition. e.g. *"'You're absolutely right.' 'This is a great idea.' 'This is the one.' If that's what your AI says to your team every day, it's not helping your business."*
+> - **The "if you can't make it work with talented people, how do you expect it without them" line is the killer move.** Adapt for a coaching-center / operations frame and use it as the agitate step.
+> - **The system-design fix is the differentiator.** Context-layer + specialist-workflow split (covered in recent posts) is the answer to "how do you stop AI yes-manning the team." Tie it back to the brain-layer the previous posts have introduced.
+> - **Close with a give-away.** The original ends on a newsletter tease. Pang can mirror with a comment-keyword giveaway (e.g. "Drop AGENT for the 5-question test we use to spot a sycophancy-trapped AI workflow in 10 minutes").
+>
+> **Transfers to:** LinkedIn (native fit), X (the quote-stack hook + forcing-question close work as a 5-tweet thread).
 
 (Add more as you find them.)
 
