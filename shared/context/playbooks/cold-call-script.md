@@ -52,6 +52,13 @@ If she asks how it works:
 > [probably no]
 > "That's exactly where I come in. I know you're busy, so we need about 10 minutes from you a week to set it up, then it runs in the background and brings in reviews on its own. And I'm not asking for money right now, it's a two-week free trial, no results no pay. Got 10 minutes this week where I can screen share and show you?"
 
+*Alternate path — discovery pivot (when reviews clearly won't land and the call is otherwise dead):* use the "one last question" to learn their real pain instead of forcing the close.
+> "Wow, that's a nice problem to have. Okay, can I ask you one last question?"
+> [yes]
+> "So I was working with another tutoring center and built them a system for something totally different. Their teachers spent hours a week making slides and worksheets by hand. Now they just type in a topic, or drop in a past paper, and it spits out full slides, worksheets, and answer sheets, all in their branding so it looks like their own team made it. Think that'd be useful for you, or other centers you know? Just trying to learn the biggest pain points in this niche."
+>
+> *Purpose: keeps a dead call alive and doubles as free market research on what actually hurts in this niche. Not a second offer, a discovery probe.*
+
 **"We already have a service doing this"**
 > "Oh nice, good that you're on it. How are the results so far?"
 > [okay / good]
@@ -73,6 +80,14 @@ If she asks how it works:
 > "Hey [name], sorry to bug you. Was looking at [center] this morning, you've served [stat] but I could only find around [#] reviews online. I build review systems for test prep centers and I set them up on a free two-week trial, no results no pay. Happy to show you what it looks like. I'll shoot you a quick email too. [number]."
 
 ---
+
+## Field notes
+
+**2026-06-16 — first day on US number + auto-dialer.** 20 dials. Three outcomes worth noting:
+- **Interested on the slides/worksheet pivot, not the reviews offer.** One owner perked up when he heard the discovery probe (drop in a past paper, get full slides + worksheets + answer sheets back in his branding). Said he'd call back 06-17. Signal: the content-generation pain may be a stronger door than reviews for some centers.
+- **"This workflow won't be useful for me."** Flat brush-off. Treat as "I don't get it yet," not a real reason.
+- **"I already have something very similar set up."** This owner has a comparable system already, so reviews/content don't move him. He's only interested if we can bring him *students*, and he'd pay a commission on that. Worth noting as a recurring shape: established centers want lead-gen, not tooling.
+- Ramp plan: 20 → 25 → 30 → ... building toward 100/day. Pickups higher than expected on the new number.
 
 ## Notes
 
