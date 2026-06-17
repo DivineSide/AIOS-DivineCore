@@ -53,10 +53,28 @@ several posts at once — log each one in turn.
    Use `--posted-at YYYY-MM-DD` only if the post wasn't published today.
    On Windows use `python` (PowerShell); the script is cross-platform.
 
-6. **Confirm** back to the user in one line: the post_id, the classification you
-   chose, and a reminder that metrics get filled in the weekly `/social-review`.
-   If `differentiator` came out `none`, say so plainly so they can decide whether
-   to edit the live post.
+6. **Push to the CRM Content tab.** Logging only writes the local `posts.csv`;
+   the `/crm` dashboard reads the Supabase `content_posts` table, which is a
+   separate sync. The user authorized this push to run on every `/log-post` (so
+   posts appear on the dashboard without a manual sync). The HTTP sync
+   (`sync_to_crm.py`) doesn't work from here (the VPS serves a self-signed
+   cert), so the writer runs inside the api container over SSH. Run these two
+   commands with the Bash tool (PowerShell lacks `<` input redirection), from
+   the repo root:
+   ```
+   python tools/social-tracker/dump_posts_json.py > .crm-posts-tmp.json
+   ssh root@srv1445995.hstgr.cloud 'docker exec -i divinecore-v2-api-1 python -c "import sys,json; from sales_os.crm import supabase_writer as w; print(w.bulk_upsert_content_posts(json.load(sys.stdin)))"' < .crm-posts-tmp.json
+   ```
+   It upserts every post by `post_id` (safe to re-run, never duplicates) and
+   prints the row count written. Then delete `.crm-posts-tmp.json`. If the push
+   fails (VPS down, or the `ssh root@srv1445995.hstgr.cloud` allow rule isn't
+   set), the local log still stands — tell the user and move on; it will sync on
+   the next `/log-post` or `/social-review`.
+
+7. **Confirm** back to the user in one line: the post_id, the classification you
+   chose, that it was pushed to the `/crm` Content tab, and a reminder that
+   metrics get filled in the weekly `/social-review`. If `differentiator` came
+   out `none`, say so plainly so they can decide whether to edit the live post.
 
 ## Notes
 
