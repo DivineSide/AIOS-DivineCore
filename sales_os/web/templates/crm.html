@@ -527,14 +527,17 @@ let liLoad = null;       // set by the LinkedIn IIFE
 let contentLoad = null;  // set by the Content dashboard IIFE
 
 // ---- config: metric keys match the old local tracker's ids, so imports map 1:1 ----
+// Daily non-negotiables, locked 2026-06-17. Comments / X tweets / X replies 3x'd (scale
+// with no platform cap). Cold calls + cold emails are weekday-only (weekdays:true → "rest
+// day" on Sat/Sun, excluded from goals). See memory/feedback_pang_weekly_kpis_from_daily.md.
 const KPI_METRICS = [
   {key:"li_posts",     label:"LinkedIn posts",         target:1},
-  {key:"x_posts",      label:"X tweets",               target:5},
-  {key:"li_comments",  label:"Engagement comments",    target:10},
-  {key:"x_replies",    label:"X quality replies",      target:20},
+  {key:"x_posts",      label:"X tweets",               target:15},
+  {key:"li_comments",  label:"Engagement comments",    target:30},
+  {key:"x_replies",    label:"X quality replies",      target:60},
   {key:"conn_sent",    label:"Connection requests",    target:20},
   {key:"cold_emails",  label:"Cold emails",            target:214, weekdays:true},  // no weekend target
-  {key:"dials",        label:"Cold call dials",        target:50},
+  {key:"dials",        label:"Cold calls",             target:50,  weekdays:true},  // no weekend target
   {key:"calls_conn",   label:"Calls connected",        target:0},
   {key:"disco_booked", label:"Discovery calls booked", weekly:4},   // weekly target, not daily
 ];

@@ -652,9 +652,9 @@ You never "go back to one account." You process three columns of a sheet once a 
 
 **Wait time: 2 days** between comment and connection request. Long enough they've likely seen the comment, short enough they still remember it.
 
-### 14.2 · Tracking (use the tracker app)
+### 14.2 · Tracking (use the /crm LinkedIn Outreach tab)
 
-Implemented as a local app: **`tools/outreach-tracker/index.html`** (double-click to open, no install). It runs the whole §14.1 pipeline for you: paste a profile URL when you comment, and it surfaces each prospect under "Needs attention today" on the right day (connect at +2, first message on accept, Loom on silence, per the §14.4 cadence). Advancing a prospect's stage also auto-ticks the matching daily KPI counter. Data stays in the browser (never committed); Export a JSON backup regularly.
+Implemented as the **"LinkedIn Outreach" tab inside `/crm`** (Supabase-backed, multi-device). It runs the whole §14.1 pipeline for you: paste a profile URL when you comment, and it surfaces each prospect under "Needs attention today" on the right day (connect at +2, first message on accept, Loom on silence, per the §14.4 cadence). Advancing a prospect's stage also auto-ticks the matching daily KPI counter on the KPI Tracker tab. (The old standalone `tools/outreach-tracker/index.html` was removed 2026-06-17 once this fully replaced it.)
 
 If you ever need the manual fallback, it's one Google Sheet, one row per prospect: Name · Profile URL · Tier (A/B/C) · Date commented · Date connect sent · Date accepted · Date 1st msg · Last touch · Status, filtered by "Date commented = 2 days ago" for today's connect list.
 
