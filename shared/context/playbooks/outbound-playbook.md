@@ -55,7 +55,7 @@ Three rules:
 - **Use specific numbers**, not vague claims. *"Generated $112,482 last week for an HVAC business in Tennessee"* beats *"we get great results."*
 - **Match the reference group**. If you are pitching a B2B SaaS, cite a B2B SaaS case study. A dog-walker case study cited at a SaaS company actively hurts you. Maximize Venn-diagram overlap between the cited reference and the prospect's ICP.
 
-- DO: *"Just finished a build for a UK beauty brand doing £2M annually, same size as you. Same exact pipeline. Want me to walk you through the diff?"*
+- DO: *"Just finished a build for a test-prep center doing $2M a year, same size as you. Same exact pipeline. Want me to walk you through the diff?"*
 - DON'T: *"We have helped many businesses scale."*
 
 ### 4. Authority
@@ -276,8 +276,8 @@ When you say *"we work with [client like the prospect]"*, you are doing four thi
 
 #### Pang/DivineSide Examples
 
-- *"I run delivery at a small AIOS shop. We just shipped a build for a UK beauty brand doing the same thing you are."*
-- *"Founder of DivineSide. We build internal AI ops systems for ecom brands 5-50 people."*
+- *"I run delivery at a small AIOS shop. We just shipped a build for a tutoring center doing the same thing you are."*
+- *"Founder of DivineSide. We build internal AI ops systems for test-prep and tutoring centers, 2-20 staff."*
 - *"I am Pang. I do the engineering on AI workflows for founder-led businesses."*
 
 The "who am I" should set up the offer, not justify your existence.

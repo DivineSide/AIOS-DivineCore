@@ -20,7 +20,6 @@
 **Questions for the table:**
 - [ ] Is $50K MRR + 100K by May 2027 still the number, or does it need adjusting now that the niche is locked?
 - [ ] Phase 0 deadline is ~2 weeks out. Are 2 paying clients in 4 weeks still realistic, or do we reset the clock?
-- [ ] **Kill criteria** was left blank at the 06-05 lock ("revisit the niche only if we don't land __ pilots in __ weeks"). We should fill it in today: _____ pilots in _____ weeks.
 
 ---
 
@@ -31,33 +30,29 @@ Rule from 05-31: a KPI with no system behind it is a wish. Mark each hit/miss an
 ### Mayank (CEO / Engineering / Video)
 | KPI | Weekly target | Hit? | Blocker |
 |---|---|---|---|
-| Founder-led sales calls | 4 booked + held | | |
 | YT long-form | 1 | | |
 | YT shorts | 2 | | |
-| Infra hours | 21 | | |
-| India beachhead build | moved weekly | | |
 
 ### Shubham (Research & Ops / Outreach)
+> **No KPIs right now.** Shubham has nothing concrete he's accountable for this week, and that's the problem. **We need to set his KPIs today** — fill this table in live once we agree what he actually owns (see §3e).
+
 | KPI | Weekly target | Hit? | Blocker |
 |---|---|---|---|
-| LinkedIn DMs | 50 | | |
-| Partner / outreach | 3-5 | | |
-| Discovery-call synthesis | 1 doc/week | | |
-| Pre-call audits | 1 per booked call | | |
+| | | | |
 
-### Pang (Developer / Marketing / Delivery)
-| KPI | Weekly target | Hit? | Blocker |
+### Pang (Developer / Marketing / Delivery) — daily KPIs
+These are the daily non-negotiables tracked in the CRM (`/crm`), not weekly targets. Cold emails + cold calls are weekday-only (no weekend goal).
+
+| KPI | Daily target | Hit? | Blocker |
 |---|---|---|---|
-| LinkedIn posts | 7 | | |
-| LinkedIn connection requests | 140 | | (was bottlenecked on connection limits — status?) |
-| LinkedIn cold DMs | 70 | | |
-| LinkedIn engagement comments | 70 | | |
-| X tweets | 35 | | |
-| X quality replies | 140 | | |
-| Cold email (joint w/ Mayank) | 1,500/wk | | |
-| Cold calls | started 06-09, target TBD | | dialer shipped this week — set the target today |
-
-**Decision:** the 06-09 cold-call start has no weekly target. **Lock a cold-call number today** now that the dialer + CRM exist.
+| LinkedIn posts | 1 | | |
+| X tweets | 15 | | |
+| LinkedIn engagement comments | 30 | | |
+| X quality replies | 60 | | |
+| LinkedIn connection requests | 20 | | connection-request limit still capping the cold-DM pipeline — status? |
+| Cold emails (joint w/ Mayank) | 214 (weekdays) | | |
+| Cold calls | 50 (weekdays) | | currently running ahead — 60 today, aiming 80 tomorrow |
+| Discovery calls booked | 4 / week | | downstream of outreach landing |
 
 ---
 
@@ -65,80 +60,58 @@ Rule from 05-31: a KPI with no system behind it is a wish. Mark each hit/miss an
 
 These are the open threads holding up Phase 0. Each needs an owner and a date, not just discussion.
 
-### 3a. The offer is two different products right now — is that intentional?
-There's real drift between our own docs:
-- **India / beachhead track** (`icps/coaching`): entry offer = **AI question-paper / content generation** — validated, the owner named it unprompted as his #1 time sink.
-- **US track** (`offer.md` §00): entry offer = **reviews + referrals + Google review replies + lead follow-up** — a local-growth play, still a *working hypothesis*, and one of us already pushed back that established centers have enough leads.
+### 3a. The US offer — what Pang is actually selling
+For the US, the entry offer is the **reviews + referrals + Google review replies** workflow, plus asking each prospect whether they'd want a **content machine** on top — something that generates their lecture slides, quizzes, and study material for them.
 
-These are not the same product. One is a content/product workflow; the other is a marketing/growth workflow.
-- [ ] **Decide:** is running two different entry offers per market deliberate (India = product pain, US = growth pain), or are we splitting focus before we've validated either?
-- [ ] Owner: ________  By: ________
+So it's not a marketing-vs-product fork to resolve: it's one growth offer (reviews / referrals / review replies) with a content-generation add-on we float in the conversation to see if it lands.
+- [ ] Confirm everyone's aligned that this is the US pitch, so I'm dialing leads with the right message.
 
-### 3b. Discovery calls — the gate on everything else
-The US offer, the guarantee numbers, and pricing are all marked "lock after 5-10 discovery calls with real US tutoring owners."
-- [ ] How many discovery calls have we actually held so far? _____
-- [ ] If it's near zero, **this is the bottleneck.** Booking discovery calls is more urgent than any build.
-- [ ] Target: ____ discovery calls booked by next sync.
+### 3b. Discovery / offer numbers — flag, don't decide yet
+We don't have the data to agree on the US offer numbers (guarantee, pricing, which workflow leads) **because we have zero clients so far.** Flagging it so it's on the radar, but there's nothing to decide today — it unlocks from real discovery calls, not from more analysis.
+- [ ] Just note it as open; revisit once we've held real US discovery calls.
 
 ### 3c. Numbers still marked TBD (can't pitch without them)
 - [ ] **Guarantee X / Y** ("pay nothing until we book X consults in Y weeks") — still blank.
 - [ ] **Retainer pricing** — still blank, both India and US.
-- [ ] These unlock from discovery (3b), not from more analysis. Note them as downstream of 3b.
+- [ ] These unlock from discovery (§3b), not from more analysis. Note them as downstream of §3b.
 
-### 3d. Sprint accountability — it didn't run; proposal to run it next week
-Honest status: the 06-05 all-hands outreach sprint (~100 touches/day each, daily scoreboard, Sunday review) **did not happen.** That's the real reason we still have no client. Not intent, no system behind it.
-
-**Proposal (Pang):** run the sprint **next week, Pang + Shubham**, two-person and actually accountable this time.
-- [ ] Daily touch target each: _____
-- [ ] Daily scoreboard posted in the group, hit or miss, by _____ each day.
-- [ ] Sunday review: touches → replies → meetings booked.
-- [ ] Agree Mayank's role in it (or whether he runs his own India track in parallel).
-
-### 3e. Open builds with no status
+### 3d. Open builds with no status
 - [ ] **Website still not built.** This is the front door for every outreach motion. Who owns it, and what's the date?
-- [ ] **No update from Mayank on the builds** — the India connection build and the ecom connection build. Need a real status on each: where they are, what's blocking, when they move.
+- [ ] **No update from Mayank on the builds** — the India connection build and the ecom connection build. How are they going? Need a real status on each: where they are, what's blocking, when they move.
 
-### 3f. Shubham — no contact, outreach unaccounted for
-- [ ] Zero contact from Shubham this week. He committed to outreach (50 LinkedIn DMs/wk, 3-5 partner outreach, synthesis doc) and there's no visibility into any of it.
-- [ ] Need a straight status today: what actually got done, and what's the blocker.
-- [ ] Set a check-in cadence so this isn't invisible again — daily number in the group, same as everyone.
+### 3e. Shubham — new KPIs + what he's actually doing
+- [ ] Zero contact from Shubham this week, and he has no KPIs he's accountable for (see §2). Need a straight answer today: **what is he actually doing?**
+- [ ] Set his new KPIs live and put them in the §2 table. Whatever he owns, it gets a daily number in the group like everyone else, so this isn't invisible again.
 
-### 3g. Stale docs flagged (housekeeping, assign and move on)
-- [ ] `README.md` still describes the pre-pivot generic vision, no mention of the coaching niche.
-- [ ] `shared/context/playbooks/` is still beauty-DTC and hasn't been migrated to coaching.
-- [ ] Upwork / Instantly channel copy still carries old positioning.
+### 3f. Stale docs — fixed
+- [x] `shared/context/playbooks/` migrated off the old beauty-DTC positioning to the coaching / test-prep niche (`outbound-playbook.md` examples updated; the other playbooks were already clean).
+- [x] Instantly channel copy — already updated.
+- [x] Upwork — deprioritized, not in active use anymore, so left as-is.
+- [ ] `README.md` is still generic (describes DivineCore as an internal AIOS, no mention of the coaching niche). Minor — leave unless we want the repo front page to state the niche.
+
+### 3g. Equity flag — the "new co-founder" who only edits video
+- [ ] There's a new person being floated as a **co-founder** who, as far as I can tell, is **only going to do video editing.**
+- [ ] **Pang's position: I am completely not OK sharing any equity with him if video editing is all he does.** Editing is a paid/contract role, not a founder stake. Need to settle this before anyone is called a co-founder or promised equity.
 
 ---
 
-## 4. Update from Pang's side (what shipped this week)
+## 4. Update from Pang's side
 
-The outbound + tracking infrastructure to actually run the US dialing motion is now built:
+**What I've been doing: hitting my daily KPI, hard.** Up to **60 cold calls today**, aiming for **80 tomorrow** — it's doable but genuinely exhausting, that volume is brutal to sustain.
 
-- **Leads CRM + KPI dashboard on Supabase** (`/crm`) — deployable, persists the prospect pipeline (positive-reply cadence) and daily KPI counters.
-- **Stats & History** rebuilt around **daily-completion**, not vanity counts — measures whether the non-negotiables got done, plus old-tracker import.
-- **Cold Call Dialer** — imports US lead CSVs, parses + sorts phones by time zone into morning/night calling blocks, logs dispositions, schedules follow-ups. Folded into `/crm` as a tab (API under `/crm/api/dialer`).
-- **Social post tracker** (`/log-post` + `/social-review`) + LinkedIn Apify importer — log each post, LLM classifies it, see which hook/format/type performs.
-- **Platform decision resolved (06-10):** we build it ourselves (Twilio + Systeme.io/client-CRM + Claude), **not** GoHighLevel. Mayank's Sharon rebuttal killed the GHL speed case (the A2P / Google Business waits are identical either way). Guardrails: timebox the build + use Twilio Advanced Opt-Out for STOP/TCPA compliance.
-- **Reliable Medicare — in progress today.** Actively working on it now, pushing to get everything they've asked for done by end of day today.
+**Posts are now systemized.** I have a system that tracks every post I put out and whether it performed or not, and I write new posts off the back of the old ones that are doing well — so the content is data-driven now, not guesswork (`/log-post` + `/social-review` + the LinkedIn importer).
 
-### My positive-reply → booked-call cadence (locked 06-10)
-There's an actual system behind "they replied" → "call booked," not guesswork. Built from speed-to-lead data (5-min reply = 21x more likely to qualify) + Lee Hinkin's cold-reply-to-meeting method. Full doc: `shared/context/sales-and-delivery/positive-reply-cadence.md`.
+**Infra that shipped to run the US dialing motion:**
+- **Leads CRM + KPI dashboard on Supabase** (`/crm`) — persists the prospect pipeline and the daily KPI counters.
+- **Stats & History** rebuilt around **daily-completion**, not vanity counts — measures whether the non-negotiables actually got done.
+- **Cold Call Dialer** — imports US lead CSVs, sorts phones by time zone into morning/night calling blocks, logs dispositions, schedules follow-ups. Folded into `/crm` (API under `/crm/api/dialer`).
 
-**Three principles:**
-1. **Speed wins** — reply within 5 minutes. Treat a positive reply like an alarm. Promised assets (Loom/audit) go out same day, rough beats late.
-2. **Own the booking** — agree the exact time in the conversation (offer 2 slots in their timezone), then I add it to Calendly and send the invite. Never make a warm lead self-book.
-3. **Follow up past comfortable** — they already raised their hand. Run the full cadence before calling anyone dead.
+**Platform decision (06-10) — for Shubham:** we were going to build everything on **GoHighLevel**, but we decided **not to** and to build it ourselves instead (Twilio + Systeme.io / client-CRM + Claude). Mayank's Sharon rebuttal killed the GHL speed case (the A2P / Google Business waits are identical either way). Shubham — if you have any thoughts on this, share them with us.
 
-**The cadence (Day 0 = their positive reply):**
-- **Day 0 (within 5 min):** answer their exact question + LinkedIn connect. HOT → propose 2 times / offer to call now. WARM → send the value asset + soft 2-time ask.
-- **+1** email bump, fresh times. **+2** switch channel (warm call if I have the number, else LinkedIn DM). **+3** primary call push + voicemail + text. **+4** send something genuinely useful + re-ask. **+5** light angle. **+7** break-up ("should I close this out?"). **+14 / +30 / monthly** light nurture.
-- Classify every reply HOT vs WARM the moment it lands; compress the cadence for HOT.
-
-**Tracked in the CRM** (`/crm`), one row per prospect, filtered by "next touch = today" each morning, so nothing falls through.
+**Reliable Medicare — still in their court.** They're still checking through everything. They haven't said anything about the price yet, or about the new updates. Nothing to action on our side until they come back.
 
 **What I'm blocked on / need from you:**
-- [ ] A locked cold-call weekly target (see §2).
-- [ ] Clarity on the offer fork (§3a) so I'm dialing US leads with the right pitch.
+- [ ] Clarity on the US offer (§3a) so I'm dialing leads with the right pitch.
 - [ ] LinkedIn connection-request bottleneck — still capping the cold-DM pipeline.
 
 ---
@@ -146,11 +119,9 @@ There's an actual system behind "they replied" → "call booked," not guesswork.
 ## 5. Decisions we don't leave without
 
 - [ ] Goals confirmed or adjusted (§1)
-- [ ] Kill criteria filled in (§1)
 - [ ] Every KPI marked hit/miss with a named blocker (§2)
-- [ ] Cold-call weekly target locked (§2)
-- [ ] Offer fork resolved: one product or two, deliberately (§3a)
-- [ ] Discovery-call count named + next-sync target set (§3b)
-- [ ] Next-week sprint agreed: Pang + Shubham, daily targets + scoreboard (§3d)
-- [ ] Status pulled from Mayank on the builds + website owner/date set (§3e)
-- [ ] Shubham gives a straight outreach status + check-in cadence set (§3f)
+- [ ] Shubham's new KPIs set and put in the §2 table (§2 / §3e)
+- [ ] US offer confirmed: reviews / referrals / review replies + content-machine add-on (§3a)
+- [ ] Status pulled from Mayank on the builds + website owner/date set (§3d)
+- [ ] Shubham gives a straight status: what is he actually doing? (§3e)
+- [ ] Equity question settled: no founder stake for a video-editing-only role (§3g)
