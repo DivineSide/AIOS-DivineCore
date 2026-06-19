@@ -6,11 +6,11 @@
 
 ---
 
-## 1. Opener (pattern interrupt, then honest)
+## 1. Opener (pattern interrupt, then disarming)
 
 > "Hey, sorry, you cut out there for a sec, is this [name]?"
 > [yes]
-> "Awesome. I'll be honest with you, this is a cold call. Give me 15 seconds to tell you why I called, and if you're not interested you can tell me to go away, totally fine."
+> "Awesome. Quick heads up, this is a cold call, so give me 15 seconds to tell you why I called, and if it's not for you, you can tell me to go away, totally fine."
 
 ## 2. The hook (real observation + the free trial, no past-client claim)
 
@@ -18,7 +18,7 @@
 
 If she asks how it works:
 
-> "Honestly it's way easier to show you than explain it. How's tomorrow at 2?"
+> "It's way easier to show you than explain it. How's tomorrow at 2?"
 
 **Why this works without a case study:** the free trial removes her risk entirely, which is the same job a testimonial would do. You are not claiming a result you do not have. You are putting your own time on the line to prove it.
 
@@ -70,7 +70,7 @@ If she asks how it works:
 > "NiceJob collects reviews, for sure. The thing I figured out is it's all about when you ask. Right after a score milestone the yes rate jumps. And it ties into your referral asks too. Easier to show you, how's [time]?"
 
 **"Send me an email"**
-> "Yeah for sure, I'll send something over. Honestly it's way easier to see live than read about, I can show you the whole thing in 10 minutes. How's tomorrow afternoon?"
+> "Yeah for sure, I'll send something over. It's way easier to see live than read about though, I can show you the whole thing in 10 minutes. How's tomorrow afternoon?"
 
 **"No budget right now"**
 > "You don't pay until you see results, it's a two-week free trial. Nothing upfront, and after that it's very affordable. Got time this week?"
@@ -94,3 +94,8 @@ If she asks how it works:
 - **Never reintroduce a fabricated client.** If asked "who have you done this for?", answer honestly: "You'd be one of my first centers in this niche, which is exactly why I'm doing the free trial. The risk is on me, not you." Early-stage reframed as the reason for the strong guarantee.
 - Real prior work (RM365, Cracked.ai, OuterSignal, Reading Rhythms) is general automation, not a test-prep review system, so don't present it as proof of *this* result. Use it only as honest background on who you are if it comes up.
 - The first real free-trial client who gets a result becomes the first true case study. Update this file's hook with a real result line at that point.
+
+**2026-06-19 — mentor input (Brendan Mulhern, experienced sales leader, see memory `feedback_cold_call_methodology`):**
+- **Applied:** removed all "honest"/"honestly" phrasing from the opener (§1) and objections (§2, §6). It makes the prospect doubt you're honest the rest of the time. Hard ban now, do not reintroduce.
+- **Open decision — opener style:** Brendan favours an assertive differentiation hook over the permission-based pattern interrupt: *"[name], I have a way to separate you from your competitors,"* then DON'T pause, go straight into the value, then assumptive book (*"I've got Tuesday at 2, can I pencil you in?"*). This competes with the current Pavle-style disarming opener. The current opener already matches the calmer tone Pang found worked better on live calls, so the merge is likely: keep the disarming structure, lead the value with the "separate from competitors" framing. Not yet rewritten, pending Pang's call.
+- **Open decision — show-up texts (§5):** Brendan says confirmation/value texts give the prospect an exit and diminish the meeting (keep all ammo for the call). This directly conflicts with the Pavle show-up sequence this doc is built on. Unresolved, Pang to decide.
