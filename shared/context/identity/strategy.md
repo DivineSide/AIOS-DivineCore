@@ -33,7 +33,7 @@ A pattern goes into AIOS only after it appears across multiple real builds. Deli
 
 | Track | Owner | Status | Notes |
 |---|---|---|---|
-| **India / beachhead + connections** | Mayank + Shubham | Primary today | The beachhead owner plus his 50+ connections. Local language (Hindi), local trust. Prototype ground and first case studies. |
+| **India / anchor client + connections** | Mayank + Shubham | Primary today | Target Academy (the anchor client) plus his 50+ connections. Local language (Hindi), local trust. Prototype ground and first case studies. |
 | **Foreign outreach (US/UK)** | Pang | In setup | Cold and warm outreach in English to Western coaching businesses. Market and ICP TBD. Higher pricing power. |
 | **Content / build-in-public** | Mayank (video), Pang (LinkedIn) | In build | The compounding engine. Mayank owns YouTube; Pang owns LinkedIn. |
 

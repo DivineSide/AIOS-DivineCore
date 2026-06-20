@@ -84,7 +84,7 @@ This question came up twice and gets resolved the same way each time. The real s
 2. Parent communication — progress updates, test reminders, re-enrollment nudges at volume
 3. Review and referral generation — word of mouth is their main growth channel but there is no system for it
 
-Do NOT assume the beachhead client's pain (content/PPT creation) translates to US centers. US test prep centers use published past papers and prep books — they do not create original content. Content automation is an India-specific entry, not a US one.
+Do NOT assume Target Academy's pain (content/PPT creation) translates to US centers. US test prep centers use published past papers and prep books — they do not create original content. Content automation is an India-specific entry, not a US one.
 
 The entry pain must be validated through research and discovery calls before locking an offer.
 

@@ -32,3 +32,10 @@ tools/social-tracker/.impressions-fill.txt
 tools/social-tracker/dashboard.html
 tools/social-tracker/.crm-preview.html
 tools/social-tracker/.crm-auth
+
+# Client builds — client IP and generated client content never goes public (repo is PUBLIC)
+clients/*/corpus/
+clients/*/templates/
+clients/*/review/
+clients/*/outputs/
+clients/*/resources/

@@ -60,7 +60,7 @@ We are following a **harvest, do not design** path. Phases, in order:
 
 **Education and coaching businesses, specifically exam-prep / coaching institutes.** Why this niche:
 
-- **Domain edge.** The founders lived inside this world as students, and have a warm beachhead client (an 8-year coaching-institute owner) who is a distribution channel, not just a customer (see [`audience.md`](audience.md)).
+- **Domain edge.** The founders lived inside this world as students, and have a warm anchor client — **Target Academy**, an 8-year coaching-institute owner — who is a distribution channel, not just a customer (see [`audience.md`](audience.md)).
 - **Structural fit with AIOS.** Coaching is a pure information business. Every interaction (a doubt asked, a paper attempted, a result recorded, a parent message) is structured, reusable, causal context. Running the business and accumulating AIOS intelligence are the same activity. No other common niche has information density this high. This is architectural, not a slogan.
 - **Fragmented tooling.** Institutes run on 4 to 7 disconnected point tools. No unified, closed-loop system exists.
 - **Established budget.** Owners already pay for software (Classplus, Teachmint, Meritto, Proctur). We are not creating a new budget line.

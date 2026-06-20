@@ -2,7 +2,7 @@
 
 This file gives Claude Code full context on DivineSide, DivineCore, the team, the tech stack, the business model, and the current state of the build. Read this before touching anything.
 
-> **NICHE LOCKED 2026-06-06.** DivineSide targets **education and coaching businesses (exam-prep / coaching institutes)**, a pure-information business chosen for its structural fit with the AIOS context-learning moat plus a warm beachhead client. See [shared/context/identity/business-info.md](shared/context/identity/business-info.md) and the discovery note [shared/context/conversations/2026-06-05-beachhead-coaching-owner-call.md](shared/context/conversations/2026-06-05-beachhead-coaching-owner-call.md).
+> **NICHE LOCKED 2026-06-06.** DivineSide targets **education and coaching businesses (exam-prep / coaching institutes)**, a pure-information business chosen for its structural fit with the AIOS context-learning moat plus a warm anchor client — **Target Academy** (the first client we land to expand from). See [shared/context/identity/business-info.md](shared/context/identity/business-info.md) and the discovery note [shared/context/conversations/2026-06-05-target-academy-owner-call.md](shared/context/conversations/2026-06-05-target-academy-owner-call.md).
 >
 > **Locked, will not change:** the niche; the product vision (build complete AI Systems per client, harvest patterns into AIOS, never design AIOS up front); AIOS-is-the-moat-not-the-pitch (enter through painful manual functions); retainer delivery model; infrastructure / repo conventions.
 >
@@ -38,7 +38,7 @@ We build complete AI Systems for one business at a time, and the patterns that r
 
 **Exam-prep / coaching institutes**, a pure-information business. Why this niche:
 
-- **Domain edge.** The founders lived inside this world as students, and there is a warm beachhead client (an 8-year coaching-institute owner) who is a distribution channel, not just a customer (50+ convertible connections).
+- **Domain edge.** The founders lived inside this world as students, and there is a warm anchor client — **Target Academy**, an 8-year coaching-institute owner — who is a distribution channel, not just a customer (50+ convertible connections).
 - **Structural fit with AIOS.** Coaching is the rare business where running the business and accumulating intelligence are the same activity. Every doubt asked, paper attempted, result recorded, and parent message is structured, reusable, causal context: exactly what a closed loop learns from. This is architectural, not a slogan.
 - **Fragmented tooling, established budget.** Owners run 4 to 7 disconnected point tools (Classplus, Teachmint, Meritto, Proctur) and already pay for software. No unified closed-loop system exists.
 
@@ -49,7 +49,7 @@ We build complete AI Systems for one business at a time, and the patterns that r
 Build the first AI System for an existing warm contact (a relative's coaching institute in India). Use it. Watch what breaks. **Goal: 2 paying clients in 4 weeks.** If we do not get there, revisit the niche, not the product vision.
 
 - **Delivery model:** retainer (it replaces the manual-labor cost the owner already pays). **Pricing numbers are TBD and must not appear in docs or copy yet.**
-- **The entry workflow is OPEN, pending a deep-research phase.** Candidates span four institute functions: Product (content/PPT/quiz generation, the beachhead's validated #1 pain), Marketing (results/testimonials/social proof), Customer Service (parent updates, doubt management, fee follow-up), Sales (do not lead here — Meritto/GoHighLevel own it). See [shared/context/sales-and-delivery/offer.md §03](shared/context/sales-and-delivery/offer.md). Do not lock a single lead workflow until the research lands.
+- **The entry workflow is OPEN, pending a deep-research phase.** Candidates span four institute functions: Product (content/PPT/quiz generation, Target Academy's validated #1 pain), Marketing (results/testimonials/social proof), Customer Service (parent updates, doubt management, fee follow-up), Sales (do not lead here — Meritto/GoHighLevel own it). See [shared/context/sales-and-delivery/offer.md §03](shared/context/sales-and-delivery/offer.md). Do not lock a single lead workflow until the research lands.
 - **We do NOT** pitch the productized system or AIOS, take clients outside the niche, or hard-commit pricing/entry-workflow/foreign-market before the research that decides them.
 
 ### Phase 1 (months 2-4): Go deep
@@ -185,11 +185,11 @@ Research workflow: watch source material → Tactiq transcription → Glasp high
 
 ## 7. THE TEAM
 
-DivineSide is run by **3 co-founders**. Detailed ownership and KPIs are being formalized in the May 2026 alignment meeting — this section will be updated post-meeting to reflect locked decisions.
+DivineSide is run by **3 founders**. Detailed ownership and KPIs are being formalized in the May 2026 alignment meeting — this section will be updated post-meeting to reflect locked decisions.
 
 | Name | Role | Notes |
 |------|------|-------|
-| Mayank Rawat | Co-founder · CEO, Engineering, Video Content | Owns product vision, system architecture, founder-led sales, all video content. Discord: mayank082527 |
+| Mayank Rawat | Founder & CEO · Engineering, Video Content | Owns product vision, system architecture, founder-led sales, all video content. Discord: mayank082527 |
 | Shubham | Co-founder · Research & Ops | Owns Kallaway/Hormozi knowledge bases, pre-call audits, operational support |
 | Pang (彭毅和) | Co-founder · Developer + Marketing | CS at Wuhan University, China. Owns pilot delivery, outbound engine, divinecore-v2 stack |
 

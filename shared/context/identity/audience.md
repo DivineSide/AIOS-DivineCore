@@ -12,11 +12,11 @@ They sell information (a course, a syllabus, mock papers, doubt-solving, results
 
 Not students. Not EdTech VPs at universities. Not "AI enthusiasts" who do not run anything. The buyer operates: they have staff to pay, students to keep enrolled, and a function that is eating their week.
 
-## The beachhead (concrete, locked)
+## The anchor client — Target Academy (concrete, locked)
 
-The first client and reference point: an **8-year coaching-institute owner**, an ex-teacher turned business owner, running online courses for government / executive-officer exams. He has his own custom app (built by a hired engineer) where classes, material, and announcements live, and **50+ convertible connections** in the same sector. He is more motivated to share a product that solves his own pain than he is to be sold to: he is a **distribution channel, not just a customer.** He has trust issues with AI (wants proof before paying) and his eyes lit up at a genuinely autonomous system, not a generic chatbot. His #1 pain, named unprompted: the manual production of content (study material, PPTs, quizzes, question papers).
+The first client and reference point: **Target Academy**, an **8-year coaching-institute owner**, an ex-teacher turned business owner, running online courses for government / executive-officer exams. He has his own custom app (built by a hired engineer) where classes, material, and announcements live, and **50+ convertible connections** in the same sector. He is more motivated to share a product that solves his own pain than he is to be sold to: he is a **distribution channel, not just a customer.** He has trust issues with AI (wants proof before paying) and his eyes lit up at a genuinely autonomous system, not a generic chatbot. His #1 pain, named unprompted: the manual production of content (study material, PPTs, quizzes, question papers).
 
-Full discovery note: [`../conversations/2026-06-05-beachhead-discovery.md`](../conversations/2026-06-05-beachhead-discovery.md).
+Full discovery note: [`../conversations/2026-06-05-target-academy-owner-call.md`](../conversations/2026-06-05-target-academy-owner-call.md).
 
 ## Buyer archetypes
 
@@ -73,4 +73,4 @@ What does NOT convert (yet): lead magnets, cold "book a strategy call," generic 
 
 ## Update cadence
 
-This file evolves as we run discovery calls and close deals. Every call and every closed client should add a line: which archetype, what pain they named, what objection they raised, what language they used. The beachhead and the foreign calls are the first inputs. Over time this becomes the most valuable file in the repo for outreach copy.
+This file evolves as we run discovery calls and close deals. Every call and every closed client should add a line: which archetype, what pain they named, what objection they raised, what language they used. Target Academy and the foreign calls are the first inputs. Over time this becomes the most valuable file in the repo for outreach copy.

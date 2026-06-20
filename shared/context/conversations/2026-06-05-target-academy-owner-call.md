@@ -1,13 +1,13 @@
 ---
 date: 2026-06-05
-prospect: "Beachhead coaching-institute owner (Mayank + Shubham connection)"
-brand: "Coaching institute (govt / executive-officer exam prep, India)"
+prospect: "Target Academy owner (Mayank + Shubham connection)"
+brand: "Target Academy — coaching institute (govt / executive-officer exam prep, India)"
 channel: call (Mayank, in Hindi) — relayed second-hand to cofounders
 niche-fit: YES
 fathom-meeting-id: "n/a (discovery call itself not recorded by us; relayed in cofounder meeting 152843349)"
 ---
 
-> **Second-hand note.** Mayank ran this discovery call with the connection in Hindi; the connection does not speak English. Details below are from Mayank's WhatsApp summary plus his relay in the 2026-06-06 cofounder meeting (Supabase meeting_id `152843349`). Not a verbatim transcript of the discovery call itself. This is the **beachhead** that anchors the whole niche.
+> **Second-hand note.** Mayank ran this discovery call with the connection in Hindi; the connection does not speak English. Details below are from Mayank's WhatsApp summary plus his relay in the 2026-06-06 cofounder meeting (Supabase meeting_id `152843349`). Not a verbatim transcript of the discovery call itself. This is **Target Academy**, the anchor client that anchors the whole niche.
 
 ## Context
 
@@ -54,7 +54,7 @@ Already pays staff for content production, parent-call handling, and fee trackin
 
 ## Niche fit verdict
 
-**YES.** This is the beachhead that defines the locked niche (education / coaching, exam-prep, information business).
+**YES.** Target Academy is the anchor client that defines the locked niche (education / coaching, exam-prep, information business).
 
 ## Outcome
 

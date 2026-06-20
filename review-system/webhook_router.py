@@ -5,9 +5,8 @@ import logging
 from datetime import datetime
 from typing import Callable
 from twilio_handler import twilio
-from brevo_handler import brevo
+from gmail_handler import gmail
 from claude_conversation import claude_engine
-from gbp_oauth import gbp_handler
 
 logger = logging.getLogger(__name__)
 
@@ -157,10 +156,8 @@ class WebhookRouter:
                 }
 
             elif channel == "email":
-                # Send via email
                 subject = "Response to Your Review"
-                html_content = f"<p>{response_text}</p>"
-                result = brevo.send_email(to_contact, subject, html_content)
+                result = gmail.send_email(to_contact, subject, response_text)
                 return {
                     "success": result["status"] == "sent",
                     "message_id": result.get("email_id"),

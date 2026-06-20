@@ -56,7 +56,7 @@
 > - ⚠️ **Core offer = working hypothesis** — the 4-workflow lead-gen angle is our best read, not a locked answer. A cofounder pushed back that established centers already have enough leads. May shift after discovery calls.
 > - ⚠️ **X and Y (guarantee numbers) TBD** — lock after 5-10 discovery calls
 > - ⚠️ **Retainer pricing TBD** — lock after discovery calls
-> - ⚠️ **India entry workflow still OPEN** — see §03 candidate catalog below for India/beachhead track
+> - ⚠️ **India entry workflow still OPEN** — see §03 candidate catalog below for the India / anchor-client track
 >
 > For the full reasoning on why three other pain points (billing, scheduling, parent communication) were ruled out, see [`../identity/niche-research.md`](../identity/niche-research.md) §Pain Point Analysis. Short version: all three require replacing existing processes or migrating existing data before we can even start, which is too high an ask for an unknown agency with no case studies.
 >
@@ -96,13 +96,13 @@ On a current sales call you are **not** pitching the productized system or AIOS.
 
 A coaching institute has four functions. Each has automatable workflows. **Which one leads the offer is OPEN pending the deep-research phase.** Treat this as the menu we choose from, and as the "here is what is possible" map for discovery calls. Do not commit a single lead workflow in copy yet.
 
-### Function 1 — Product: the education itself  *(validated paid need at the beachhead)*
+### Function 1 — Product: the education itself  *(validated paid need at Target Academy)*
 What exists: Teachmint/EduAI, Testmate, MagicSchool generate content from a prompt or syllabus, isolated and manual.
 Workflows we could build:
 - **Content / presentation automation** — generate formatted decks, study material, and exercises from the lesson plan, in the institute's template and brand voice.
 - **Question-paper generation tied to batch performance** — generate papers targeting the topics the current batch is weakest on, not just "a paper on Chapter 5."
-- **Auto-notes from class recordings** — structured notes and revision summaries same-day. (Note: the beachhead said students prefer self-notes, so this is low-priority; offer as an option, not a lead.)
-Why it matters: the beachhead named manual content production as his #1 time sink, unprompted. This is the validated paid need on the India side.
+- **Auto-notes from class recordings** — structured notes and revision summaries same-day. (Note: Target Academy's owner said students prefer self-notes, so this is low-priority; offer as an option, not a lead.)
+Why it matters: Target Academy's owner named manual content production as his #1 time sink, unprompted. This is the validated paid need on the India side.
 
 ### Function 2 — Sales: enrolment & lead conversion  *(defended, do not lead)*
 What exists: Meritto (AI voice calls, lead allocation) and GoHighLevel own this; it is the most automated of the four.
@@ -112,7 +112,7 @@ Guidance: do NOT lead with sales automation. Use it as a second or third workflo
 ### Function 3 — Marketing: results, testimonials & social proof  *(open gap, revenue-linked)*
 What exists: generic announcements; owners post manually. Most underserved of the four.
 Workflows: result/topper announcement engine, testimonial collection at the optimal moment, social-proof pipeline.
-Note: strong "fixes revenue" story in theory, but for the word-of-mouth-driven beachhead a **referral system** (he liked it) fits his actual channel better than social content. Validate per client.
+Note: strong "fixes revenue" story in theory, but for word-of-mouth-driven owners like Target Academy a **referral system** (he liked it) fits his actual channel better than social content. Validate per client.
 
 ### Function 4 — Customer service: parent & student communication  *(high priority, fast time-to-value)*
 What exists: Classplus/Proctur/TrackFee do one-way broadcasting (reminders, notifications).
@@ -122,13 +122,13 @@ Workflows: intelligent contextual parent updates, doubt-queue management (catego
 
 ## 04 · Pricing model (numbers TBD)
 
-- **Delivery model: retainer.** It replaces the manual-labor cost the owner already pays (admin staff, content help). The beachhead confirmed he would pay a retainer if we do the work better and cheaper than his current cost.
+- **Delivery model: retainer.** It replaces the manual-labor cost the owner already pays (admin staff, content help). Target Academy's owner confirmed he would pay a retainer if we do the work better and cheaper than his current cost.
 - **No numbers in any doc or copy yet.** India is price-sensitive (volume over margin); the West has higher pricing power. Both numbers are TBD and resolve through discovery, not analysis.
 - Every new workflow beyond the first is scoped and priced as its own engagement. Keep the retainer defensible as monitoring + access + the compounding system, not a bucket of pre-paid hours.
 
 ## 05 · Payment posture: proof first
 
-The beachhead (and skeptical owners generally) carry a trust gap with AI ("it will make mistakes"). Counter it with a **proof-first posture**: show it working on their business before they pay, offer a trial/demo, and structure payment so they commit on delivered value rather than upfront. This is a principle, not a fixed mechanic. The formal guarantee for the new offer is still to be written (see [`guarantee.md`](guarantee.md)).
+Target Academy's owner (and skeptical owners generally) carry a trust gap with AI ("it will make mistakes"). Counter it with a **proof-first posture**: show it working on their business before they pay, offer a trial/demo, and structure payment so they commit on delivered value rather than upfront. This is a principle, not a fixed mechanic. The formal guarantee for the new offer is still to be written (see [`guarantee.md`](guarantee.md)).
 
 ## 06 · Hidden / switching cost (build the offer around removing it)
 
@@ -151,7 +151,7 @@ One workflow at a time, one function at a time. Do not sell breadth before depth
 | Channel | Audience | Naming discipline |
 |---|---|---|
 | **Foreign outreach (Pang)** | Western coaching / tutoring businesses (US vs UK TBD) | Outcome-first, no AIOS |
-| **India / connections (Mayank, Shubham)** | Beachhead + 50 connections, Hindi, local trust | Outcome-first, no AIOS |
+| **India / connections (Mayank, Shubham)** | Target Academy (anchor client) + 50 connections, Hindi, local trust | Outcome-first, no AIOS |
 | **LinkedIn / community (Pang, Shubham)** | Coaching owners and operators | Outcome-first |
 
 > The Upwork and Instantly channel copy still carries the old beauty positioning and is on the downstream rewrite list (it lives in integration code, outside this folder). Do not treat that copy as current.
@@ -165,4 +165,4 @@ One workflow at a time, one function at a time. Do not sell breadth before depth
 
 ## 10 · Lessons
 
-*(Add a one-liner per build: what worked, what the actual outcome was, what the owner's language for the pain was, whether the entry workflow and model landed. The beachhead build is the first entry.)*
+- **2026-06-12, Target Academy build (coaching institute, India):** content-automation entry validated hard. Demo = 20 ORIGINAL exam questions (calibrated on public previous-year papers, not borrowed banks) rendered into the client's exact Word + PPT templates (front page, borders, watermark, legacy Kruti Dev font) — built same-day materials arrived, sent via WhatsApp. Owner reaction: *"anybody will buy this — your first customer for sure."* What worked: proof-first beat any pitch; matching their **exact template/font** (including a legacy non-Unicode font) was the believability unlock; "original questions no competitor has" landed as differentiation; positioning the staffer as operator-not-replaced de-risked delivery. Owner's pain language: "most time-consuming activity," 2 hours per PPT + separate approver. Entry workflow = Product/content automation, confirmed against the pre-discovery PDFs' rejected candidates.

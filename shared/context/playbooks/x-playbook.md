@@ -375,7 +375,7 @@ Algorithm boosts dwell-time → if the hook makes someone stop and read for ≥1
 | Asset | When to use | Time per piece |
 |-------|-------------|----------------|
 | **1-page ops audit** (personalized to that institute's likely top manual pain) | Default for ICP prospects | 30-45 min |
-| **Loom walkthrough** of the audit + 1 workflow you'd build first | Top-tier ICP — beachhead-tier operators | 30-60 min |
+| **Loom walkthrough** of the audit + 1 workflow you'd build first | Top-tier ICP — anchor-tier operators | 30-60 min |
 | **Case study breakdown** mapped to their ops stack | When prospect has tool or pain overlap with an existing build | 20-30 min |
 
 **Delivery format (sourced from Aean, 2026-05-26):**
