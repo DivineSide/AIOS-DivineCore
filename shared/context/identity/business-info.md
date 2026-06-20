@@ -12,6 +12,14 @@ One-liner (working): **"DivineSide turns businesses into systems."**
 
 We are not an automation agency. We do not build chatbots and call them AI, and we do not run template GoHighLevel/Zapier workflows as the product. We build closed-loop systems that run business functions end to end and improve from the data the business already produces. The machine executes. Humans supervise.
 
+## Origin story (the WHY, working draft 2026-06-20)
+
+The sales-facing "why we exist" story. Brendan Mulhern (sales mentor) flagged that a strong WHY is what substitutes for case studies at this stage, differentiates us from every other AI agency, and travels when someone refers us. It is a business origin story, not a save-the-students mission (Pang doesn't believe that one and would deliver it flat). It is honestly owner-focused. Embellished in framing only, true in substance.
+
+> We grew up in a country built on exams, endless tests, relentless pressure, coaching institutes running everything. Last year we started building AI automation for businesses and kept seeing the same thing: owners buried in manual work spread across five disconnected tools. Test-prep and tutoring centers were the clearest case. They run on information, lesson notes, papers, student records, reviews, follow-ups, and almost all of it is still done by hand. We knew this world from the inside, so we decided to build the system these centers actually need, one that runs the painful manual work and gets smarter on their own data over time.
+
+**Status: working draft, not locked.** Leads with the high-pressure exam upbringing (do not name the country in the story). Pang to confirm the upbringing detail with Mayank and Shubham (ask them: "what did you actually see growing up around coaching institutes that made this worth building?"), then tighten from their raw answer.
+
 ## Core philosophy
 
 - **Traditional business**: people execute, tools assist.

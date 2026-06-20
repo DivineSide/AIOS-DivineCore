@@ -9,7 +9,9 @@
 > Load this before writing any US cold email, LinkedIn outreach, sales script, or proposal. Everything below §00 is context and architecture — this block is the thing you say.
 
 **One-liner (use across all campaigns):**
-"We help test prep and tutoring centers get more referrals, more Google reviews, and instant follow-up on every inquiry, all running automatically."
+"We help tutoring and test prep centers get more students while automating the manual work that nobody likes to do."
+
+> The old tactic-list one-liner ("more referrals, more Google reviews, instant follow-up") was retired 2026-06-20: it listed tactics every agency lists, so it read as generic. The replacement leads with the outcome (more students, less manual work) and hints at the differentiator. Reviews/referrals/follow-up are now the tactics named in the next breath, never the hook itself.
 
 **Guarantee:**
 "You pay nothing until we book you [X] new consultations in [Y] weeks."
@@ -23,7 +25,9 @@
 4. **Lead follow-up** — every inquiry (web form, voicemail, SMS) gets a response within minutes, qualifies the lead, and books the consultation automatically, without the owner being available
 
 **The positioning line (when asked why us vs anyone else):**
-"Other agencies build you one thing and leave. We run all four on one retainer, learn your business over time, and add more as you grow."
+"Other agencies build you one thing and leave. We start with automations already proven to bring centers like yours more students and less manual work, then learn your business, audit your processes, and automate more of it as we grow together."
+
+> **Custom-partnership direction (2026-06-20, Brendan Mulhern input).** Brendan recommended leaning into the custom route now: a proven base of workflows PLUS an ongoing partnership to find and automate each business's specific bottlenecks. This matches our harvest model (deliver custom, productize the repeaters later). Discipline: the positioning line above carries the partnership framing, but **cold outreach still leads with ONE outcome wedge** (reviews + referrals + instant follow-up), never "we automate anything." Sell one result to get the call; introduce the partnership breadth once engaged. Do not let "partnership" turn the cold hook into an open-ended wishlist.
 
 **What we do NOT mention on the sales call:** AIOS, the closed loop, "AI agents," or any technical architecture. We mention outcomes and the workflows that produce them.
 

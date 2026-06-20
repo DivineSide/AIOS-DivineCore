@@ -164,3 +164,27 @@ I'm testing two versions and tracking which one books more meetings.
 
 **Objection handling (where I struggle most).** For "not interested," I agree, shrink the ask, and give them an out: *"Totally fair, you don't even know me. I'm not asking you to buy anything. Give me 20 seconds, and if it's useless you can hang up on me."* Then straight into: their search term, their review count, the competitors beating them, the fix, and a 10-minute booking.
 
+**Script 3 — audit-first (the new direction, built from your advice)**
+
+This is the one I'm switching to. The call's only job is to book a free 15-minute audit, not to sell. I open calm, give the reason (a free audit of how they're getting students and where manual work is costing them), and I don't explain the how at all. If they ask how, I use the restaurant-reviews analogy and say that's what the audit's for.
+
+- **Opener:** "Hey, is this [name]? [name], hey, this is Peter. I'll be quick, you can throw me off the phone in 15 seconds if it's not for you. Fair?"
+- **Reason / free audit:** "I run automation for tutoring and test prep centers, and before I called I looked at [center]. I put together free audits for centers like yours: how you're getting students, how you stack up against the centers nearby, and where the manual day-to-day is costing you students and time. No charge, no pitch on this call, I just walk you through what I found. Worth a look?"
+- **Confirm the time zone, then book live:** "You're in [city/state], right? Just so I get the time right." → offer two times → take the email → book the Zoom on the call.
+- **"Not interested" (your line):** "I figured there was a chance you'd say that, and that's fair, you don't know me yet. That's exactly why I'm not asking you to buy anything. It's a free audit, 15 minutes, and our setup has driven real results for centers a lot like yours. Worst case you get a free breakdown of where you stand against your competition. [day] at [time] work?"
+
+This sets up the two-call close you recommended: the audit call is Call 1 (discovery + their numbers), then I build the ROI and present + close on Call 2.
+
+---
+
+## Open questions for Brendan (live call)
+
+Running list to cover on the call. Add to this as more come up.
+
+1. **Objection handling (top priority, drill live).** What do I actually say when they hit me with "not interested" right after the opener? This is where I lose calls. Want to role-play a few.
+2. **Selling the outcome with no "how."** I get that the curiosity gap is on purpose, but how far do I take it? At what point in the email/call do I start explaining the how without giving it all away?
+3. **Loom video.** You said don't put the audit in the Loom, lead with the reason for it. Should I send a Loom at all in the cold email, or does even a teaser Loom weaken the "reply to find out" hook?
+4. **Two-call vs one-call close.** You favor two calls so you can run real analysis and ROI. I've been closing on one. When is each the right move for a lower-ticket, fairly productized offer like ours?
+5. **Customization vs product.** We're custom now to learn the niche, but the long game is a productized platform. Does that change how I should be pricing or positioning today?
+6. **Pricing.** Once I bring you real client numbers (cost per student, capacity, empty seats, lifecycle), can we build the ROI-based pricing together like you laid out?
+

@@ -1,101 +1,91 @@
-# Cold Call Script — Reviews + Referrals (US test prep / tutoring)
+# Cold Call Script — Brendan Mulhern method (US test prep / tutoring)
 
-> **Honest version, 2026-06-10.** Pang's working cold-call script for the reviews/referrals offer. Mechanics (pattern interrupt, book-on-the-call, pre-frame, show-up texts, objection handling) are kept from the original draft. **The fabricated case study ("I doubled another center's reviews in two months") is removed everywhere** — it isn't true, and a sharp owner who asks "who?" ends the call. The **two-week free trial is the proof and the de-risk**; it carries the weight a case study would, honestly. Once the first real free-trial client gets a result, a true result line can replace the trial-only framing.
+> **This is the script Brendan Mulhern (sales mentor) actually gave, 2026-06-20.** It replaces the earlier reviews/trial script. Faithful to his words, lightly cleaned to voice rules (no em-dashes, no "honest"/"honestly"). An earlier "audit-first" rewrite was scrapped because it invented framing Brendan never said.
 >
-> Pairs with the locked engage-first LinkedIn sequence in [`linkedin-playbook.md`](linkedin-playbook.md) §14 and the offer in [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md). Voice: casual, plain, no em-dashes, no fake claims. Placeholders: `[name]`, `[center]`, `[stat]`, `[time]`. Worked example uses A+ Test Prep / Lucy Zhang.
+> **The flow is email-first, then call.** Brendan's call references a prior email, so the cold call sits downstream of the multi-thread cold email (see [`../sales-and-delivery/`](../sales-and-delivery/) and the cold email section of [`../../../.claude/brendan-mulhern-brief.md`](../../../.claude/brendan-mulhern-brief.md)).
+>
+> **The call's only job is to book a 15-minute discovery call.** You do not sell or explain the how on the phone. Two-call close: this books Call 1 (discovery), then you build a custom plan and present + close on Call 2.
+>
+> Pairs with the offer in [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md) and the operational plan in [`cold-calling-plan.md`](cold-calling-plan.md). Placeholders: `[prospect]` (e.g. Bob), `[client]` (a center you work with), `[time]`. Your call name: Peter.
 
 ---
 
-## 1. Opener (pattern interrupt, then disarming)
+## 0. Before the call: you emailed them first
 
-> "Hey, sorry, you cut out there for a sec, is this [name]?"
-> [yes]
-> "Awesome. Quick heads up, this is a cold call, so give me 15 seconds to tell you why I called, and if it's not for you, you can tell me to go away, totally fine."
+Brendan's method is research-first and email-first. You've already sent a short, personal email to this person (and others at the same center, top down). The call is a follow-up to that email. That is what makes the gatekeeper line below land.
 
-## 2. The hook (real observation + the free trial, no past-client claim)
+## 1. Get past the gatekeeper (lead with the prospect's name)
 
-> "So I was looking at [center] and I noticed you've served [stat, e.g. over 10,000 families], but you've only got around [#] Google reviews. That gap actually drags down where you show up in Google search. I build review systems for test prep centers, and I'm confident enough I can fix that for you that I'll set the whole thing up free for two weeks. If you're not seeing reviews come in by the end, you don't pay a cent. After that it's very affordable. Is that something you'd want?"
+Leading with the name signals you already know them.
 
-If she asks how it works:
+> "Hi, may I speak to [prospect] please?"
 
-> "It's way easier to show you than explain it. How's tomorrow at 2?"
+Gatekeeper: "May I ask who's calling?"
 
-**Why this works without a case study:** the free trial removes her risk entirely, which is the same job a testimonial would do. You are not claiming a result you do not have. You are putting your own time on the line to prove it.
+> "Yes, my name is Peter. I emailed [prospect] earlier this week and I'm following up."
 
-## 3. Book on the call, manually (never send a link to fill in)
+> ⚠️ Brendan's stronger version is *"I spoke to [prospect] via email last week and he asked me to call him today at 2"* or *"following up on some questions he had."* That gets you through faster but it's a fabrication if they never replied or asked you to call. Given you don't do fake claims, use the true version above (you did email them). Decide for yourself how far you want to push it.
 
-> "I'll pull it up on Zoom so you can see exactly what it does. How's tomorrow at 2, or is 4 better?"
-> [she picks]
-> "Perfect, what's the best email for the Zoom invite?"
-> [type it in yourself, book it right then]
-> "Done, you'll get a confirmation."
+## 2. When [prospect] picks up (the pitch and the ask)
 
-## 4. Pre-frame the call's value (so the call has value even if she doesn't buy)
+You name what you do (drive new students), say you believe you can help, acknowledge it's a bad time, and go straight to booking the 15 minutes. You do NOT explain how.
 
-> "And before we meet I'm going to look at the other test prep centers around [area], their reviews, their websites, how they're pulling students, and I'll show you all of it live. So even if we don't end up working together, you'll walk away knowing exactly where you stand against them."
+> "Hi [prospect], I'm working with [client] driving new students to their programs, and I believe we can help you too. I know now probably isn't the best time, so I'd like to schedule a quick 15-minute call to learn more about your business and how we could increase your enrollment. I've got my calendar open, I'm free next Tuesday at 11 or Wednesday at 2:30. Do either of those work for you?"
 
-## 5. Show-up texts
+If those times don't work, drill down to one that does. Make his timing work.
 
-- **Morning of:** "Hey [name], looked into a couple of your competitors this morning, found something pretty interesting. Excited to show you at [time]."
-- **3 hours before:** "Hey [name], looking forward to our call. Sent the Zoom invite to your email, let me know you got it."
-- **10 min before:** "Here's the Zoom link: [link]. See you in 10."
+> Tip carried over from the old script: confirm the prospect's state/time zone before you offer times, so you don't pitch a slot in the wrong zone.
 
-## 6. Objections
+## 3. Objection: "Can you send me some material?"
 
-**"What is this about?"**
-> "I build review systems for test prep centers like yours. I set the whole thing up on a two-week free trial so you can see it work before you pay anything. Happy to show you what it looks like, how's tomorrow?"
+Do not send material. The how stays for the consultation.
 
-**"We already have a lot of clients / we're doing fine"**
-> "Oh that's great, nice problem to have, sounds like you're busy. Can I ask, how are you mainly getting students right now, mostly word of mouth or something else?"
-> [word of mouth]
-> "Makes sense. You've been established a long time, great team, thousands of students. But I'm looking at your review page and you've only got around [#]. Do you have a system for asking for reviews right now?"
-> [probably no]
-> "That's exactly where I come in. I know you're busy, so we need about 10 minutes from you a week to set it up, then it runs in the background and brings in reviews on its own. And I'm not asking for money right now, it's a two-week free trial, no results no pay. Got 10 minutes this week where I can screen share and show you?"
+> "I wish it were that easy. Every business I work with has different hurdles they're trying to get past. For me to properly understand your business and recommend the right solution, a 15-minute conversation is the best way. Does Tuesday at 11 or Wednesday at 2:30 work?"
 
-*Alternate path — discovery pivot (when reviews clearly won't land and the call is otherwise dead):* use the "one last question" to learn their real pain instead of forcing the close.
-> "Wow, that's a nice problem to have. Okay, can I ask you one last question?"
-> [yes]
-> "So I was working with another tutoring center and built them a system for something totally different. Their teachers spent hours a week making slides and worksheets by hand. Now they just type in a topic, or drop in a past paper, and it spits out full slides, worksheets, and answer sheets, all in their branding so it looks like their own team made it. Think that'd be useful for you, or other centers you know? Just trying to learn the biggest pain points in this niche."
->
-> *Purpose: keeps a dead call alive and doubles as free market research on what actually hurts in this niche. Not a second offer, a discovery probe.*
+## 4. Book it live on the phone (the most important step)
 
-**"We already have a service doing this"**
-> "Oh nice, good that you're on it. How are the results so far?"
-> [okay / good]
-> "So here's where I'm different. Most review tools just blast a templated message, like 'Hi Judy, thanks for visiting, please leave us a review here.' That barely gets replies. I use AI that actually sounds like you. So instead it follows up on how their kid is doing, something like 'Hi Sarah, how's Brandon getting on? It's been a few months, how's everything going?' Then when she replies, it reads what she said and works its way around to asking for the review naturally. Way easier to show you live, how's [time]?"
->
-> *[Optional incentive, use with care: a charity donation per review is still technically an incentivized review under Google's policy. Safer framing is to donate per piece of feedback / per response, not per public Google review. Do not promise cash or gift cards for reviews.]*
+The moment he agrees a time, get his email and send the invite while you're still on the call.
 
-**"We already have NiceJob / [tool]"**
-> "NiceJob collects reviews, for sure. The thing I figured out is it's all about when you ask. Right after a score milestone the yes rate jumps. And it ties into your referral asks too. Easier to show you, how's [time]?"
+> "Perfect. What's the best email for the invite?"
+> [he gives it]
+> "Right now I'm sending you a meeting link. Let me know when you get it. There's an accept button at the bottom, hit that and it adds the meeting straight to your calendar."
+> [he accepts]
+> "Great, I'll see you next Tuesday at 2:30."
 
-**"Send me an email"**
-> "Yeah for sure, I'll send something over. It's way easier to see live than read about though, I can show you the whole thing in 10 minutes. How's tomorrow afternoon?"
+---
 
-**"No budget right now"**
-> "You don't pay until you see results, it's a two-week free trial. Nothing upfront, and after that it's very affordable. Got time this week?"
+## 5. The discovery call (Call 1) — agenda
 
-## 7. Voicemail (under 20 seconds)
+Brendan's structure for the booked meeting. Goal: get the information you need to prove your value, then set up Call 2 to close.
 
-> "Hey [name], sorry to bug you. Was looking at [center] this morning, you've served [stat] but I could only find around [#] reviews online. I build review systems for test prep centers and I set them up on a free two-week trial, no results no pay. Happy to show you what it looks like. I'll shoot you a quick email too. [number]."
+- A conversation is best. A slide deck is optional, useful only to show current clients and outcomes (ROI).
+- Open by reading the agenda: *"The agenda for today's call is..."* then walk the 3 to 5 bullets:
+
+1. **Learn the business** — "Tell me about your business. How it started, what you offer."
+2. **What type of programs do you offer?**
+3. **How do you typically acquire new students?**
+4. **What are your typical costs?**
+5. **Summarize** what you learned from what they just told you.
+
+**Next steps (sets up Call 2, the close):**
+
+> "We can absolutely help you. What I'm going to do is take everything you've shared and formalize a customized plan for the areas we just discussed. I'd like to set up a follow-up call for next Tuesday to walk you through it, and at that point we can decide if it makes sense to become partners. Does next Tuesday at 2:30 work? Great, see you then."
+
+> The deeper discovery questions (cost per student, capacity, empty seats, student lifecycle, the numbers Brendan uses to build ROI-based pricing) belong in [`../sales-and-delivery/sales-discovery-call.md`](../sales-and-delivery/sales-discovery-call.md). Fold them into bullets 3 and 4 above.
 
 ---
 
 ## Field notes
 
-**2026-06-16 — first day on US number + auto-dialer.** 20 dials. Three outcomes worth noting:
-- **Interested on the slides/worksheet pivot, not the reviews offer.** One owner perked up when he heard the discovery probe (drop in a past paper, get full slides + worksheets + answer sheets back in his branding). Said he'd call back 06-17. Signal: the content-generation pain may be a stronger door than reviews for some centers.
+**2026-06-16 — first day on US number + auto-dialer.** 20 dials:
+- **Interested on the slides/worksheet pivot, not the reviews offer.** One owner perked up at the content-generation idea (drop in a past paper, get full slides + worksheets + answer sheets back in his branding). Said he'd call back 06-17. Signal: content-generation pain may be a stronger door than reviews for some centers.
 - **"This workflow won't be useful for me."** Flat brush-off. Treat as "I don't get it yet," not a real reason.
-- **"I already have something very similar set up."** This owner has a comparable system already, so reviews/content don't move him. He's only interested if we can bring him *students*, and he'd pay a commission on that. Worth noting as a recurring shape: established centers want lead-gen, not tooling.
-- Ramp plan: 20 → 25 → 30 → ... building toward 100/day. Pickups higher than expected on the new number.
+- **"I already have something very similar set up."** This owner only cares about getting more students and would pay commission on that. Recurring shape: established centers want lead-gen, not tooling.
 
 ## Notes
 
-- **Never reintroduce a fabricated client.** If asked "who have you done this for?", answer honestly: "You'd be one of my first centers in this niche, which is exactly why I'm doing the free trial. The risk is on me, not you." Early-stage reframed as the reason for the strong guarantee.
-- Real prior work (RM365, Cracked.ai, OuterSignal, Reading Rhythms) is general automation, not a test-prep review system, so don't present it as proof of *this* result. Use it only as honest background on who you are if it comes up.
-- The first real free-trial client who gets a result becomes the first true case study. Update this file's hook with a real result line at that point.
+- **Never invent a client or a result.** If asked "who have you done this for?", answer plainly: "You'd be one of my first centers in this niche." Do NOT claim you "doubled another center's reviews" or any specific result you don't have.
+- Real prior work (RM365, Cracked.ai, OuterSignal, Reading Rhythms) is general automation, not a test-prep result, so don't present it as proof of *this* outcome. Use it only as background on who you are if it comes up.
+- The first real client who gets a result becomes the first true case study. Add a real result line here at that point.
 
-**2026-06-19 — mentor input (Brendan Mulhern, experienced sales leader, see memory `feedback_cold_call_methodology`):**
-- **Applied:** removed all "honest"/"honestly" phrasing from the opener (§1) and objections (§2, §6). It makes the prospect doubt you're honest the rest of the time. Hard ban now, do not reintroduce.
-- **Open decision — opener style:** Brendan favours an assertive differentiation hook over the permission-based pattern interrupt: *"[name], I have a way to separate you from your competitors,"* then DON'T pause, go straight into the value, then assumptive book (*"I've got Tuesday at 2, can I pencil you in?"*). This competes with the current Pavle-style disarming opener. The current opener already matches the calmer tone Pang found worked better on live calls, so the merge is likely: keep the disarming structure, lead the value with the "separate from competitors" framing. Not yet rewritten, pending Pang's call.
-- **Open decision — show-up texts (§5):** Brendan says confirmation/value texts give the prospect an exit and diminish the meeting (keep all ammo for the call). This directly conflicts with the Pavle show-up sequence this doc is built on. Unresolved, Pang to decide.
+**2026-06-20 — source:** this script is Brendan Mulhern's cold-call method (gatekeeper, name-led, book the 15-min discovery, withhold the how, two-call close). See memory `feedback_cold_call_methodology` and the full brief at `.claude/brendan-mulhern-brief.md`.
