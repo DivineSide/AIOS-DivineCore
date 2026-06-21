@@ -4,7 +4,7 @@
 >
 > **The flow is email-first, then call.** Brendan's call references a prior email, so the cold call sits downstream of the multi-thread cold email (see [`../sales-and-delivery/`](../sales-and-delivery/) and the cold email section of [`../../../.claude/brendan-mulhern-brief.md`](../../../.claude/brendan-mulhern-brief.md)).
 >
-> **The call's only job is to book a 15-minute discovery call.** You do not sell or explain the how on the phone. Two-call close: this books Call 1 (discovery), then you build a custom plan and present + close on Call 2.
+> **The call's only job is to book a 15-minute discovery call.** You don't try to close the sale on the phone. Brendan says withhold the how entirely; Pang's version gives a short clue if asked (one-liner + positioning + a couple of example workflows) so they have a reason to take the call, then pivots to "I'll show you the detail." See §3. Two-call close: this books Call 1 (discovery), then you build a custom plan and present + close on Call 2.
 >
 > Pairs with the offer in [`../sales-and-delivery/offer.md`](../sales-and-delivery/offer.md) and the operational plan in [`cold-calling-plan.md`](cold-calling-plan.md). Placeholders: `[prospect]` (e.g. Bob), `[client]` (a center you work with), `[time]`. Your call name: Peter.
 
@@ -26,23 +26,33 @@ Gatekeeper: "May I ask who's calling?"
 
 > ⚠️ Brendan's stronger version is *"I spoke to [prospect] via email last week and he asked me to call him today at 2"* or *"following up on some questions he had."* That gets you through faster but it's a fabrication if they never replied or asked you to call. Given you don't do fake claims, use the true version above (you did email them). Decide for yourself how far you want to push it.
 
-## 2. When [prospect] picks up (the pitch and the ask)
+## 2. When [prospect] picks up (the pitch and the interest check)
 
-You name what you do (drive new students), say you believe you can help, acknowledge it's a bad time, and go straight to booking the 15 minutes. You do NOT explain how.
+Name what you do (drive new students), say you believe you can help, acknowledge it's a bad time, and end on an interest question, not a hard time-pick. The questions they ask back are your opening.
 
-> "Hi [prospect], I'm working with [client] driving new students to their programs, and I believe we can help you too. I know now probably isn't the best time, so I'd like to schedule a quick 15-minute call to learn more about your business and how we could increase your enrollment. I've got my calendar open, I'm free next Tuesday at 11 or Wednesday at 2:30. Do either of those work for you?"
+> "Hi [prospect], I'm working with [client] driving new students to their programs, and I believe we can help you too. I know now probably isn't the best time, so I'd love to book 15 minutes sometime this week to show you in detail how we can increase your enrollment. Is that something you'd be interested in?"
 
-If those times don't work, drill down to one that does. Make his timing work.
+From here they usually start asking questions. That's good, that's the conversation opening. Handle it (next section), then book a specific time.
 
-> Tip carried over from the old script: confirm the prospect's state/time zone before you offer times, so you don't pitch a slot in the wrong zone.
+## 3. "How does it work?" — give them a clue (Pang's call)
 
-## 3. Objection: "Can you send me some material?"
+> ⚠️ **Open disagreement with Brendan.** Brendan says withhold the how completely to keep them curious. Pang disagrees: if you give them zero idea of what you actually do, there's no reason to give up time and hop on a call. So on this script you DO give a clue when asked, the one-liner plus the positioning plus a couple of example workflows, then pivot to the call to "show the detail." This is question #2 to settle with Brendan on the next call.
+
+When they ask "how does it work / what do you actually do?":
+
+> "Good question. Short version, we help tutoring and test prep centers get more students while automating the manual work nobody likes to do. Most agencies build you one thing and leave. We start with automations already proven to bring centers like yours more students and less manual work, then learn your business and automate more of it as we grow. For example, we set up systems that get your past and current families leaving Google reviews so more parents find you, ask your happy parents for referrals on their own, and make sure every new inquiry gets answered within minutes so you stop losing leads. There's more, but it's way easier to show you the detail on a quick call than run through all of it now. I've got [day] at [time] or [day] at [time], which works better?"
+
+If those times don't work, drill down to one that does.
+
+> Tip: confirm the prospect's state/time zone before you offer times, so you don't pitch a slot in the wrong zone.
+
+## 4. Objection: "Can you send me some material?"
 
 Do not send material. The how stays for the consultation.
 
 > "I wish it were that easy. Every business I work with has different hurdles they're trying to get past. For me to properly understand your business and recommend the right solution, a 15-minute conversation is the best way. Does Tuesday at 11 or Wednesday at 2:30 work?"
 
-## 4. Book it live on the phone (the most important step)
+## 5. Book it live on the phone (the most important step)
 
 The moment he agrees a time, get his email and send the invite while you're still on the call.
 
@@ -54,7 +64,7 @@ The moment he agrees a time, get his email and send the invite while you're stil
 
 ---
 
-## 5. The discovery call (Call 1) — agenda
+## 6. The discovery call (Call 1) — agenda
 
 Brendan's structure for the booked meeting. Goal: get the information you need to prove your value, then set up Call 2 to close.
 

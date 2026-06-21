@@ -86,94 +86,52 @@ Building in public, posting every day, anchored on "19-year-old building DivineS
 - **LinkedIn:** 7 posts/week (mostly authority and educational, one personal story on Fridays, one case study on weekends), 20 connection requests/day to ICP, 15-30 min/day commenting on owners' and influencers' posts, and replying to every comment.
 - **X:** 5 tweets/day ramping toward 10, 20-30 genuine replies/day to peers in the AI / automation / build-in-public niche (replies are the real growth engine on X), and DMing operators under 1k followers for peer connection, not sales.
 
-## Cold email
+## Cold email + Loom (built from your advice)
 
-I run this through Instantly to US test-prep / tutoring owners. It's a 2-step sequence (1 day apart) with two A/B variants per step.
+> Context: I also run an automated Instantly campaign for volume (541 sent so far, 5.36% reply rate, 2 positive). The manual, Loom-led motion below is the additional approach I'm building from your advice, for my best-fit and unicorn targets. The two run side by side.
 
-**Results so far:**
-- 541 emails sent
-- 5.36% reply rate (~29 replies)
-- 2 positive replies (6.9% of replies)
+> **Disclaimer:** this is my first pass at turning your advice into something concrete, so I could easily have misread or overcomplicated parts of it. Please don't hold back, I'd genuinely value any corrections or thoughts.
 
-**Setup:** sends Mon-Fri in two windows (7:00-10:00am and 6:00-7:30pm US Eastern), 360/day cap, stops on reply. Open and link tracking are off for deliverability.
+**The approach I landed on:**
+- Manual and personal, 10-20 researched companies a day, multi-thread top-down (owner first, then head of marketing, then admissions). I'll keep my automated campaign running for volume and use this manual motion on my best-fit and "unicorn" targets, like you suggested.
+- The email itself stays short. Its only job is to get them to watch a personal Loom. The Loom is where the value lives.
+- In the Loom I do a mini-audit: I show one or two specific things that are costing them students (their review gap versus a nearby competitor, or slow follow-up on new inquiries), explain why it matters, but I hold back how I'd fix it and save that for the call. (This is the part I asked about in question 7.)
 
-### Step 1 · Variant A — subject: "your google reviews"
+**The email (built around the Loom):**
 
-> Hi {{firstName}},
+> **subject:** quick question [firstName]
 >
-> Most of {{Cleaned Company Name}}'s new students probably come from word of mouth and parents searching Google.
+> Hey [firstName],
 >
-> I build automation systems for test prep and tutoring centers. The last one I built was for a US test prep center. They had over 500 students but only 20 Google reviews, which was dragging down their search ranking.
+> Have you ever thought about how students who need test prep actually find and choose a center? I was that student once, and it was harder than it should be, so I built a solution to it.
 >
-> I set up a system that asks parents for a review and a referral automatically. It doubled their review count in two months and runs on its own.
+> I recorded a quick 2-minute video for you about [Company]:
 >
-> I'd set the same up for you guys. If it doesn't double your Google reviews within two months, you don't pay.
+> [Loom link]
 >
-> Open to a quick look? Reply and I'll send a 90-second Zoom video walkthrough of the system.
->
-> Pang,
-> Sent from my iPhone
-
-### Step 1 · Variant B — subject: "feedback"
-
-> Hi {{firstName}},
->
-> I'm building an automation system for test prep and tutoring centers, and right now I'm still trying to understand the biggest pain points owners actually face.
->
-> Where I've landed so far is a system that answers every new inquiry within minutes, asks happy parents for a Google review at the right moment, and asks for referrals at the right time on its own.
->
-> I already built it for a US test prep center with over 500 students and only 20 reviews, and it doubled their count in two months.
->
-> But I'm not convinced reviews and follow-up are the biggest pain for centers like yours. Would you be open to giving feedback on what I'm building?
->
-> Pang,
-> Founder
->
-> PS. I'll send you a $50 gift card for your time.
-
-### Step 2 · Variant A — subject: blank (threads under step 1)
-
-> Hi {{firstName}},
->
-> bumping this in case it slipped past you. Worth adding: there's zero risk on your end. If I don't double your Google reviews in two months, you don't pay a cent.
->
-> Worth a quick look?
+> If it's worth a deeper look, I've got Tuesday or Thursday at 2 open.
 >
 > Pang
 
-### Step 2 · Variant B — subject: blank
+**The Loom script (60-90 seconds, their site and Google listing on screen):**
 
-> If you aren't interested, you can tell me to go kick rocks :-)
+> "Hey [firstName], Pang here, this'll be quick. I came across [Company] and I work with test prep and tutoring centers, so I spent a few minutes looking at how you show up online. Let me show you what I found.
+>
+> First thing. You've got [#] Google reviews. A center a few minutes from you, [competitor], has [#]. When a parent searches for test prep in your area, that gap is a big part of who shows up first and who gets the call.
+>
+> Second. I filled in your contact form yesterday and [haven't heard back / it took two days]. Every one of those is a parent who was ready to enroll and didn't get a reply in time.
+>
+> Now, I'm not going to get into exactly how I'd fix these on a video, because the right fix depends on your business and it's worth doing properly, together. But both of these are very fixable, and they're costing you students right now.
+>
+> If you want, I'll walk you through exactly what I'd do on a quick 15 minutes. Tuesday or Thursday at 2 work? Thanks for watching."
 
-## Cold call scripts
+> One thing I'm still deciding: whether to keep the "I was a student" opener (from your examples) or swap it for my real story (I grew up in the exam-prep world). Open to your view on which lands better.
 
-I'm testing two versions and tracking which one books more meetings.
+## Cold call
 
-**Script 1 — warm / consultative**
+I'm adopting the method you laid out: get past the gatekeeper by leading with the prospect's name, reference the email I sent, pitch that I help drive new students and book a 15-minute discovery call (no selling on the phone), then the two-call close (discovery, then present a custom plan and close).
 
-- **Opener:** "Hey, is this [center]? [name], this is Peter, how's it going? Hey, do you know [client] over in [area]?" → [No] → "No worries. I do some work for them, helped them bring in more students, and figured I'd reach out to see if I could do the same for you, if you've got a second."
-- **A few questions** to get them talking: how they're getting students now, whether they have any process for asking past parents for Google reviews.
-- **The offer:** when a parent searches "test prep near me," Google pushes the centers with the most reviews to the top and most parents call those first. Our system gets past and current families leaving reviews, and layers a referral system on top (when a happy parent leaves a review, we follow up and ask them to refer a friend).
-- **Pullback:** "I'm not trying to twist your arm. I do these quick intros to see if we're a fit, I only work with centers I vibe with. Worst case you walk away with a couple of tips."
-- **Close:** "If you're open to it, let's grab 10 minutes today or tomorrow, I'll screen-share and show you exactly how it'd work."
-
-**Script 2 — assertive (the one I'm weaker at)**
-
-- **Opener:** "Hi, is this [center]? [name], this is Peter, how are you? I'll be quick. I've got a system that helps test-prep centers separate from the competition and pull in more students. I looked at your center and think it'd work well for you. Is that something you'd even be open to?"
-- **If interested:** "It's a two-week free trial, if you don't see results, you don't pay. We set up an AI that gets your past and current parents leaving Google reviews so more families find you, and when someone leaves a good review we follow up to ask for a referral. Let me show you how it'd work, 15 minutes, today or tomorrow?"
-
-**Objection handling (where I struggle most).** For "not interested," I agree, shrink the ask, and give them an out: *"Totally fair, you don't even know me. I'm not asking you to buy anything. Give me 20 seconds, and if it's useless you can hang up on me."* Then straight into: their search term, their review count, the competitors beating them, the fix, and a 10-minute booking.
-
-**Script 3 — audit-first (the new direction, built from your advice)**
-
-This is the one I'm switching to. The call's only job is to book a free 15-minute audit, not to sell. I open calm, give the reason (a free audit of how they're getting students and where manual work is costing them), and I don't explain the how at all. If they ask how, I use the restaurant-reviews analogy and say that's what the audit's for.
-
-- **Opener:** "Hey, is this [name]? [name], hey, this is Peter. I'll be quick, you can throw me off the phone in 15 seconds if it's not for you. Fair?"
-- **Reason / free audit:** "I run automation for tutoring and test prep centers, and before I called I looked at [center]. I put together free audits for centers like yours: how you're getting students, how you stack up against the centers nearby, and where the manual day-to-day is costing you students and time. No charge, no pitch on this call, I just walk you through what I found. Worth a look?"
-- **Confirm the time zone, then book live:** "You're in [city/state], right? Just so I get the time right." → offer two times → take the email → book the Zoom on the call.
-- **"Not interested" (your line):** "I figured there was a chance you'd say that, and that's fair, you don't know me yet. That's exactly why I'm not asking you to buy anything. It's a free audit, 15 minutes, and our setup has driven real results for centers a lot like yours. Worst case you get a free breakdown of where you stand against your competition. [day] at [time] work?"
-
-This sets up the two-call close you recommended: the audit call is Call 1 (discovery + their numbers), then I build the ROI and present + close on Call 2.
+The one place I adapted it: when they ask "how does it work," I give a short clue (my one-liner, the positioning, a couple of example workflows) rather than withholding the how completely, because I'm worried that giving them zero idea leaves no reason to take the call. That's question for you below.
 
 ---
 
@@ -187,4 +145,5 @@ Running list to cover on the call. Add to this as more come up.
 4. **Two-call vs one-call close.** You favor two calls so you can run real analysis and ROI. I've been closing on one. When is each the right move for a lower-ticket, fairly productized offer like ours?
 5. **Customization vs product.** We're custom now to learn the niche, but the long game is a productized platform. Does that change how I should be pricing or positioning today?
 6. **Pricing.** Once I bring you real client numbers (cost per student, capacity, empty seats, lifecycle), can we build the ROI-based pricing together like you laid out?
+7. **On withholding the solution in the Loom/audit.** I'd love to understand your thinking here a little more, if you don't mind. You suggested doing a mini-audit that shows what's wrong but holds back the solution. I've seen a lot of advice that leans the other way, giving as much value as possible upfront, and you also mentioned giving value first, so I want to make sure I'm applying your approach the right way. What's the reasoning behind holding back the how, and how do you think about the line between giving enough value to earn the call and giving so much they no longer need it? Really appreciate you walking me through this.
 
