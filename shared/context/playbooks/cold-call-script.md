@@ -28,19 +28,25 @@ Gatekeeper: "May I ask who's calling?"
 
 ## 2. When [prospect] picks up (the pitch and the interest check)
 
-Name what you do (drive new students), say you believe you can help, acknowledge it's a bad time, and end on an interest question, not a hard time-pick. The questions they ask back are your opening.
+Name what you do, drop the client name to see if it lands, acknowledge it's a bad time, then go for the booking.
 
-> "Hi [prospect], I'm working with [client] driving new students to their programs, and I believe we can help you too. I know now probably isn't the best time, so I'd love to book 15 minutes sometime this week to show you in detail how we can increase your enrollment. Is that something you'd be interested in?"
+> "Hi [prospect], I'm working with Target Academy driving new students to their programs, and I believe we can help you too. Have you heard about them perhaps?"
+> [if no] "Ahh I see, no worries."
+> "I know now probably isn't the best time, so I'd love to book 15 minutes sometime this week to show how we can increase your enrollment. Are you free any time this week?"
 
-From here they usually start asking questions. That's good, that's the conversation opening. Handle it (next section), then book a specific time.
+From here they usually start asking questions. That's good, that's your opening. Handle it (next section), then book a specific time.
 
-## 3. "How does it work?" — give them a clue (Pang's call)
+## 3. "How does it work?" — give them a clue
 
-> ⚠️ **Open disagreement with Brendan.** Brendan says withhold the how completely to keep them curious. Pang disagrees: if you give them zero idea of what you actually do, there's no reason to give up time and hop on a call. So on this script you DO give a clue when asked, the one-liner plus the positioning plus a couple of example workflows, then pivot to the call to "show the detail." This is question #2 to settle with Brendan on the next call.
+> Note: Brendan leans toward withholding the how to keep them curious. Pang gives a short clue (what we do, a couple of example workflows, then the audit framing) so they have a reason to take the call. Why Brendan withholds it is still question #1 for the Monday call.
 
 When they ask "how does it work / what do you actually do?":
 
-> "Good question. Short version, we help tutoring and test prep centers get more students while automating the manual work nobody likes to do. Most agencies build you one thing and leave. We start with automations already proven to bring centers like yours more students and less manual work, then learn your business and automate more of it as we grow. For example, we set up systems that get your past and current families leaving Google reviews so more parents find you, ask your happy parents for referrals on their own, and make sure every new inquiry gets answered within minutes so you stop losing leads. There's more, but it's way easier to show you the detail on a quick call than run through all of it now. I've got [day] at [time] or [day] at [time], which works better?"
+> "Good question. So the whole idea is we help tutoring centers get more students while automating the manual work. Most agencies set up one thing and leave. We start with systems that are already proven to work for businesses like yours, then learn your business and automate more of it as we grow together.
+>
+> For example, we set up systems that get you Google reviews automatically so more parents find you, and we've also set up referral systems to increase word-of-mouth.
+>
+> And again, every center is unique, so we normally do an audit first before recommending the right solution. It's way easier to show you the detail on a quick call than try to run through all of it now. So are you free on… or at…?"
 
 If those times don't work, drill down to one that does.
 
@@ -48,9 +54,9 @@ If those times don't work, drill down to one that does.
 
 ## 4. Objection: "Can you send me some material?"
 
-Do not send material. The how stays for the consultation.
+Do not send material. The how stays for the call.
 
-> "I wish it were that easy. Every business I work with has different hurdles they're trying to get past. For me to properly understand your business and recommend the right solution, a 15-minute conversation is the best way. Does Tuesday at 11 or Wednesday at 2:30 work?"
+> "I wish it were that easy. Every center I work with has different hurdles they're trying to get past. So for me to properly understand your business and recommend the right solution, a 15-minute conversation is the best way for both of us. So are you free on… or at…?"
 
 ## 5. Book it live on the phone (the most important step)
 

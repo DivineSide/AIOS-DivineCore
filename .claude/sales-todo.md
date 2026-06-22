@@ -6,6 +6,12 @@
 
 *Working draft. Still to confirm the upbringing detail with Mayank + Shubham, then tighten. Do not name the country in the story.*
 
+**Where it's going (the bigger vision):**
+
+> We got pulled in by this idea spreading online of an AI operating system, a business where the AI watches its own data and makes the day-to-day decisions on its own. That's the long game we're building toward, one center at a time.
+
+*Use this with Brendan, in content, and with cofounders. Keep it OUT of cold outreach, to a tutoring owner it's noise, and AIOS is the moat, not the pitch.*
+
 ---
 
 ## 2. The core offer
@@ -56,39 +62,50 @@
 
 ---
 
-## 4. Cold email + Loom
+## 4. Cold email (settled, automated Instantly sequence)
 
-Manual and personal, 10-20 researched companies a day, multi-thread top-down (owner, then head of marketing, then admissions). Runs alongside the automated Instantly campaign. The email is short, its only job is to get them to watch the Loom. The Loom is a mini-audit: show 1-2 real problems, withhold the how.
+Permission-first: email 1 asks to send a video, the Loom only goes out after they reply yes. Two A/B versions, same opener, different proof anchor. Full sequence, follow-ups, and Loom outline in [cold-email-script.md](../shared/context/playbooks/cold-email-script.md).
 
-**The email (built around the Loom):**
+**Version A — referral anchor:**
 
-> **subject:** quick question [firstName]
+> subject: quick question {{firstName}}
 >
-> Hey [firstName],
+> {{firstName}}, saw you're in charge at {{Cleaned Company Name}}.
 >
-> Have you ever thought about how students who need test prep actually find and choose a center? I was that student once, and it was harder than it should be, so I built a solution to it.
+> We help education centers automate the manual work while bringing in more referrals.
 >
-> I recorded a quick 2-minute video for you about [Company]:
+> Mind if I send a quick video breaking down the strategy that generated 15 new referrals from happy parents for one of my test-prep clients?
 >
-> [Loom link]
+> Pang
+> Sent from my iPhone
+
+**Version B — time-saved anchor:** same opener and value line, anchor swapped to "the strategy that's saving one of my test-prep clients hours of manual work every week."
+
+**Follow-up (day 3):**
+
+> {{firstName}}, circling back from earlier this week.
 >
-> If it's worth a deeper look, I've got Tuesday or Thursday at 2 open.
+> We help education centers automate the manual work while bringing in more referrals.
+>
+> Still happy to send that quick video breaking down the strategy that generated 15 new referrals from happy parents for one of my test-prep clients. Want me to send it over?
 >
 > Pang
 
-**The Loom script (60-90 seconds, their site and Google listing on screen):**
+Walk-away and breakup follow-ups, plus the Loom-delivery email, are in the full doc.
 
-> "Hey [firstName], Pang here, this'll be quick. I came across [Company] and I work with test prep and tutoring centers, so I spent a few minutes looking at how you show up online. Let me show you what I found.
->
-> First thing. You've got [#] Google reviews. A center a few minutes from you, [competitor], has [#]. When a parent searches for test prep in your area, that gap is a big part of who shows up first and who gets the call.
->
-> Second. I filled in your contact form yesterday and [haven't heard back / it took two days]. Every one of those is a parent who was ready to enroll and didn't get a reply in time.
->
-> Now, I'm not going to get into exactly how I'd fix these on a video, because the right fix depends on your business and it's worth doing properly, together. But both of these are very fixable, and they're costing you students right now.
->
-> If you want, I'll walk you through exactly what I'd do on a quick 15 minutes. Tuesday or Thursday at 2 work? Thanks for watching."
+### The manual outreach (high-touch targets)
 
-*The give = the problem (mini-audit). The withhold = the how (that's the call). Open question for Brendan on where exactly that line sits.*
+Separate motion from the automated sequence above. Research each center first (check their Google reviews, then test their phone for missed calls), then lead with one of two angles. Both reframe the pitch around protecting the word-of-mouth they already earned, not "marketing" (these owners tune marketing out).
+
+**Reviews angle** (reframe: reviews are word-of-mouth, just the version that happens when the owner isn't in the room):
+
+> "You've clearly built this on word-of-mouth. The thing is, when a referred parent looks you up, the first thing they check is your Google reviews, and right now that's where some of those referrals quietly drop off."
+
+**Missed-call angle** (strongest when you have proof you called and no one picked up):
+
+> "I actually tried calling [Center] earlier this week and couldn't get through. I'm guessing I'm not the only one, and when a referred parent calls ready to sign up and no one picks up, that's a word-of-mouth lead gone to whoever answered first."
+
+Both lines to be shortened. Loom script for the manual version: TBD.
 
 ---
 
@@ -96,4 +113,6 @@ Manual and personal, 10-20 researched companies a day, multi-thread top-down (ow
 
 1. **Giving before asking (the main one).** You've said to give value before asking for anything, and I'm fully on board with that. Should I be trying to give as much value as I possibly can upfront? And I'd love to understand the reasoning for not showing them the solution itself. Thanks for helping me think this through.
 2. **Customization vs product.** Does the long-term productize plan change how to price/position today?
+3. **Using numbers I can't fully back yet.** I want to be upfront with you: my cold email came out pretty different from the approach you shared, and I'm leaning on a couple of result numbers (like "15 referrals from happy parents" or "saving a client hours a week") that I can't fully stand behind yet, since I don't have a verified test-prep result. Is that a problem in your experience? How do you handle proof and numbers when you're early and don't have the case study yet?
+4. **The Loom approach.** For the video, my plan is to only point out what's missing and what we'd fix, without explaining how we'd actually fix it. Does that sound right to you?
 
