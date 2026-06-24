@@ -131,5 +131,5 @@ jobs:
       - name: Ping Discord
         run: |
           curl -s -H "Content-Type: application/json" \
-            -d "{\"content\": \"✅ DsideOS deployed to Hetzner: \`sha-${{ github.sha }}\`\"}" \
+            -d "{\"embeds\": [{\"title\": \"✅ DsideOS deployed\", \"color\": 3066993, \"fields\": [{\"name\": \"Commit\", \"value\": \"${{ github.event.head_commit.message || 'manual trigger' }}\", \"inline\": false}, {\"name\": \"By\", \"value\": \"${{ github.actor }}\", \"inline\": true}, {\"name\": \"SHA\", \"value\": \"\`${{ github.sha }}\`\", \"inline\": true}]}]}" \
             "${{ secrets.DISCORD_WEBHOOK_URL }}" || true
