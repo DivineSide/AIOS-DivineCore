@@ -24,13 +24,13 @@ from pptx.oxml.ns import qn
 from pptx.util import Cm, Pt
 
 sys.path.insert(0, str(Path(__file__).parent))
-from krutidev import krutidev_to_unicode, unicode_to_krutidev_runs  # noqa: E402
+from krutidev import DEFAULT_FONT, krutidev_to_unicode, render_runs  # noqa: E402
 
 BASE = Path(__file__).resolve().parents[1]
 TEMPLATE_PPTX = BASE / "resources" / "ppt target revision series 02.pptx"
 
-KRUTI = "Kruti Dev 010"
 LATIN = "Calibri"
+_FONT = DEFAULT_FONT  # set by build(); add_mixed() reads it via render_runs()
 GOLD = RGBColor(0xFF, 0xC0, 0x00)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
@@ -58,10 +58,11 @@ def _png_size_px(path):
 
 
 def add_mixed(para, text, size, color, bold=False):
-    for run_text, is_latin in unicode_to_krutidev_runs(text):
+    runs, deva_font = render_runs(text, _FONT)
+    for run_text, is_latin in runs:
         r = para.add_run()
         r.text = run_text
-        r.font.name = LATIN if is_latin else KRUTI
+        r.font.name = LATIN if is_latin else deva_font
         r.font.size = Pt(size)
         r.font.bold = bold
         r.font.color.rgb = color
@@ -230,10 +231,12 @@ def add_answer_slide(prs, layout, banner, questions):
         add_mixed(p, "      ".join(row), 28, WHITE)
 
 
-def build(questions_path: Path, out_path: Path, answer_key: bool = True):
+def build(questions_path: Path, out_path: Path, answer_key: bool = True,
+          font: str = DEFAULT_FONT):
     """answer_key=False -> verbatim-MCQ deck shown live in class (no answers).
     answer_key=True  -> practice deck with the trailing उत्तरमाला slide."""
-    global _IMG_BASE
+    global _IMG_BASE, _FONT
+    _FONT = font  # add_mixed() reads this via render_runs()
     _IMG_BASE = questions_path.resolve().parent  # crops resolve beside the JSON
     data = json.loads(questions_path.read_text(encoding="utf-8"))
     prs = Presentation(str(TEMPLATE_PPTX))

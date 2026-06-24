@@ -28,15 +28,18 @@ from docx.shared import Cm, Pt
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).parent))
-from krutidev import unicode_to_krutidev_runs  # noqa: E402
+from krutidev import DEFAULT_FONT, render_runs  # noqa: E402
 
 BASE = Path(__file__).resolve().parents[1]
 FRONT_PAGE_DOCX = BASE / "resources" / "front-page.docx"  # made by extract_front_page.py
 LOGO_IMG = BASE / "templates" / "docx_image1.jpeg"
 WATERMARK_IMG = BASE / "templates" / "watermark.png"
 
-KRUTI = "Kruti Dev 010"
 LATIN = "Times New Roman"
+
+# The font choice for the current build(), set by build(). add_mixed() reads it
+# via render_runs() so the Devanagari font + encoding follow the frontend's pick.
+_FONT = DEFAULT_FONT
 BODY_PT = 14
 
 # usable area inside their margins (A4, 1.27cm margins)
@@ -79,9 +82,10 @@ def add_figure(doc, rel, max_w_cm=STEM_FIG_W_CM, max_h_cm=STEM_FIG_H_CM, para=No
 
 
 def add_mixed(para, text, size=BODY_PT, bold=False):
-    for run_text, is_latin in unicode_to_krutidev_runs(text):
+    runs, deva_font = render_runs(text, _FONT)
+    for run_text, is_latin in runs:
         r = para.add_run(run_text)
-        r.font.name = LATIN if is_latin else KRUTI
+        r.font.name = LATIN if is_latin else deva_font
         r.font.size = Pt(size)
         r.font.bold = bold
     return para
@@ -208,8 +212,9 @@ def add_answer_key(doc, questions):
         add_latin(tight(doc.add_paragraph(), 4), "      ".join(row), size=12)
 
 
-def build(questions_path: Path, out_path: Path):
-    global _IMG_BASE
+def build(questions_path: Path, out_path: Path, font: str = DEFAULT_FONT):
+    global _IMG_BASE, _FONT
+    _FONT = font  # add_mixed() reads this via render_runs()
     _IMG_BASE = questions_path.resolve().parent  # crops resolve beside the JSON
     data = json.loads(questions_path.read_text(encoding="utf-8"))
     doc = Document(str(FRONT_PAGE_DOCX))  # their real front page, original sections

@@ -273,6 +273,66 @@ def unicode_to_krutidev_runs(text: str):
     return runs
 
 
+# A plain Latin-word splitter for Unicode mode. We do NOT need to pull out the
+# Kruti-repurposed punctuation here (`:`, `;`, `|`, …) — in Unicode mode those
+# characters render correctly in any font, so only true Latin words get split
+# out so they can use a Latin font for nicer Western glyphs.
+_LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z0-9'’.\-/]*(?: +[A-Za-z][A-Za-z0-9'’.\-/]*)*")
+
+
+def unicode_runs(text: str):
+    """Split text into [(text, is_latin)] runs, keeping Devanagari as Unicode.
+
+    The Unicode-mode counterpart of unicode_to_krutidev_runs(): Hindi runs are
+    returned UNCHANGED (render with a Unicode Devanagari font like Nirmala UI),
+    Latin runs are split out so they can use a Latin font. Nothing is converted.
+    """
+    runs = []
+    last = 0
+    for m in _LATIN_WORD.finditer(text):
+        if m.start() > last:
+            runs.append((text[last : m.start()], False))
+        runs.append((m.group(), True))
+        last = m.end()
+    if last < len(text):
+        runs.append((text[last:], False))
+    return runs
+
+
+# The font registry the frontend chooses from. Each entry names the Devanagari
+# font and the run-splitter used to render it. To add a font, add a row here —
+# the builders read this, they don't hardcode font names.
+FONTS = {
+    "krutidev": {
+        "devanagari": "Kruti Dev 010",
+        "splitter": unicode_to_krutidev_runs,
+    },
+    "unicode": {
+        "devanagari": "Nirmala UI",
+        "splitter": unicode_runs,
+    },
+}
+
+DEFAULT_FONT = "krutidev"   # current shipping behavior; frontend overrides per build
+
+
+def render_runs(text: str, font: str = DEFAULT_FONT):
+    """THE font switch. Unicode text in -> [(run_text, is_latin)] out.
+
+    `font` selects the rendering: "krutidev" converts Hindi to Kruti Dev legacy
+    encoding (current shipping path); "unicode" keeps Hindi as Unicode for a
+    Unicode Devanagari font. Builders call this and never touch the font tables
+    directly — so the choice is a single parameter threaded from the frontend.
+
+    Returns (runs, devanagari_font_name) so the caller knows which font to set
+    on the non-Latin runs.
+    """
+    if font not in FONTS:
+        raise ValueError(f"Unknown font {font!r}. Available: {list(FONTS)}")
+    spec = FONTS[font]
+    return spec["splitter"](str(text or "")), spec["devanagari"]
+
+
 if __name__ == "__main__":
     # Known-good pairs (verified against Kruti Dev typing references).
     U2K_CASES = [
@@ -308,4 +368,19 @@ if __name__ == "__main__":
     ok = any(":" in t for t, is_latin in runs if is_latin)
     failures += not ok
     print(f"RUNS {'PASS' if ok else 'FAIL'}: {runs}")
+
+    # render_runs("...", "krutidev") must equal unicode_to_krutidev_runs.
+    kr_runs, kr_font = render_runs("भारत Test", "krutidev")
+    ok = kr_runs == unicode_to_krutidev_runs("भारत Test") and kr_font == "Kruti Dev 010"
+    failures += not ok
+    print(f"RENDER krutidev {'PASS' if ok else 'FAIL'}: {kr_runs} font={kr_font}")
+
+    # render_runs("...", "unicode") must keep Devanagari unchanged + split Latin.
+    uni_runs, uni_font = render_runs("भारत Test", "unicode")
+    hindi_kept = any("भारत" in t for t, is_latin in uni_runs if not is_latin)
+    latin_split = any(t == "Test" for t, is_latin in uni_runs if is_latin)
+    ok = hindi_kept and latin_split and uni_font == "Nirmala UI"
+    failures += not ok
+    print(f"RENDER unicode {'PASS' if ok else 'FAIL'}: {uni_runs} font={uni_font}")
+
     raise SystemExit(1 if failures else 0)

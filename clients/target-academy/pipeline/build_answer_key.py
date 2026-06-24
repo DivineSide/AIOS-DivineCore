@@ -24,21 +24,22 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
 sys.path.insert(0, str(Path(__file__).parent))
-from krutidev import unicode_to_krutidev_runs  # noqa: E402
+from krutidev import DEFAULT_FONT, render_runs  # noqa: E402
 
 BASE = Path(__file__).resolve().parents[1]
 FRONT_PAGE_DOCX = BASE / "resources" / "front-page.docx"
 LOGO_IMG = BASE / "templates" / "docx_image1.jpeg"
 WATERMARK_IMG = BASE / "templates" / "watermark.png"
 
-KRUTI = "Kruti Dev 010"
 LATIN = "Times New Roman"
+_FONT = DEFAULT_FONT  # set by build(); add_mixed() reads it via render_runs()
 
 
 def add_mixed(para, text, size=14, bold=False):
-    for run_text, is_latin in unicode_to_krutidev_runs(text):
+    runs, deva_font = render_runs(text, _FONT)
+    for run_text, is_latin in runs:
         r = para.add_run(run_text)
-        r.font.name = LATIN if is_latin else KRUTI
+        r.font.name = LATIN if is_latin else deva_font
         r.font.size = Pt(size)
         r.font.bold = bold
     return para
@@ -168,19 +169,49 @@ def _build_docx(questions_path: Path, docx_path: Path):
 
 
 def _docx_to_pdf(docx_path: Path, pdf_path: Path):
-    """Convert using Word via win32com (Windows only)."""
-    import win32com.client
-    word = win32com.client.Dispatch("Word.Application")
-    word.Visible = False
-    try:
-        doc = word.Documents.Open(str(docx_path.resolve()))
-        doc.SaveAs(str(pdf_path.resolve()), FileFormat=17)  # 17 = wdFormatPDF
-        doc.Close()
-    finally:
-        word.Quit()
+    """Convert .docx -> .pdf. Word via win32com on Windows (dev), LibreOffice
+    headless on Linux (server). Tries Word first, falls back to soffice."""
+    if sys.platform == "win32":
+        try:
+            import win32com.client
+            word = win32com.client.Dispatch("Word.Application")
+            word.Visible = False
+            try:
+                doc = word.Documents.Open(str(docx_path.resolve()))
+                doc.SaveAs(str(pdf_path.resolve()), FileFormat=17)  # 17 = wdFormatPDF
+                doc.Close()
+            finally:
+                word.Quit()
+            return
+        except Exception:
+            pass  # fall through to LibreOffice if Word is unavailable
+    _docx_to_pdf_libreoffice(docx_path, pdf_path)
 
 
-def build(questions_path: Path, out_path: Path):
+def _docx_to_pdf_libreoffice(docx_path: Path, pdf_path: Path):
+    """Server path: LibreOffice headless. Requires `libreoffice`/`soffice` on PATH
+    plus the Kruti Dev / Nirmala UI fonts installed system-wide."""
+    import shutil
+    import subprocess
+
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise RuntimeError("LibreOffice (soffice) not found on PATH.")
+    out_dir = pdf_path.resolve().parent
+    subprocess.run(
+        [soffice, "--headless", "--convert-to", "pdf", "--outdir",
+         str(out_dir), str(docx_path.resolve())],
+        check=True, capture_output=True, timeout=120,
+    )
+    # LibreOffice names the output <docx-stem>.pdf — rename to the requested name.
+    produced = out_dir / (docx_path.stem + ".pdf")
+    if produced != pdf_path and produced.exists():
+        produced.replace(pdf_path)
+
+
+def build(questions_path: Path, out_path: Path, font: str = DEFAULT_FONT):
+    global _FONT
+    _FONT = font  # add_mixed() reads this via render_runs()
     data = json.loads(questions_path.read_text(encoding="utf-8"))
     n = len(data["questions"])
 

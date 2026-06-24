@@ -26,6 +26,15 @@ Usage:
 JSON shape (per question): { "n", "stem", "options":[...], "answer":"a".."e",
     "reason"?, "solution"?, "sources"?:[...], "flag"? }  — top-level keys
     "filename"/"ppt_filename"/"solution_filename" set the client-facing names.
+
+PAPER FORMAT (top-level "format" key, default "format-1"):
+    "format-1"  the branded 2-column practice paper + उत्तरमाला answer key
+                (build_paper). The default — what was demoed and locked.
+    "format-2"  the per-question 8-row table layout (build_paper_format2),
+                every option pre-marked "incorrect". No answer key page (the
+                table layout carries answers in its own cells). When format-2
+                is selected it REPLACES the format-1 paper; deck + solution +
+                answer-key PDF are still produced.
 """
 
 import json
@@ -33,10 +42,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import build_deck        # noqa: E402
-import build_paper       # noqa: E402
-import build_solution    # noqa: E402
-import build_answer_key  # noqa: E402
+import build_deck          # noqa: E402
+import build_paper         # noqa: E402
+import build_paper_format2 # noqa: E402
+import build_solution      # noqa: E402
+import build_answer_key    # noqa: E402
 
 BASE = Path(__file__).resolve().parents[1]
 INPUT_DIR = BASE / "review" / "input"
@@ -152,11 +162,18 @@ def review_summary(data: dict) -> tuple[int, int, list[str]]:
     return len(data["questions"]), len(flagged), flagged
 
 
-def run(input_path: Path | None = None) -> dict:
-    """Validate -> generate all three -> return a result dict for the caller."""
+def run(input_path: Path | None = None, font: str | None = None) -> dict:
+    """Validate -> generate all three -> return a result dict for the caller.
+
+    `font` ("krutidev" | "unicode") selects the Devanagari rendering for every
+    builder. Defaults to the JSON's top-level "font" key, else the shipping
+    default ("krutidev"). This is the frontend's per-build font choice.
+    """
     src = input_path or find_input()
     data = validate(src)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    font = (font or data.get("font") or "krutidev").lower()
 
     deck_name, sol_name, paper_name, akey_name = output_names(data)
     deck_out = OUTPUT_DIR / deck_name
@@ -165,13 +182,17 @@ def run(input_path: Path | None = None) -> dict:
     akey_out = OUTPUT_DIR / akey_name
 
     # 1. in-class deck — verbatim MCQs, NO answers shown live
-    build_deck.build(src, deck_out, answer_key=False)
+    build_deck.build(src, deck_out, answer_key=False, font=font)
     # 2. teacher solution — answers + reasoning + manual-review flags
-    build_solution.build(src, sol_out)
-    # 3. branded practice paper — with उत्तरमाला key
-    build_paper.build(src, paper_out)
+    build_solution.build(src, sol_out, font=font)
+    # 3. branded practice paper — format-1 (2-col + उत्तरमाला) or format-2 (tables)
+    fmt = (data.get("format") or "format-1").lower()
+    if fmt == "format-2":
+        build_paper_format2.build(src, paper_out, font=font)
+    else:
+        build_paper.build(src, paper_out, font=font)
     # 4. simple one-page answer-key PDF (owner request)
-    build_answer_key.build(src, akey_out)
+    build_answer_key.build(src, akey_out, font=font)
 
     n, n_flag, flagged = review_summary(data)
     return {

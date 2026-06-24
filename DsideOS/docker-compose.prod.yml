@@ -1,0 +1,93 @@
+# Production (Hetzner CX23) — pull pre-built images from GHCR, Caddy out front.
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Caddy terminates TLS (auto Let's Encrypt) and path-splits:
+#   dsideos.divinesideai.com/api/* -> api:8000
+#   dsideos.divinesideai.com/*     -> frontend:3000
+#
+# Set DSIDEOS_IMAGE_TAG to pin a version (CI sets it to the commit sha).
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data        # persists the TLS certs across restarts
+      - caddy-config:/config
+    depends_on:
+      - api
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  api:
+    image: ghcr.io/divineside/dsideos-api:${DSIDEOS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - JOBS_DIR=/data/jobs
+    env_file:
+      - .env
+    volumes:
+      - jobs:/data/jobs
+    depends_on:
+      - redis
+
+  worker:
+    image: ghcr.io/divineside/dsideos-worker:${DSIDEOS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # CX23 is 4GB RAM — concurrency=2 keeps LibreOffice + Claude calls within budget.
+    command: celery -A worker.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - JOBS_DIR=/data/jobs
+    env_file:
+      - .env
+    volumes:
+      - jobs:/data/jobs
+      # Client branded assets (IP — not in the image). Provisioned on the server.
+      - ./assets/resources:/app/clients/target-academy/resources:ro
+      - ./assets/templates:/app/clients/target-academy/templates:ro
+    depends_on:
+      - redis
+
+  beat:
+    image: ghcr.io/divineside/dsideos-worker:${DSIDEOS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: celery -A worker.celery_app beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - JOBS_DIR=/data/jobs
+    env_file:
+      - .env
+    volumes:
+      - jobs:/data/jobs
+    depends_on:
+      - redis
+
+  # ── frontend ────────────────────────────────────────────────────────────────
+  # The dashboard lives in its OWN repo + image. This service just runs that
+  # published image alongside the backend so Caddy can route to it. Update the
+  # image ref to your frontend's GHCR path. Until it's published, comment this
+  # out and Caddy's /* handler will 502 (the /api/* path still works).
+  frontend:
+    image: ghcr.io/divineside/dsideos-frontend:${FRONTEND_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      # The frontend calls the backend at the same origin under /api.
+      - NEXT_PUBLIC_API_BASE=/api
+    depends_on:
+      - api
+
+volumes:
+  jobs:
+  redis-data:
+  caddy-data:
+  caddy-config:

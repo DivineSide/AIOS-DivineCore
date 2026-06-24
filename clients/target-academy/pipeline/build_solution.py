@@ -1,163 +1,252 @@
 """Build the TEACHER solution doc (.docx) from a solved questions JSON.
 
-Private to the teacher (NOT shown in class) -> no branding, no Kruti Dev: clean
-A4 Word in Unicode Devanagari (Nirmala UI). Per question: number + stem, all
-options with the correct one bold + ✓, an उत्तर line, and a हल/व्याख्या block
-only when the question carries a "solution" field (maths/reasoning/assertion).
-Factual GK questions may carry a short "reason" (one line) instead.
+Private to the teacher (NOT shown in class, NOT branded publicly). Follows the
+same visual standard as the practice paper: opens front-page.docx to inherit the
+rectangular page border (w:pgBorders), applies the faded watermark logo, and uses
+Kruti Dev 010 / Times New Roman via unicode_to_krutidev_runs — exactly as
+build_paper.py does.
 
-Questions JSON shape (per item, superset of build_deck/build_paper):
-  { "n", "stem", "statements"?, "match"?, "lead_in"?, "options":[...],
-    "answer": "a"|..|"e", "reason"?: "one line", "solution"?: "worked steps" }
+Per question layout (matches the WhatsApp solution format):
+    Q1. <stem>                          — Kruti Dev, bold
+    (A) <opt>  (B) <opt> ...            — Kruti Dev
+    उत्तर: (C) <correct option text>     — bold, green
+    विस्तृत व्याख्या: <explanation>      — Kruti Dev, label bold
+
+Source provenance and ⚠ flags live HERE ONLY — never on the branded paper/deck.
 
 Usage: python build_solution.py [questions.json] [out.docx]
 """
 
+import copy
 import json
 import sys
 from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 from PIL import Image
 
-BASE = Path(__file__).resolve().parents[1]
-FONT = "Nirmala UI"          # Unicode Devanagari, ships with Windows
-GREEN = RGBColor(0x1B, 0x6B, 0x2D)
-GREY = RGBColor(0x55, 0x55, 0x55)
-RED = RGBColor(0xC0, 0x2A, 0x2A)
-LABELS = ["a", "b", "c", "d", "e", "f"]
-FIG_W_CM = 5.0  # teacher doc is single-column; keep figures compact
+sys.path.insert(0, str(Path(__file__).parent))
+from krutidev import DEFAULT_FONT, render_runs  # noqa: E402
 
-_IMG_BASE = BASE  # set per build() so JSON image paths resolve beside the JSON
+# Font for the current build(), set by build(); add_mixed reads it via render_runs.
+_FONT = DEFAULT_FONT
+
+BASE         = Path(__file__).resolve().parents[1]
+FRONT_PAGE_DOCX = BASE / "resources" / "front-page.docx"
+LOGO_IMG     = BASE / "templates" / "docx_image1.jpeg"
+WATERMARK_IMG= BASE / "templates" / "watermark.png"
+
+LATIN  = "Times New Roman"
+BODY_PT = 12
+FIG_W_CM = 6.0      # single-column doc — can be a bit wider than 2-col paper
+
+GREEN = RGBColor(0x1B, 0x6B, 0x2D)
+GREY  = RGBColor(0x55, 0x55, 0x55)
+RED   = RGBColor(0xC0, 0x2A, 0x2A)
+
+LABELS     = ["a", "b", "c", "d", "e", "f"]
+LABELS_UP  = ["A", "B", "C", "D", "E", "F"]
+
+_IMG_BASE = BASE
 
 
 def _img_path(rel):
     p = Path(rel)
     return p if p.is_absolute() else (_IMG_BASE / p)
 
-# Preferred answer sources for national GK; UK-specific questions use ExamPillar + UK sites.
-TIER1_SOURCES = ("exampillar", "testbook")
+
+# ── shared helpers (same pattern as build_paper.py) ──────────────────────────
+
+def make_watermark(logo_path: Path, out_path: Path, alpha=0.10):
+    logo = Image.open(logo_path).convert("RGBA")
+    a = logo.split()[3].point(lambda v: int(v * alpha))
+    logo.putalpha(a)
+    logo.save(out_path, "PNG")
 
 
-def run(p, text, size=12, bold=False, color=None, italic=False):
-    r = p.add_run(text)
-    r.font.name = FONT
-    r.font.size = Pt(size)
-    r.font.bold = bold
-    r.font.italic = italic
-    if color is not None:
-        r.font.color.rgb = color
-    return r
+def add_watermark_header(section, image_path: Path, width_cm=11.0):
+    header = section.header
+    header.is_linked_to_previous = False
+    para = header.paragraphs[0]
+    run = para.add_run()
+    run.add_picture(str(image_path), width=Cm(width_cm))
+    inline = run._element.find(qn("w:drawing")).find(qn("wp:inline"))
+    drawing = inline.getparent()
+    anchor = drawing.makeelement(qn("wp:anchor"), {
+        "distT": "0", "distB": "0", "distL": "114300", "distR": "114300",
+        "simplePos": "0", "relativeHeight": "251658240", "behindDoc": "1",
+        "locked": "0", "layoutInCell": "1", "allowOverlap": "1",
+    })
+    simple_pos = anchor.makeelement(qn("wp:simplePos"), {"x": "0", "y": "0"})
+    anchor.append(simple_pos)
+    for axis, tag in (("positionH", "wp:positionH"), ("positionV", "wp:positionV")):
+        pos = anchor.makeelement(qn(tag), {"relativeFrom": "page"})
+        align = pos.makeelement(qn("wp:align"), {})
+        align.text = "center"
+        pos.append(align)
+        anchor.append(pos)
+    for child_tag in ("wp:extent", "wp:docPr", "a:graphic"):
+        el = inline.find(qn(child_tag))
+        anchor.append(copy.deepcopy(el))
+        if child_tag == "wp:extent":
+            anchor.append(anchor.makeelement(qn("wp:wrapNone"), {}))
+    drawing.replace(inline, anchor)
 
 
 def tight(p, after=2, before=0):
-    p.paragraph_format.space_after = Pt(after)
+    p.paragraph_format.space_after  = Pt(after)
     p.paragraph_format.space_before = Pt(before)
     return p
 
 
-def build(questions_path: Path, out_path: Path):
-    global _IMG_BASE
-    _IMG_BASE = questions_path.resolve().parent  # crops resolve beside the JSON
-    data = json.loads(questions_path.read_text(encoding="utf-8"))
-    doc = Document()
-    for s in ("left_margin", "right_margin", "top_margin", "bottom_margin"):
-        setattr(doc.sections[0], s, Cm(1.6))
-    doc.styles["Normal"].font.name = FONT
-    doc.styles["Normal"].font.size = Pt(12)
+def add_mixed(para, text, size=BODY_PT, bold=False, color=None):
+    """Unicode string -> Devanagari + Times New Roman runs, font per _FONT."""
+    runs, deva_font = render_runs(text, _FONT)
+    for run_text, is_latin in runs:
+        r = para.add_run(run_text)
+        r.font.name  = LATIN if is_latin else deva_font
+        r.font.size  = Pt(size)
+        r.font.bold  = bold
+        if color:
+            r.font.color.rgb = color
+    return para
 
-    title = tight(doc.add_paragraph(), 2)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run(title, data.get("solution_title", "समाधान — शिक्षक हेतु (Solution Key)"),
-        size=16, bold=True)
-    sub = tight(doc.add_paragraph(), 10)
-    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run(sub, data.get("solution_subtitle", "केवल शिक्षक के लिए — कक्षा में प्रदर्शित न करें"),
-        size=10, color=GREY, italic=True)
 
-    # PYQ papers ship with the commission's official answer key — that IS the
-    # source of truth, so no per-question source-checking applies to them.
+def add_latin(para, text, size=BODY_PT, bold=False, color=None):
+    r = para.add_run(text)
+    r.font.name  = LATIN
+    r.font.size  = Pt(size)
+    r.font.bold  = bold
+    if color:
+        r.font.color.rgb = color
+    return para
+
+
+# ── per-question renderer ─────────────────────────────────────────────────────
+
+def add_question(doc, q, official: bool):
+    ans_idx = LABELS.index(q["answer"].lower())
+
+    # Q1. stem
+    qp = tight(doc.add_paragraph(), after=2, before=8)
+    add_mixed(qp, f"{q['n']}. {q['stem']}", bold=True)
+
+    # sub-statements (assertion style)
+    for i, st in enumerate(q.get("statements") or [], start=1):
+        add_mixed(tight(doc.add_paragraph(), 1), f"   {i}. {st}")
+
+    # match pairs
+    for left_t, right_t in q.get("match") or []:
+        mp = tight(doc.add_paragraph(), 1)
+        add_mixed(mp, f"   {left_t}")
+        add_latin(mp, "  —  ")
+        add_mixed(mp, right_t)
+
+    if q.get("lead_in"):
+        add_mixed(tight(doc.add_paragraph(), 2), f"   {q['lead_in']}")
+
+    # question diagram
+    if q.get("image"):
+        fp = tight(doc.add_paragraph(), 4)
+        fp.add_run().add_picture(str(_img_path(q["image"])), width=Cm(FIG_W_CM))
+
+    # options
+    if q.get("option_images"):
+        for i, rel in enumerate(q["option_images"]):
+            correct = i == ans_idx
+            op = tight(doc.add_paragraph(), 1)
+            add_latin(op, f"   ({LABELS_UP[i]}) ",
+                      bold=correct, color=GREEN if correct else None)
+            if correct:
+                add_latin(op, "✓ ", bold=True, color=GREEN)
+            op.add_run().add_picture(str(_img_path(rel)), width=Cm(FIG_W_CM - 2.0))
+    else:
+        for i, opt in enumerate(q["options"]):
+            correct = i == ans_idx
+            op = tight(doc.add_paragraph(), 1)
+            mark = " ✓" if correct else ""
+            add_mixed(op, f"   ({LABELS_UP[i]}) {opt}{mark}",
+                      bold=correct, color=GREEN if correct else None)
+
+    # उत्तर line
+    ansp = tight(doc.add_paragraph(), after=1, before=2)
+    add_mixed(ansp, "उत्तर: ", bold=True, color=GREEN)
+    opts = q.get("options") or []
+    ans_txt = f"({LABELS_UP[ans_idx]})"
+    if ans_idx < len(opts):
+        ans_txt += f" {opts[ans_idx]}"
+    add_mixed(ansp, ans_txt, bold=True, color=GREEN)
+
+    # विस्तृत व्याख्या (solution) or संकेत (short reason)
+    explanation = q.get("solution") or q.get("reason")
+    if explanation:
+        label = "विस्तृत व्याख्या: " if q.get("solution") else "संकेत: "
+        ep = tight(doc.add_paragraph(), after=2)
+        add_mixed(ep, label, bold=True)
+        add_mixed(ep, explanation)
+
+    # Source provenance + flag — TEACHER DOC ONLY
+    srcs = [s.lower() for s in (q.get("sources") or [])]
+    if official:
+        sp = tight(doc.add_paragraph(), 2)
+        add_mixed(sp, "✔ स्रोत: ", size=9, bold=True, color=GREEN)
+        add_mixed(sp, "आधिकारिक उत्तर कुंजी (UKSSSC)", size=9, color=GREY)
+    elif srcs:
+        sp = tight(doc.add_paragraph(), 2)
+        add_mixed(sp, "✔ स्रोत: ", size=9, bold=True, color=GREEN)
+        add_latin(sp, " / ".join(srcs), size=9, color=GREY)
+    elif q.get("flag"):
+        sp = tight(doc.add_paragraph(), 2)
+        add_mixed(sp, "⚠ जाँच आवश्यक — ", size=10, bold=True, color=RED)
+        add_mixed(sp, q["flag"], size=10, color=RED)
+
+
+# ── build entry point ─────────────────────────────────────────────────────────
+
+def build(questions_path: Path, out_path: Path, font: str = DEFAULT_FONT):
+    global _IMG_BASE, _FONT
+    _FONT = font  # add_mixed() reads this via render_runs()
+    _IMG_BASE = questions_path.resolve().parent
+
+    data     = json.loads(questions_path.read_text(encoding="utf-8"))
     official = data.get("answer_source") == "official_key"
 
+    # Open the branded template — inherits pgBorders, page geometry, section def
+    doc = Document(str(FRONT_PAGE_DOCX))
+
+    # Strip every paragraph and table that came with the template content
+    body = doc.element.body
+    for child in list(body):
+        tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+        if tag in ("p", "tbl"):
+            body.remove(child)
+
+    # Watermark on first (only) section
+    make_watermark(LOGO_IMG, WATERMARK_IMG)
+    add_watermark_header(doc.sections[0], WATERMARK_IMG)
+
+    # Title
+    title = tight(doc.add_paragraph(), after=2)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    add_latin(title,
+              data.get("solution_title", "समाधान — शिक्षक हेतु"),
+              size=16, bold=True)
+
+    sub = tight(doc.add_paragraph(), after=10)
+    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    add_latin(sub,
+              data.get("solution_subtitle", "केवल शिक्षक के लिए — कक्षा में प्रदर्शित न करें"),
+              size=10, color=GREY)
+
     for q in data["questions"]:
-        ans_idx = LABELS.index(q["answer"].lower())
-
-        qp = tight(doc.add_paragraph(), 2, before=8)
-        run(qp, f"{q['n']}. ", size=12, bold=True)
-        run(qp, q["stem"], size=12, bold=True)
-
-        for i, st in enumerate(q.get("statements") or [], start=1):
-            run(tight(doc.add_paragraph(), 1), f"   {i}. {st}", size=11)
-        for left_t, right_t in q.get("match") or []:
-            run(tight(doc.add_paragraph(), 1), f"   {left_t}  —  {right_t}", size=11)
-        if q.get("lead_in"):
-            run(tight(doc.add_paragraph(), 2), f"   {q['lead_in']}", size=11)
-
-        # the question's own diagram (Q3-type), embedded under the stem
-        if q.get("image"):
-            fp = tight(doc.add_paragraph(), 4)
-            fp.add_run().add_picture(str(_img_path(q["image"])), width=Cm(FIG_W_CM))
-
-        if q.get("option_images"):
-            # option diagrams (Q60-type): label, image, ✓ on the correct one
-            for i, rel in enumerate(q["option_images"]):
-                correct = i == ans_idx
-                op = tight(doc.add_paragraph(), 1)
-                run(op, f"   ({LABELS[i]}) ", size=11, bold=correct,
-                    color=GREEN if correct else None)
-                if correct:
-                    run(op, "✓ ", size=11, bold=True, color=GREEN)
-                op.add_run().add_picture(str(_img_path(rel)), width=Cm(FIG_W_CM - 1.5))
-        else:
-            for i, opt in enumerate(q["options"]):
-                op = tight(doc.add_paragraph(), 1)
-                correct = i == ans_idx
-                mark = " ✓" if correct else ""
-                run(op, f"   ({LABELS[i]}) {opt}{mark}", size=11,
-                    bold=correct, color=GREEN if correct else None)
-
-        ansp = tight(doc.add_paragraph(), 1, before=2)
-        run(ansp, "उत्तर: ", size=11, bold=True, color=GREEN)
-        # diagram-option questions have no text option to name — just the label
-        opts = q.get("options") or []
-        ans_txt = f"({q['answer'].lower()})"
-        if ans_idx < len(opts):
-            ans_txt += f" {opts[ans_idx]}"
-        run(ansp, ans_txt, size=11, bold=True, color=GREEN)
-
-        if q.get("solution"):
-            sp = tight(doc.add_paragraph(), 2)
-            run(sp, "हल / व्याख्या: ", size=11, bold=True)
-            run(sp, q["solution"], size=11)
-        elif q.get("reason"):
-            rp = tight(doc.add_paragraph(), 2)
-            run(rp, "संकेत: ", size=10, bold=True, color=GREY)
-            run(rp, q["reason"], size=10, color=GREY)
-
-        # Source provenance + manual-review flag — TEACHER DOC ONLY (never the
-        # branded PPT/paper). Live papers carry "sources": [...] per question;
-        # when the two Tier-1 sources don't both confirm, the answer is flagged
-        # in RED so Mayank checks it before it reaches the class.
-        srcs = [s.lower() for s in (q.get("sources") or [])]
-        if official:
-            sp = tight(doc.add_paragraph(), 2)
-            run(sp, "✔ स्रोत: ", size=9, bold=True, color=GREEN)
-            run(sp, "आधिकारिक उत्तर कुंजी (UKSSSC)", size=9, color=GREY)
-        elif srcs:
-            sp = tight(doc.add_paragraph(), 2)
-            shown = " / ".join(srcs)
-            run(sp, "✔ स्रोत: ", size=9, bold=True, color=GREEN)
-            run(sp, shown, size=9, color=GREY)
-        elif q.get("flag"):
-            sp = tight(doc.add_paragraph(), 2)
-            run(sp, "⚠ जाँच आवश्यक — ", size=10, bold=True, color=RED)
-            run(sp, q["flag"], size=10, color=RED)
+        add_question(doc, q, official)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(out_path)
-    n = len(data["questions"])
+    n        = len(data["questions"])
     with_sol = sum(1 for q in data["questions"] if q.get("solution"))
     print(f"OK: {out_path} ({n} questions, {with_sol} with worked solutions)")
 

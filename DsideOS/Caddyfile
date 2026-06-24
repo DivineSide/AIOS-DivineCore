@@ -1,0 +1,25 @@
+# Caddy reverse proxy — automatic HTTPS via Let's Encrypt.
+# One public domain, path-split between frontend and backend.
+#
+#   dsideos.divinesideai.com/api/*  -> the FastAPI backend (this repo)
+#   dsideos.divinesideai.com/*      -> the frontend container
+#
+# Caddy obtains + renews the TLS cert automatically on first request, as long as
+# the DNS A record for dsideos.divinesideai.com points at this server and ports
+# 80 + 443 are open in the Hetzner firewall.
+
+dsideos.divinesideai.com {
+	# Backend API — strip nothing; FastAPI routes are already under /api/*.
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Everything else -> the frontend container.
+	# (Frontend image + service name "frontend" come from the frontend repo;
+	# see docker-compose.prod.yml for the placeholder service.)
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	encode gzip
+}
