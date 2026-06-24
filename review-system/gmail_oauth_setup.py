@@ -8,13 +8,14 @@ Steps:
 3. Browser opens, sign in, grant permission
 4. Copy the printed refresh token into .env as GMAIL_REFRESH_TOKEN
 """
+import os
+
 from google_auth_oauthlib.flow import InstalledAppFlow
-import json
 
 CLIENT_CONFIG = {
     "installed": {
-        "client_id": "759847781829-bic4vjj7cerq42omcgvbef1oqlthdd8c.apps.googleusercontent.com",
-        "client_secret": "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",
+        "client_id": os.environ["GOOGLE_CLIENT_ID"],
+        "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
         "redirect_uris": ["http://localhost:8080/"]
