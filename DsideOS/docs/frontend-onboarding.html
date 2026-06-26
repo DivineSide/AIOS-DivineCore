@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DsideOS Frontend — Developer Onboarding</title>
+<style>
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --border:    #252a38;
+    --text:      #d4d8e8;
+    --muted:     #6b7394;
+    --accent:    #5b8af5;
+    --accent-dim:#1e2d52;
+    --green:     #3ecf8e;
+    --green-dim: #0e2b20;
+    --yellow:    #f5c542;
+    --red:       #e05c5c;
+    --code-bg:   #141720;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Sidebar */
+  nav {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 2rem 1rem 2rem 1.5rem;
+    border-right: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 2rem;
+    display: block;
+  }
+
+  .nav-section {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  nav a {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 0.25rem 0;
+    transition: color 0.15s;
+  }
+  nav a:hover { color: var(--text); }
+
+  /* Main content */
+  main {
+    padding: 3rem 3.5rem 6rem;
+    min-width: 0;
+  }
+
+  /* Headings */
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+    text-wrap: balance;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #fff;
+    margin: 3rem 0 1rem;
+    padding-top: 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 2rem 0 0.75rem;
+  }
+
+  p { margin-bottom: 1rem; color: var(--text); }
+
+  /* Code */
+  code {
+    font-family: var(--mono);
+    font-size: 0.8em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    color: #a8b5d8;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem;
+    position: relative;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #c8d3f5;
+  }
+
+  .comment { color: var(--muted); }
+  .keyword { color: #89b4fa; }
+  .string  { color: #a6e3a1; }
+  .number  { color: #fab387; }
+  .url     { color: var(--accent); }
+
+  /* Callouts */
+  .callout {
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    border-left: 3px solid;
+    font-size: 14px;
+  }
+  .callout-info  { background: var(--accent-dim); border-color: var(--accent); }
+  .callout-ok    { background: var(--green-dim);  border-color: var(--green);  }
+  .callout p { margin: 0; }
+  .callout strong { color: #fff; }
+
+  /* Diagram */
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.75rem 2rem;
+    margin: 1.5rem 0;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.9;
+    overflow-x: auto;
+    color: #8b96c8;
+  }
+
+  .diagram .box    { color: var(--text); }
+  .diagram .arrow  { color: var(--muted); }
+  .diagram .label  { color: var(--accent); font-size: 11px; letter-spacing: 0.05em; }
+  .diagram .note   { color: var(--green); }
+
+  /* Endpoint table */
+  .endpoint-list { margin: 1rem 0 1.5rem; }
+
+  .endpoint {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .endpoint:last-child { border-bottom: none; }
+
+  .method {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.2em 0.55em;
+    border-radius: 4px;
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  .method.get { background: var(--green-dim); color: var(--green); }
+
+  .ep-path {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .ep-desc { color: var(--muted); font-size: 13px; }
+
+  /* Steps */
+  .steps { counter-reset: step; margin: 1rem 0; }
+
+  .step {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0 1rem;
+    margin-bottom: 1.5rem;
+    counter-increment: step;
+  }
+
+  .step::before {
+    content: counter(step);
+    width: 2rem;
+    height: 2rem;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+  }
+
+  .step-content p { margin-bottom: 0.5rem; }
+  .step-content p:last-child { margin-bottom: 0; }
+
+  /* Env table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin: 1rem 0 1.5rem;
+  }
+  th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 0.6rem 1rem 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  td:first-child { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+  td:last-child { color: var(--muted); font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.15em 0.6em;
+    border-radius: 99px;
+    background: var(--green-dim);
+    color: var(--green);
+    margin-left: 0.5rem;
+    vertical-align: middle;
+  }
+
+  /* Section divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 3rem 0;
+  }
+
+  ul { padding-left: 1.25rem; margin-bottom: 1rem; }
+  li { margin-bottom: 0.35rem; color: var(--text); font-size: 14px; }
+
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { display: none; }
+    main { padding: 2rem 1.5rem 4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav>
+  <span class="nav-logo">DsideOS</span>
+  <span class="nav-section">Overview</span>
+  <a href="#architecture">How it fits together</a>
+  <a href="#flow">Request flow</a>
+
+  <span class="nav-section">Backend API</span>
+  <a href="#endpoints">Endpoints</a>
+  <a href="#job-lifecycle">Job lifecycle</a>
+  <a href="#responses">Response shapes</a>
+
+  <span class="nav-section">Frontend work</span>
+  <a href="#env">Environment setup</a>
+  <a href="#api-client">API client</a>
+  <a href="#upload">Upload + poll pattern</a>
+  <a href="#checklist">Integration checklist</a>
+
+  <span class="nav-section">Deployment</span>
+  <a href="#cicd">CI/CD pipeline</a>
+  <a href="#your-cicd">Your CI/CD</a>
+  <a href="#dns">DNS + routing</a>
+</nav>
+
+<main>
+
+  <h1>DsideOS Frontend<br>Developer Onboarding</h1>
+  <p class="subtitle">Everything you need to connect the dashboard to the live backend. No assumed knowledge — read top to bottom once, then use as a reference.</p>
+
+  <!-- ARCHITECTURE -->
+  <h2 id="architecture">How it all fits together</h2>
+
+  <p>The backend and frontend are <strong>completely separate</strong> — different repos, different Docker images, different deploys. They communicate only over HTTP. The same domain serves both via Nginx path-splitting on the server.</p>
+
+  <div class="diagram">
+<span class="label">BROWSER</span>
+<span class="box">  Dashboard (React/Next.js)</span>
+<span class="arrow">        │  HTTPS requests to dsideos.divinesideai.com</span>
+<span class="arrow">        ▼</span>
+<span class="label">SERVER  (Hetzner, 204.168.198.139)</span>
+<span class="box">  Nginx  ──── /api/*  ──────────▶  FastAPI  :8000</span>
+<span class="box">         └─── /*      ──────────▶  Frontend :3000</span>
+<span class="arrow">                                        │</span>
+<span class="box">                                    Redis  (job queue)</span>
+<span class="arrow">                                        │</span>
+<span class="box">                                    Celery Worker</span>
+<span class="arrow">                                        │</span>
+<span class="note">                                    Pipeline scripts → output files</span>
+  </div>
+
+  <div class="callout callout-info">
+    <p><strong>Key point:</strong> You never call the backend directly from a hardcoded IP. You call <code>/api/extract</code> — same origin as the frontend. Nginx routes it. This means zero CORS configuration needed.</p>
+  </div>
+
+  <!-- FLOW -->
+  <h2 id="flow">How a job works end-to-end</h2>
+
+  <p>The backend is <strong>asynchronous</strong> — jobs don't block. You submit a file, get a job ID back immediately, poll until done, then download the result.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-content">
+        <p><strong>Upload</strong> — POST a file + metadata to <code>/api/extract</code> or <code>/api/full</code>. Response is instant: <code>{"job_id": "abc-123", "status": "QUEUED"}</code>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-content">
+        <p><strong>Poll</strong> — Every 2–3 seconds, GET <code>/api/jobs/abc-123</code>. Status cycles: <code>QUEUED → RUNNING → DONE</code> (or <code>FAILED</code>).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-content">
+        <p><strong>Download</strong> — Once <code>DONE</code>, the response includes <code>files: ["paper.docx", "deck.pptx", ...]</code>. Fetch each from <code>/api/files/abc-123/paper.docx</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENDPOINTS -->
+  <h2 id="endpoints">API endpoints <span class="badge">LIVE</span></h2>
+
+  <div class="endpoint-list">
+    <div class="endpoint">
+      <span class="method">POST</span>
+      <span class="ep-path">/api/extract</span>
+      <span class="ep-desc">Upload a file (docx/pdf/image) → get questions JSON</span>
+    </div>
+    <div class="endpoint">
+      <span class="method">POST</span>
+      <span class="ep-path">/api/full</span>
+      <span class="ep-desc">Upload + metadata → all 4 deliverables (paper, deck, solution, answer key)</span>
+    </div>
+    <div class="endpoint">
+      <span class="method">POST</span>
+      <span class="ep-path">/api/build</span>
+      <span class="ep-desc">Questions JSON + metadata → paper + deck + answer key</span>
+    </div>
+    <div class="endpoint">
+      <span class="method">POST</span>
+      <span class="ep-path">/api/solutions</span>
+      <span class="ep-desc">Questions JSON + metadata → teacher solution doc</span>
+    </div>
+    <div class="endpoint">
+      <span class="method">POST</span>
+      <span class="ep-path">/api/answer-key</span>
+      <span class="ep-desc">Questions JSON + metadata → standalone answer key PDF</span>
+    </div>
+    <div class="endpoint">
+      <span class="method get">GET</span>
+      <span class="ep-path">/api/jobs/{id}</span>
+      <span class="ep-desc">Poll job status</span>
+    </div>
+    <div class="endpoint">
+      <span class="method get">GET</span>
+      <span class="ep-path">/api/files/{id}/{filename}</span>
+      <span class="ep-desc">Download an output file</span>
+    </div>
+  </div>
+
+  <!-- JOB LIFECYCLE -->
+  <h2 id="job-lifecycle">Job lifecycle &amp; status values</h2>
+
+  <p>Poll <code>/api/jobs/{id}</code> every 2–3 seconds. Stop when status is <code>DONE</code> or <code>FAILED</code>.</p>
+
+  <pre><code><span class="comment">// GET /api/jobs/abc-123</span>
+
+<span class="comment">// While running:</span>
+{ <span class="string">"job_id"</span>: <span class="string">"abc-123"</span>, <span class="string">"status"</span>: <span class="string">"RUNNING"</span> }
+
+<span class="comment">// On success:</span>
+{
+  <span class="string">"job_id"</span>: <span class="string">"abc-123"</span>,
+  <span class="string">"status"</span>: <span class="string">"DONE"</span>,
+  <span class="string">"files"</span>: [<span class="string">"Practice Paper.docx"</span>, <span class="string">"Practice Paper (Class).pptx"</span>, <span class="string">"Answer Key.pdf"</span>]
+}
+
+<span class="comment">// On failure:</span>
+{ <span class="string">"job_id"</span>: <span class="string">"abc-123"</span>, <span class="string">"status"</span>: <span class="string">"FAILED"</span>, <span class="string">"error"</span>: <span class="string">"..."</span> }</code></pre>
+
+  <!-- RESPONSES -->
+  <h2 id="responses">Request shapes</h2>
+
+  <h3>POST /api/full — multipart/form-data</h3>
+
+  <pre><code><span class="keyword">const</span> form = <span class="keyword">new</span> FormData()
+form.append(<span class="string">'file'</span>, fileBlob, <span class="string">'paper.docx'</span>)   <span class="comment">// the uploaded file</span>
+form.append(<span class="string">'paper_name'</span>, <span class="string">'Practice Set 01'</span>)
+form.append(<span class="string">'format'</span>, <span class="string">'format-1'</span>)             <span class="comment">// 'format-1' | 'format-2'</span>
+form.append(<span class="string">'font'</span>, <span class="string">'krutidev'</span>)               <span class="comment">// 'krutidev' | 'unicode'</span>
+form.append(<span class="string">'generate_explanations'</span>, <span class="string">'false'</span>) <span class="comment">// true = slower, adds AI explanations</span>
+
+<span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">'/api/full'</span>, { method: <span class="string">'POST'</span>, body: form })
+<span class="keyword">const</span> { job_id } = <span class="keyword">await</span> res.json()
+</code></pre>
+
+  <h3>Downloading a file</h3>
+
+  <pre><code><span class="comment">// Trigger a browser download once the job is DONE</span>
+<span class="keyword">async function</span> downloadFile(jobId, filename) {
+  <span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">`/api/files/${jobId}/${encodeURIComponent(filename)}`</span>)
+  <span class="keyword">const</span> blob = <span class="keyword">await</span> res.blob()
+  <span class="keyword">const</span> url = URL.createObjectURL(blob)
+  <span class="keyword">const</span> a = document.createElement(<span class="string">'a'</span>)
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}</code></pre>
+
+  <hr class="divider">
+
+  <!-- FRONTEND ENV -->
+  <h2 id="env">Environment setup</h2>
+
+  <p>Because the frontend and backend share the same domain, all API calls use a relative path — no base URL needed in production. For local development, proxy <code>/api</code> to the backend.</p>
+
+  <h3>Next.js — next.config.js</h3>
+  <pre><code><span class="comment">// next.config.js</span>
+module.exports = {
+  <span class="keyword">async</span> rewrites() {
+    <span class="keyword">return</span> [{ source: <span class="string">'/api/:path*'</span>, destination: <span class="string">'http://localhost:8000/api/:path*'</span> }]
+  }
+}</code></pre>
+
+  <h3>Vite — vite.config.ts</h3>
+  <pre><code><span class="comment">// vite.config.ts</span>
+<span class="keyword">export default</span> {
+  server: {
+    proxy: { <span class="string">'/api'</span>: <span class="string">'http://localhost:8000'</span> }
+  }
+}</code></pre>
+
+  <div class="callout callout-ok">
+    <p><strong>In production, no proxy needed.</strong> The frontend and backend are served from the same domain — Nginx routes <code>/api/*</code> to the backend automatically. Your fetch calls just use <code>/api/...</code> and it works.</p>
+  </div>
+
+  <!-- API CLIENT -->
+  <h2 id="api-client">Recommended API client</h2>
+
+  <p>Copy this into <code>lib/api.ts</code> — it handles upload, polling, and download in one place.</p>
+
+  <pre><code><span class="comment">// lib/api.ts</span>
+
+<span class="keyword">export async function</span> submitJob(file: File, meta: {
+  paper_name: string
+  format?: <span class="string">'format-1'</span> | <span class="string">'format-2'</span>
+  font?: <span class="string">'krutidev'</span> | <span class="string">'unicode'</span>
+  generate_explanations?: boolean
+}): Promise&lt;string&gt; {
+  <span class="keyword">const</span> form = <span class="keyword">new</span> FormData()
+  form.append(<span class="string">'file'</span>, file)
+  form.append(<span class="string">'paper_name'</span>, meta.paper_name)
+  form.append(<span class="string">'format'</span>, meta.format ?? <span class="string">'format-1'</span>)
+  form.append(<span class="string">'font'</span>, meta.font ?? <span class="string">'krutidev'</span>)
+  form.append(<span class="string">'generate_explanations'</span>, String(meta.generate_explanations ?? <span class="keyword">false</span>))
+
+  <span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">'/api/full'</span>, { method: <span class="string">'POST'</span>, body: form })
+  <span class="keyword">if</span> (!res.ok) <span class="keyword">throw new</span> Error(<span class="string">`Submit failed: ${res.status}`</span>)
+  <span class="keyword">const</span> { job_id } = <span class="keyword">await</span> res.json()
+  <span class="keyword">return</span> job_id
+}
+
+<span class="keyword">export async function</span> pollJob(jobId: string): Promise&lt;{
+  status: <span class="string">'QUEUED'</span> | <span class="string">'RUNNING'</span> | <span class="string">'DONE'</span> | <span class="string">'FAILED'</span>
+  files?: string[]
+  error?: string
+}&gt; {
+  <span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">`/api/jobs/${jobId}`</span>)
+  <span class="keyword">if</span> (!res.ok) <span class="keyword">throw new</span> Error(<span class="string">`Poll failed: ${res.status}`</span>)
+  <span class="keyword">return</span> res.json()
+}
+
+<span class="keyword">export async function</span> waitForJob(
+  jobId: string,
+  onProgress?: (status: string) => void,
+  intervalMs = <span class="number">2500</span>
+) {
+  <span class="keyword">while</span> (<span class="keyword">true</span>) {
+    <span class="keyword">const</span> job = <span class="keyword">await</span> pollJob(jobId)
+    onProgress?.(job.status)
+    <span class="keyword">if</span> (job.status === <span class="string">'DONE'</span>) <span class="keyword">return</span> job
+    <span class="keyword">if</span> (job.status === <span class="string">'FAILED'</span>) <span class="keyword">throw new</span> Error(job.error ?? <span class="string">'Job failed'</span>)
+    <span class="keyword">await new</span> Promise(r => setTimeout(r, intervalMs))
+  }
+}
+
+<span class="keyword">export function</span> downloadFile(jobId: string, filename: string) {
+  <span class="keyword">const</span> a = document.createElement(<span class="string">'a'</span>)
+  a.href = <span class="string">`/api/files/${jobId}/${encodeURIComponent(filename)}`</span>
+  a.download = filename
+  a.click()
+}</code></pre>
+
+  <!-- UPLOAD PATTERN -->
+  <h2 id="upload">Upload + poll pattern (React example)</h2>
+
+  <pre><code><span class="keyword">import</span> { submitJob, waitForJob, downloadFile } from <span class="string">'@/lib/api'</span>
+
+<span class="keyword">function</span> UploadButton() {
+  <span class="keyword">const</span> [status, setStatus] = useState(<span class="string">''</span>)
+
+  <span class="keyword">async function</span> handleUpload(file: File) {
+    setStatus(<span class="string">'Uploading...'</span>)
+    <span class="keyword">const</span> jobId = <span class="keyword">await</span> submitJob(file, { paper_name: file.name })
+
+    setStatus(<span class="string">'Processing...'</span>)
+    <span class="keyword">const</span> job = <span class="keyword">await</span> waitForJob(jobId, s => setStatus(s))
+
+    <span class="comment">// Download all output files</span>
+    job.files?.forEach(f => downloadFile(jobId, f))
+    setStatus(<span class="string">'Done!'</span>)
+  }
+
+  <span class="keyword">return</span> (
+    &lt;input type=<span class="string">"file"</span> onChange={e => handleUpload(e.target.files![0])} /&gt;
+  )
+}</code></pre>
+
+  <!-- CHECKLIST -->
+  <h2 id="checklist">Integration checklist</h2>
+
+  <ul>
+    <li>Dev proxy configured (<code>/api</code> → <code>localhost:8000</code>)</li>
+    <li>File upload sends <code>multipart/form-data</code>, not JSON</li>
+    <li>Polling stops on <code>DONE</code> or <code>FAILED</code> — never infinite loops</li>
+    <li>File downloads use the job ID from the response, not a hardcoded path</li>
+    <li>Error states handled: network errors, <code>FAILED</code> status, non-200 responses</li>
+    <li>Max file size: <strong>50 MB</strong> (enforced by backend)</li>
+    <li>No auth headers needed right now — backend is open (will add later)</li>
+  </ul>
+
+  <hr class="divider">
+
+  <!-- CICD -->
+  <h2 id="cicd">How CI/CD works (backend — for context)</h2>
+
+  <p>Understanding the backend pipeline helps you set up yours correctly.</p>
+
+  <div class="diagram">
+<span class="label">TRIGGER</span>  git push to main (if DsideOS/ files changed)
+<span class="arrow">    │</span>
+<span class="label">STEP 1</span>   test  ── Python compiles, font self-tests, route registration check
+<span class="arrow">    │  (fails here = nothing deploys)</span>
+<span class="label">STEP 2</span>   build ── GitHub builds Docker image from Dockerfile
+           push  ── Image tagged sha-&lt;commit&gt; pushed to GHCR
+<span class="arrow">    │  (api + worker run in parallel)</span>
+<span class="label">STEP 3</span>   deploy ── SSH into Hetzner
+                    docker compose pull   ← downloads new image
+                    docker compose up -d  ← replaces containers
+<span class="label">STEP 4</span>   notify ── Discord #deploys ping with commit + actor
+  </div>
+
+  <!-- YOUR CICD -->
+  <h2 id="your-cicd">Setting up your frontend CI/CD</h2>
+
+  <p>The pattern is identical — just swap Python tests for your framework's build/lint step, and the Docker image for your frontend image.</p>
+
+  <pre><code><span class="comment"># .github/workflows/frontend-ci.yml</span>
+<span class="keyword">name</span>: Frontend CI/CD
+<span class="keyword">on</span>:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+<span class="keyword">jobs</span>:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - <span class="keyword">name</span>: Build and test
+        run: |
+          npm ci
+          npm run build   <span class="comment"># or whatever your build command is</span>
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/divineside/dsideos-frontend:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            cd /root/DsideOS
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f docker-compose.prod.yml pull frontend
+            docker compose -f docker-compose.prod.yml up -d frontend
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}</code></pre>
+
+  <h3>Secrets to add in your frontend repo</h3>
+  <table>
+    <tr><th>Secret</th><th>Value</th></tr>
+    <tr><td>HETZNER_HOST</td><td>204.168.198.139</td></tr>
+    <tr><td>HETZNER_USER</td><td>root</td></tr>
+    <tr><td>HETZNER_SSH_KEY</td><td>The same private key already on the server</td></tr>
+    <tr><td>GHCR_PULL_TOKEN</td><td>GitHub PAT with read:packages scope</td></tr>
+    <tr><td>DISCORD_WEBHOOK_URL</td><td>#deploys webhook (ask Mayank)</td></tr>
+  </table>
+
+  <!-- DNS -->
+  <h2 id="dns">DNS + routing on the server</h2>
+
+  <p>Nginx on the server routes by domain and path. The frontend service runs on port 3000 inside Docker. Once your image is pushed and the <code>frontend</code> service is added back to <code>docker-compose.prod.yml</code>, Nginx routes <code>/*</code> to it automatically — no Nginx config changes needed.</p>
+
+  <div class="callout callout-info">
+    <p><strong>Your Dockerfile</strong> just needs to serve the built app on port 3000. For Next.js that's <code>next start -p 3000</code>. For a static build, use a small nginx or <code>serve</code> image.</p>
+  </div>
+
+  <pre><code><span class="comment"># Minimal Next.js Dockerfile</span>
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+EXPOSE 3000
+CMD ["node", "server.js"]</code></pre>
+
+  <div class="callout callout-ok">
+    <p><strong>That's everything.</strong> Backend is live at <code>https://dsideos.divinesideai.com/api/</code> — you can start making requests against it today. The <code>waitForJob</code> + <code>downloadFile</code> helpers in <code>lib/api.ts</code> are the main integration surface.</p>
+  </div>
+
+</main>
+</div>
+</body>
+</html>

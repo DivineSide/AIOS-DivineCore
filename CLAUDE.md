@@ -133,21 +133,20 @@ DivineCore channels:
 | Layer | Tool | Notes |
 |-------|------|-------|
 | Interface | Discord | Primary operating environment |
-| Automation/Workflow | n8n | Self-hosted on Hostinger VPS |
+| Automation/Workflow | n8n | Self-hosted on Hetzner VPS |
 | Development | Claude Code | Primary and increasingly dominant dev tool |
 | AI Models | Anthropic (Claude), OpenAI (GPT-4o mini) | Via OpenRouter as fallback |
 | Database (structured) | Airtable | Knowledge bases, task tracking, CRM |
 | Database (vector) | Supabase + pgvector | Semantic search for working examples |
 | Embeddings | OpenAI text-embedding-3-small | For Supabase vector store |
 | Middleware | Node.js (discord.js) | Discord → n8n webhook bridge |
-| VPS | Hostinger | srv1445995.hstgr.cloud / IP: 187.124.96.99 |
+| VPS | Hetzner | divinesideai / IP: 204.168.198.139 (CX23, Helsinki) |
 | Process Manager | PM2 | Keeps middleware alive, survives reboots |
 | Reverse Proxy | Nginx | HTTPS routing on VPS |
 | Future Interface | Proprietary app (TBD) | Replaces Discord when DivineSide launches publicly |
 
 **n8n Instance**  
-URL: https://n8n.srv1445995.hstgr.cloud  
-Hosted on Hostinger VPS. All workflows live here.
+Hosted on Hetzner VPS (204.168.198.139). All workflows live here.
 
 **Discord Middleware**  
 Location on VPS: /root/discord-middleware/index.js  

@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DsideOS Console — Reference Design</title>
+<meta name="description" content="Reference UI design for the DsideOS console — maps every backend endpoint to a concrete UI element with reasoning.">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0E0F11;
+    --surface:   #1A1C20;
+    --border:    #25282E;
+    --accent:    #4F7FFF;
+    --accent-dim:#2a3f80;
+    --text:      #E8EAF0;
+    --muted:     #6B7280;
+    --success:   #22C55E;
+    --warning:   #F59E0B;
+    --danger:    #EF4444;
+    --sidebar-w: 220px;
+    --font-ui:   -apple-system, 'Segoe UI', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+
+  /* ── SHELL ── */
+  .shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+  .sidebar-logo {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+    letter-spacing: -0.5px; flex-shrink: 0;
+  }
+  .logo-text { font-size: 14px; font-weight: 600; letter-spacing: -0.2px; }
+  .logo-sub  { font-size: 10px; color: var(--muted); font-family: var(--font-mono); }
+
+  .nav { padding: 12px 0; flex: 1; overflow-y: auto; }
+  .nav-section-label {
+    padding: 8px 18px 4px;
+    font-size: 10px; font-weight: 600;
+    color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 18px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-item.active { color: var(--text); border-left-color: var(--accent); background: rgba(79,127,255,0.08); }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  .sidebar-footer {
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  /* ── MAIN ── */
+  .main { overflow-y: auto; display: flex; flex-direction: column; }
+  .topbar {
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-title { font-size: 15px; font-weight: 600; }
+  .topbar-sub   { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .content { padding: 28px; flex: 1; max-width: 900px; }
+
+  /* ── VIEWS ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 12px; font-weight: 600;
+    color: var(--muted); letter-spacing: 0.07em; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(79,127,255,0.04);
+  }
+  .upload-icon { margin: 0 auto 12px; width: 40px; height: 40px; opacity: 0.4; }
+  .upload-label { font-size: 14px; color: var(--text); margin-bottom: 4px; }
+  .upload-hint  { font-size: 12px; color: var(--muted); }
+  .upload-selected {
+    margin-top: 12px; padding: 10px 14px;
+    background: var(--border); border-radius: 6px;
+    font-family: var(--font-mono); font-size: 12px;
+    display: flex; align-items: center; gap: 8px;
+    display: none;
+  }
+  .upload-selected.visible { display: flex; }
+  .file-pill-name { color: var(--text); flex: 1; }
+  .file-pill-size { color: var(--muted); }
+  .file-remove { cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; }
+  .file-remove:hover { color: var(--danger); }
+
+  /* ── FORM FIELDS ── */
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .field-row.single { grid-template-columns: 1fr; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .field input, .field select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+  .field select option { background: var(--surface); }
+
+  /* ── SEGMENT CONTROL ── */
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg-btn {
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg); color: var(--muted);
+    font-size: 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .seg-btn:hover { border-color: var(--accent); color: var(--text); }
+  .seg-btn.active { border-color: var(--accent); background: rgba(79,127,255,0.12); color: var(--text); }
+
+  /* ── CHECKBOX ROW ── */
+  .check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check-row input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+  .check-row span { font-size: 13px; color: var(--muted); }
+  .check-row:hover span { color: var(--text); }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: 7px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    border: none; transition: opacity 0.15s, background 0.15s;
+    font-family: var(--font-ui);
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #6b93ff; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+  .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+
+  /* ── STATUS PILL ── */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .pill-queued   { background: rgba(107,114,128,0.15); color: var(--muted); }
+  .pill-queued .status-dot { background: var(--muted); }
+  .pill-running  { background: rgba(245,158,11,0.12); color: var(--warning); }
+  .pill-running .status-dot { background: var(--warning); animation: pulse 1.2s ease-in-out infinite; }
+  .pill-done     { background: rgba(34,197,94,0.12); color: var(--success); }
+  .pill-done .status-dot { background: var(--success); }
+  .pill-failed   { background: rgba(239,68,68,0.12); color: var(--danger); }
+  .pill-failed .status-dot { background: var(--danger); }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* ── JOB CARD ── */
+  .job-entry {
+    display: grid; grid-template-columns: 1fr auto auto;
+    align-items: center; gap: 14px;
+    padding: 12px 16px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 8px;
+  }
+  .job-name { font-size: 13px; font-weight: 500; }
+  .job-meta { font-size: 11px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+  .job-actions { display: flex; gap: 6px; }
+
+  /* ── OUTPUT FILES ── */
+  .output-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .output-file {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: border-color 0.15s;
+  }
+  .output-file:hover { border-color: var(--accent); }
+  .file-type-badge {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 4px; align-self: flex-start;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .badge-docx { background: rgba(79,127,255,0.15); color: #82a4ff; }
+  .badge-pptx { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .badge-pdf  { background: rgba(239,68,68,0.15); color: #f87171; }
+  .badge-json { background: rgba(107,114,128,0.15); color: var(--muted); }
+  .file-name  { font-size: 12px; color: var(--text); line-height: 1.4; word-break: break-word; }
+  .file-size  { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap { margin: 10px 0; }
+  .progress-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; font-family: var(--font-mono); }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s ease; }
+
+  /* ── STAGE LOG ── */
+  .stage-log { display: flex; flex-direction: column; gap: 6px; }
+  .stage-item { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+  .stage-icon { width: 18px; height: 18px; flex-shrink: 0; }
+  .stage-label { color: var(--muted); }
+  .stage-item.done .stage-label { color: var(--text); }
+  .stage-item.running .stage-label { color: var(--warning); }
+
+  /* ── DIVIDER ── */
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.4; }
+  .empty p { font-size: 13px; }
+
+  /* ── ANNOTATION PANEL (reference doc only) ── */
+  .annotation {
+    background: rgba(79,127,255,0.06);
+    border: 1px solid rgba(79,127,255,0.2);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-size: 12px; color: #a0b4e8; line-height: 1.6;
+  }
+  .annotation strong { color: var(--accent); }
+  .annotation code {
+    font-family: var(--font-mono); background: rgba(0,0,0,0.3);
+    padding: 1px 5px; border-radius: 3px; font-size: 11px;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">D</div>
+      <div>
+        <div class="logo-text">DsideOS</div>
+        <div class="logo-sub">console.dsideos.divinesideai.com</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section-label">Content</div>
+
+      <!-- Generate = POST /api/full -->
+      <div class="nav-item active" onclick="showView('generate')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M8 5v6"/>
+        </svg>
+        Generate
+      </div>
+
+      <!-- Jobs = GET /api/jobs/{id} polling view -->
+      <div class="nav-item" onclick="showView('jobs')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/>
+        </svg>
+        Jobs
+      </div>
+
+      <!-- Extract only = POST /api/extract -->
+      <div class="nav-item" onclick="showView('extract')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M4 2h8a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M5 6h6M5 9h4"/>
+        </svg>
+        Extract Questions
+      </div>
+
+      <!-- Solutions = POST /api/solutions -->
+      <div class="nav-item" onclick="showView('solutions')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 4h10M3 8h7M3 12h5"/>
+        </svg>
+        Solutions Doc
+      </div>
+
+      <!-- Answer Key = POST /api/answer-key -->
+      <div class="nav-item" onclick="showView('answerkey')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M5 8l2 2 4-4"/><rect x="2" y="2" width="12" height="12" rx="2"/>
+        </svg>
+        Answer Key
+      </div>
+
+      <div class="divider" style="margin: 8px 0;"></div>
+      <div class="nav-section-label">System</div>
+
+      <div class="nav-item" onclick="showView('health')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 8h3l2-4 2 8 2-4h3"/>
+        </svg>
+        API Health
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      v0.1.0 · DsideOS API
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- ── VIEW: GENERATE (POST /api/full) ── -->
+    <div id="view-generate" class="view active">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Generate — Full Pipeline</div>
+          <div class="topbar-sub">Upload a paper → get branded paper, class deck, and answer key</div>
+        </div>
+      </div>
+      <div class="content">
+
+        <div class="annotation">
+          <strong>POST /api/full</strong> — This is the main action. Teacher uploads a .docx or .pdf (a past exam paper, typed questions, anything). Backend extracts the questions, then builds all 3 deliverables in one shot: the branded practice paper, the in-class PowerPoint deck, and the answer key PDF. All fields below map 1:1 to form fields the API accepts.
+        </div>
+
+        <div class="card">
+          <div class="card-title">Upload Paper</div>
+
+          <!-- File upload → `file` field in multipart form -->
+          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" ondragover="handleDragOver(event)" ondrop="handleDrop(event)">
+            <input type="file" id="fileInput" accept=".docx,.pdf,.png,.jpg,.jpeg,.webp" style="display:none" onchange="handleFileSelect(event)">
+            <svg class="upload-icon" viewBox="0 0 40 40" fill="none" stroke="#6B7280" stroke-width="1.5">
+              <path d="M20 26V14M14 20l6-6 6 6"/><path d="M8 30h24"/>
+            </svg>
+            <div class="upload-label">Drop your paper here, or click to browse</div>
+            <div class="upload-hint">.docx · .pdf · .png · .jpg · .webp — max 50 MB</div>
+          </div>
+
+          <div class="upload-selected" id="uploadSelected">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#6B7280" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
+            <span class="file-pill-name" id="selectedFileName">—</span>
+            <span class="file-pill-size" id="selectedFileSize">—</span>
+            <span class="file-remove" onclick="clearFile()">×</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Paper Settings</div>
+
+          <!-- paper_name → output filenames: "<paper_name>.docx", "<paper_name> (Class).pptx", etc. -->
+          <div class="field-row">
+            <div class="field">
+              <label>Paper Name</label>
+              <input type="text" placeholder="e.g. UKSSSC Patwari Set 4" id="paperName">
+              <!-- This becomes the filename prefix for all 3 output files -->
+            </div>
+            <!-- format → "format-1" (standard border) or "format-2" (alternate template) -->
+            <div class="field">
+              <label>Template Format</label>
+              <select id="formatSelect">
+                <option value="format-1">Format 1 — Standard border</option>
+                <option value="format-2">Format 2 — Alternate layout</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- font → "krutidev" (rendered for print) or "unicode" (readable on screen) -->
+          <div class="field" style="margin-bottom:14px">
+            <label>Hindi Font</label>
+            <div class="seg" id="fontSeg">
+              <div class="seg-btn active" onclick="setSeg('fontSeg', this, 'krutidev')">Kruti Dev</div>
+              <div class="seg-btn" onclick="setSeg('fontSeg', this, 'unicode')">Unicode</div>
+            </div>
+            <!-- Kruti Dev = print-ready (the default for Target Academy delivery)
+                 Unicode = readable on screen, no font mapping needed -->
+          </div>
+
+          <!-- title_hindi + subtitle_hindi → shown on paper header, optional -->
+          <div class="field-row">
+            <div class="field">
+              <label>Title (Hindi) — optional</label>
+              <input type="text" placeholder="e.g. उत्तराखंड पटवारी परीक्षा" id="titleHindi">
+            </div>
+            <div class="field">
+              <label>Subtitle (Hindi) — optional</label>
+              <input type="text" placeholder="e.g. सेट 4 · 2024" id="subtitleHindi">
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="generateBtn" onclick="submitGenerate()" disabled>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4 4 6-7"/></svg>
+          Generate All Files
+        </button>
+        <!-- Disabled until a file is selected. On click: POST /api/full with multipart form.
+             Response: { job_id, status: "QUEUED" } → redirect to Jobs view showing that job. -->
+
+      </div>
+    </div>
+
+    <!-- ── VIEW: JOBS (GET /api/jobs/{id}) ── -->
+    <div id="view-jobs" class="view">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Jobs</div>
+          <div class="topbar-sub">Track running jobs and download outputs</div>
+        </div>
+        <button class="btn btn-ghost" style="font-size:12px" onclick="refreshJobs()">↻ Refresh</button>
+      </div>
+      <div class="content">
+
+        <div class="annotation">
+          <strong>GET /api/jobs/{job_id}</strong> — Poll every 2.5 seconds until status is <code>DONE</code> or <code>FAILED</code>. The <code>outputs</code> array tells you the exact filenames to download. Jobs are deleted after 24 hours — download before then.
+        </div>
+
+        <!-- RUNNING example -->
+        <div class="job-entry">
+          <div>
+            <div class="job-name">UKSSSC Patwari Set 4</div>
+            <div class="job-meta">a3f9c1b2e4d80017 · full · started 2 min ago</div>
+            <div class="progress-wrap">
+              <div class="progress-label">Stage: extract → build</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div>
+            </div>
+          </div>
+          <span class="status-pill pill-running"><span class="status-dot"></span>RUNNING</span>
+          <div class="job-actions">
+            <button class="btn btn-ghost" style="font-size:11px" disabled>Downloading…</button>
+          </div>
+        </div>
+
+        <!-- DONE example -->
+        <div class="job-entry" style="border-color: rgba(34,197,94,0.2);">
+          <div>
+            <div class="job-name">Uttarakhand GK — Batch A</div>
+            <div class="job-meta">7f2a3c9d1e4b0052 · full · completed 14 min ago · 48 questions</div>
+          </div>
+          <span class="status-pill pill-done"><span class="status-dot"></span>DONE</span>
+          <div class="job-actions">
+            <button class="btn btn-primary" style="font-size:11px" onclick="showOutputs('7f2a3c9d1e4b0052')">View Files</button>
+          </div>
+        </div>
+
+        <!-- FAILED example -->
+        <div class="job-entry" style="border-color: rgba(239,68,68,0.2);">
+          <div>
+            <div class="job-name">Indian Polity Set 1</div>
+            <div class="job-meta">c8d1b0a3f7e29041 · full · failed 1 hr ago</div>
+            <div style="font-size:11px; color: var(--danger); margin-top:4px; font-family: var(--font-mono);">
+              ValueError: No questions found in document
+            </div>
+          </div>
+          <span class="status-pill pill-failed"><span class="status-dot"></span>FAILED</span>
+          <div class="job-actions">
+            <button class="btn btn-ghost" style="font-size:11px">Retry</button>
+          </div>
+        </div>
+
+        <!-- QUEUED example -->
+        <div class="job-entry">
+          <div>
+            <div class="job-name">VDO 2024 Paper</div>
+            <div class="job-meta">e5a2c7f1b9d30088 · full · queued 10 sec ago</div>
+          </div>
+          <span class="status-pill pill-queued"><span class="status-dot"></span>QUEUED</span>
+          <div class="job-actions">
+            <button class="btn btn-ghost" style="font-size:11px" disabled>Waiting…</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Outputs panel — shown when "View Files" is clicked -->
+        <div id="outputsPanel" style="display:none">
+          <div class="card-title" style="margin-bottom:14px">Output Files — Uttarakhand GK · Batch A</div>
+          <!-- GET /api/files/{job_id}/{name} for each file in outputs[] -->
+          <div class="output-grid">
+            <div class="output-file">
+              <span class="file-type-badge badge-docx">DOCX</span>
+              <div class="file-name">Uttarakhand GK — Batch A.docx</div>
+              <div class="file-size">184 KB</div>
+              <button class="btn btn-ghost" style="font-size:11px; padding:6px 10px;" onclick="downloadFile('7f2a3c9d1e4b0052', 'Uttarakhand GK — Batch A.docx')">↓ Download</button>
+            </div>
+            <div class="output-file">
+              <span class="file-type-badge badge-pptx">PPTX</span>
+              <div class="file-name">Uttarakhand GK — Batch A (Class).pptx</div>
+              <div class="file-size">2.1 MB</div>
+              <button class="btn btn-ghost" style="font-size:11px; padding:6px 10px;" onclick="downloadFile('7f2a3c9d1e4b0052', 'Uttarakhand GK — Batch A (Class).pptx')">↓ Download</button>
+            </div>
+            <div class="output-file">
+              <span class="file-type-badge badge-pdf">PDF</span>
+              <div class="file-name">Uttarakhand GK — Batch A — Answer Key.pdf</div>
+              <div class="file-size">48 KB</div>
+              <button class="btn btn-ghost" style="font-size:11px; padding:6px 10px;" onclick="downloadFile('7f2a3c9d1e4b0052', 'Uttarakhand GK — Batch A — Answer Key.pdf')">↓ Download</button>
+            </div>
+            <div class="output-file">
+              <span class="file-type-badge badge-json">JSON</span>
+              <div class="file-name">questions.json</div>
+              <div class="file-size">22 KB</div>
+              <button class="btn btn-ghost" style="font-size:11px; padding:6px 10px;" onclick="downloadFile('7f2a3c9d1e4b0052', 'questions.json')">↓ Download</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── VIEW: EXTRACT ONLY (POST /api/extract) ── -->
+    <div id="view-extract" class="view">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Extract Questions</div>
+          <div class="topbar-sub">Parse a paper into structured JSON — no formatting, no output docs</div>
+        </div>
+      </div>
+      <div class="content">
+
+        <div class="annotation">
+          <strong>POST /api/extract</strong> — Upload any paper format; backend returns a <code>questions.json</code> only. Use this when you want to inspect or edit the extracted questions before building the final docs. The JSON can then be fed into <strong>Solutions Doc</strong> or <strong>Answer Key</strong> workflows directly. Accepts: .docx, .pdf, .png, .jpg, .jpeg, .webp up to 50 MB.
+        </div>
+
+        <div class="card">
+          <div class="card-title">Upload Paper</div>
+          <div class="upload-zone" onclick="document.getElementById('fileInputExtract').click()">
+            <input type="file" id="fileInputExtract" accept=".docx,.pdf,.png,.jpg,.jpeg,.webp" style="display:none">
+            <svg class="upload-icon" viewBox="0 0 40 40" fill="none" stroke="#6B7280" stroke-width="1.5">
+              <path d="M20 26V14M14 20l6-6 6 6"/><path d="M8 30h24"/>
+            </svg>
+            <div class="upload-label">Upload paper to extract questions</div>
+            <div class="upload-hint">.docx · .pdf · .png · .jpg · .jpeg · .webp — max 50 MB</div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary">
+          Extract Questions Only
+        </button>
+        <!-- POST /api/extract → job_id → poll → download questions.json -->
+
+      </div>
+    </div>
+
+    <!-- ── VIEW: SOLUTIONS DOC (POST /api/solutions) ── -->
+    <div id="view-solutions" class="view">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Solutions Doc</div>
+          <div class="topbar-sub">Generate the teacher-only solution document from a questions JSON</div>
+        </div>
+      </div>
+      <div class="content">
+
+        <div class="annotation">
+          <strong>POST /api/solutions</strong> — Takes a <code>questions.json</code> (from Extract or manually written) and builds the teacher solution doc (.docx) with answers, reasoning, source citations, and any flagged questions. Toggle <strong>AI Explanations</strong> to have the backend call the LLM to generate full worked solutions for each question — costs more time and API tokens.
+        </div>
+
+        <div class="card">
+          <div class="card-title">Questions JSON</div>
+          <div class="upload-zone" onclick="document.getElementById('fileInputSolutions').click()">
+            <input type="file" id="fileInputSolutions" accept=".json" style="display:none">
+            <svg class="upload-icon" viewBox="0 0 40 40" fill="none" stroke="#6B7280" stroke-width="1.5">
+              <path d="M20 26V14M14 20l6-6 6 6"/><path d="M8 30h24"/>
+            </svg>
+            <div class="upload-label">Upload questions.json</div>
+            <div class="upload-hint">Output from Extract, or a manually written questions file</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Options</div>
+          <div class="field-row">
+            <div class="field">
+              <label>Paper Name</label>
+              <input type="text" placeholder="e.g. UKSSSC Patwari Set 4">
+            </div>
+            <div class="field">
+              <label>Font</label>
+              <select>
+                <option value="krutidev">Kruti Dev</option>
+                <option value="unicode">Unicode</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- generate_explanations boolean → triggers LLM call per question -->
+          <label class="check-row">
+            <input type="checkbox" id="genExplanations">
+            <span>Generate AI explanations (calls LLM per question — slower)</span>
+          </label>
+        </div>
+
+        <button class="btn btn-primary">
+          Build Solution Doc
+        </button>
+        <!-- POST /api/solutions with BuildRequest body → job_id → poll → download .docx -->
+
+      </div>
+    </div>
+
+    <!-- ── VIEW: ANSWER KEY (POST /api/answer-key) ── -->
+    <div id="view-answerkey" class="view">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Answer Key</div>
+          <div class="topbar-sub">Generate a standalone answer key PDF from a questions JSON</div>
+        </div>
+      </div>
+      <div class="content">
+
+        <div class="annotation">
+          <strong>POST /api/answer-key</strong> — Takes a <code>questions.json</code> and outputs a single-page answer key PDF. Use when you already have the questions JSON and only need the key — faster than running the full pipeline. Output: <code>&lt;paper_name&gt; - Answer Key.pdf</code>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Questions JSON</div>
+          <div class="upload-zone" onclick="document.getElementById('fileInputAnswerKey').click()">
+            <input type="file" id="fileInputAnswerKey" accept=".json" style="display:none">
+            <svg class="upload-icon" viewBox="0 0 40 40" fill="none" stroke="#6B7280" stroke-width="1.5">
+              <path d="M20 26V14M14 20l6-6 6 6"/><path d="M8 30h24"/>
+            </svg>
+            <div class="upload-label">Upload questions.json</div>
+            <div class="upload-hint">Must include answer fields for each question</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Options</div>
+          <div class="field-row">
+            <div class="field">
+              <label>Paper Name</label>
+              <input type="text" placeholder="e.g. UKSSSC Patwari Set 4">
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary">
+          Generate Answer Key PDF
+        </button>
+        <!-- POST /api/answer-key → job_id → poll → download .pdf -->
+
+      </div>
+    </div>
+
+    <!-- ── VIEW: API HEALTH (GET /) ── -->
+    <div id="view-health" class="view">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">API Health</div>
+          <div class="topbar-sub">Live status of the DsideOS backend</div>
+        </div>
+      </div>
+      <div class="content">
+
+        <div class="annotation">
+          <strong>GET /</strong> — Returns <code>{"ok": true, "service": "dsideos-content", "version": "0.1.0"}</code>. Use this to confirm the backend is reachable before running jobs.
+        </div>
+
+        <div class="card">
+          <div class="card-title">Backend Status</div>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px">
+            <span class="status-pill pill-done"><span class="status-dot"></span>ONLINE</span>
+            <span style="font-family:var(--font-mono); font-size:12px; color:var(--muted)">https://dsideos.divinesideai.com</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:14px;">
+              <div style="font-size:11px; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.06em">Service</div>
+              <div style="font-family:var(--font-mono); font-size:13px">dsideos-content</div>
+            </div>
+            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:14px;">
+              <div style="font-size:11px; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.06em">Version</div>
+              <div style="font-family:var(--font-mono); font-size:13px">0.1.0</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost" onclick="pingHealth()">↻ Ping API</button>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  function setSeg(groupId, btn, value) {
+    document.querySelectorAll('#' + groupId + ' .seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  let selectedFile = null;
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) setFile(file);
+  }
+  function handleDragOver(e) {
+    e.preventDefault();
+    document.getElementById('uploadZone').classList.add('drag-over');
+  }
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('uploadZone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  }
+  function setFile(file) {
+    selectedFile = file;
+    document.getElementById('selectedFileName').textContent = file.name;
+    document.getElementById('selectedFileSize').textContent = formatBytes(file.size);
+    document.getElementById('uploadSelected').classList.add('visible');
+    document.getElementById('generateBtn').disabled = false;
+  }
+  function clearFile() {
+    selectedFile = null;
+    document.getElementById('uploadSelected').classList.remove('visible');
+    document.getElementById('fileInput').value = '';
+    document.getElementById('generateBtn').disabled = true;
+  }
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+  }
+
+  function submitGenerate() {
+    if (!selectedFile) return;
+    const paperName = document.getElementById('paperName').value || 'Paper';
+    const format = document.getElementById('formatSelect').value;
+    const font = document.querySelector('#fontSeg .seg-btn.active')?.dataset?.value || 'krutidev';
+    // POST /api/full with FormData
+    // const form = new FormData()
+    // form.append('file', selectedFile)
+    // form.append('paper_name', paperName)
+    // form.append('format', format)
+    // form.append('font', font)
+    // fetch('/api/full', { method: 'POST', body: form })
+    //   .then(r => r.json())
+    //   .then(({ job_id }) => { showView('jobs'); startPolling(job_id) })
+    alert('POST /api/full → job queued → check Jobs tab\n(wire fetch() here)');
+  }
+
+  function showOutputs(jobId) {
+    document.getElementById('outputsPanel').style.display = 'block';
+    document.getElementById('outputsPanel').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function downloadFile(jobId, filename) {
+    // GET /api/files/{job_id}/{filename}
+    const a = document.createElement('a');
+    a.href = '/api/files/' + jobId + '/' + encodeURIComponent(filename);
+    a.download = filename;
+    a.click();
+  }
+
+  function refreshJobs() {
+    // re-poll GET /api/jobs/{id} for each tracked job_id
+    alert('Poll GET /api/jobs/{id} for each active job here');
+  }
+
+  function pingHealth() {
+    fetch('/api/../')  // GET /
+      .then(r => r.json())
+      .then(d => alert(JSON.stringify(d, null, 2)))
+      .catch(() => alert('Backend unreachable'));
+  }
+</script>
+</body>
+</html>
