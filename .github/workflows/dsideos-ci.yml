@@ -129,7 +129,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COMMIT_MSG: ${{ github.event.head_commit.message || 'manual trigger' }}
+          ACTOR: ${{ github.actor }}
+          SHA: ${{ github.sha }}
         run: |
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\": [{\"title\": \"✅ DsideOS deployed\", \"color\": 3066993, \"fields\": [{\"name\": \"Commit\", \"value\": \"${{ github.event.head_commit.message || 'manual trigger' }}\", \"inline\": false}, {\"name\": \"By\", \"value\": \"${{ github.actor }}\", \"inline\": true}, {\"name\": \"SHA\", \"value\": \"\`${{ github.sha }}\`\", \"inline\": true}]}]}" \
-            "${{ secrets.DISCORD_WEBHOOK_URL }}" || true
+          python3 -c "
+          import json, os, urllib.request
+          payload = {
+            'embeds': [{
+              'title': '✅ DsideOS deployed',
+              'color': 3066993,
+              'fields': [
+                {'name': 'Commit', 'value': os.environ['COMMIT_MSG'], 'inline': False},
+                {'name': 'By',     'value': os.environ['ACTOR'],      'inline': True},
+                {'name': 'SHA',    'value': os.environ['SHA'][:7],    'inline': True},
+              ]
+            }]
+          }
+          data = json.dumps(payload).encode()
+          req = urllib.request.Request(os.environ['DISCORD_WEBHOOK'], data=data,
+                headers={'Content-Type': 'application/json'}, method='POST')
+          urllib.request.urlopen(req)
+          " || true
