@@ -23,8 +23,8 @@ class BuildMeta(BaseModel):
 
 class Question(BaseModel):
     n: int
-    stem: str
-    options: list[str] = []
+    stem: str = Field(max_length=8000)
+    options: list[str] = Field(default=[], max_length=12)
     answer: Optional[str] = None
     reason: Optional[str] = None
     solution: Optional[str] = None
@@ -35,7 +35,9 @@ class Question(BaseModel):
 
 
 class BuildRequest(BaseModel):
-    questions: list[Question]
+    # cap the list so a single request can't enqueue thousands of LLM calls
+    # (build/answer-key/solutions; solutions does one Sonnet call per question).
+    questions: list[Question] = Field(min_length=1, max_length=200)
     meta: BuildMeta = BuildMeta()
 
 
