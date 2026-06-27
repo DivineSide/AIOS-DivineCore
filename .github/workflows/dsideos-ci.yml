@@ -125,7 +125,8 @@ jobs:
   # ── 4. notify #deploys ───────────────────────────────────────────────────────
   notify:
     needs: deploy
-    if: github.event_name != 'pull_request'
+    # run even if deploy failed, so we always get a ping (and see failures)
+    if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Ping Discord
@@ -134,22 +135,42 @@ jobs:
           COMMIT_MSG: ${{ github.event.head_commit.message || 'manual trigger' }}
           ACTOR: ${{ github.actor }}
           SHA: ${{ github.sha }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        # Write the script to a file (no inline-quoting fragility), and DON'T
+        # swallow errors silently — log clearly so a missing/blank webhook or a
+        # bad commit message is visible in the Actions log instead of "nothing
+        # pinged". The step itself stays non-fatal via continue-on-error.
+        continue-on-error: true
         run: |
-          python3 -c "
-          import json, os, urllib.request
+          cat > notify.py <<'PY'
+          import json, os, sys, urllib.request
+
+          hook = os.environ.get("DISCORD_WEBHOOK", "").strip()
+          if not hook:
+              print("::warning::DISCORD_WEBHOOK_URL secret is empty or not set — "
+                    "add it in repo Settings > Secrets > Actions. Skipping ping.")
+              sys.exit(0)
+
+          ok = os.environ.get("DEPLOY_RESULT") == "success"
           payload = {
-            'embeds': [{
-              'title': '✅ DsideOS deployed',
-              'color': 3066993,
-              'fields': [
-                {'name': 'Commit', 'value': os.environ['COMMIT_MSG'], 'inline': False},
-                {'name': 'By',     'value': os.environ['ACTOR'],      'inline': True},
-                {'name': 'SHA',    'value': os.environ['SHA'][:7],    'inline': True},
-              ]
-            }]
+              "embeds": [{
+                  "title": "✅ DsideOS deployed" if ok else "❌ DsideOS deploy failed",
+                  "color": 3066993 if ok else 15158332,
+                  "fields": [
+                      {"name": "Commit", "value": (os.environ.get("COMMIT_MSG") or "—")[:1000], "inline": False},
+                      {"name": "By",     "value": os.environ.get("ACTOR", "—"),      "inline": True},
+                      {"name": "SHA",    "value": os.environ.get("SHA", "")[:7],     "inline": True},
+                  ],
+              }]
           }
           data = json.dumps(payload).encode()
-          req = urllib.request.Request(os.environ['DISCORD_WEBHOOK'], data=data,
-                headers={'Content-Type': 'application/json'}, method='POST')
-          urllib.request.urlopen(req)
-          " || true
+          req = urllib.request.Request(hook, data=data,
+                headers={"Content-Type": "application/json"}, method="POST")
+          try:
+              with urllib.request.urlopen(req, timeout=15) as r:
+                  print(f"Discord responded {r.status}")
+          except Exception as e:
+              print(f"::error::Discord ping failed: {type(e).__name__}: {e}")
+              sys.exit(1)
+          PY
+          python3 notify.py
