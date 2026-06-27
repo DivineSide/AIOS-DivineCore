@@ -30,6 +30,7 @@ from worker.tasks import (
     build_task,
     extract_task,
     full_task,
+    generate_task,
     solutions_task,
 )
 
@@ -92,6 +93,45 @@ def full(
     jobs.create(job_id, workflow="full", **meta)
     _save_upload(job_id, file)
     full_task.apply_async(args=[job_id, meta], task_id=job_id)
+    return JobAccepted(job_id=job_id)
+
+
+# ── AI-generative endpoint (no upload — subject + count) ─────────────────────
+
+VALID_SUBJECTS = {
+    "uk-history", "uk-geography", "uk-culture",
+    "uk-general-studies", "general-gk", "hindi",
+}
+
+
+@app.post("/api/generate", response_model=JobAccepted)
+def generate(
+    subject: str = Form(...),
+    count: int = Form(...),
+    paper_name: str = Form("Paper"),
+    format: str = Form("format-1"),
+    font: str = Form("krutidev"),
+    title_hindi: str = Form(""),
+    subtitle_hindi: str = Form(""),
+):
+    """AI Generative: pick a subject + question count -> generate questions from
+    the embedded book corpus -> same deliverables as /api/full (no file upload)."""
+    if subject not in VALID_SUBJECTS:
+        raise HTTPException(400, f"Unknown subject {subject!r}. "
+                                 f"Valid: {sorted(VALID_SUBJECTS)}")
+    if not (1 <= count <= 100):
+        raise HTTPException(400, "count must be between 1 and 100.")
+
+    meta = {
+        "paper_name": paper_name,
+        "format": format,
+        "font": font,
+        "title_hindi": title_hindi,
+        "subtitle_hindi": subtitle_hindi,
+    }
+    job_id = jobs.new_id()
+    jobs.create(job_id, workflow="generate", subject=subject, **meta)
+    generate_task.apply_async(args=[job_id, subject, count, meta], task_id=job_id)
     return JobAccepted(job_id=job_id)
 
 

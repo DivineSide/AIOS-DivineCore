@@ -30,6 +30,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PIPELINE = REPO_ROOT / "clients" / "target-academy" / "pipeline"
 sys.path.insert(0, str(PIPELINE))
 
+# the RAG package (query.py: rag_lookup/pyq_lookup) — used by generate_task.
+RAG = REPO_ROOT / "clients" / "target-academy" / "rag"
+sys.path.insert(0, str(RAG))
+
 # Ensure the LLM key is available to the pipeline's llm.py loader.
 if settings.ANTHROPIC_API_KEY:
     os.environ.setdefault("ANTHROPIC_API_KEY", settings.ANTHROPIC_API_KEY)
@@ -230,6 +234,37 @@ def full_task(self, job_id: str, meta: dict):
         jobs.update_meta(job_id, status="DONE", outputs=outputs,
                          n_questions=len(extracted.get("questions", [])))
         return {"status": "DONE", "outputs": outputs}
+    except Exception as e:
+        jobs.update_meta(job_id, status="FAILED", error=f"{type(e).__name__}: {e}")
+        raise
+
+
+@shared_task(bind=True, name="worker.tasks.generate")
+def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
+    """AI Generative: subject + count -> generate N questions from the book corpus
+    (RAG + LLM, see worker.generate) -> run the existing build pipeline -> same
+    deliverables as /api/full. No upload involved."""
+    import asyncio
+    from . import generate
+
+    font = (meta.get("font") or "krutidev").lower()
+    jobs.update_meta(job_id, status="RUNNING", stage="generate", font=font,
+                     format=meta.get("format", "format-1"))
+    try:
+        # phases 1-3: produce the questions list (async pipeline, run to completion)
+        questions = asyncio.run(generate.generate_questions(subject, count))
+        if not questions:
+            raise RuntimeError("Generation produced no questions.")
+
+        jobs.update_meta(job_id, stage="build", n_questions=len(questions))
+
+        # phase 4: identical to the build path the other tools use
+        data = _wrap_questions(questions, meta)
+        _placeholder_answers(data)
+        outputs = _run_builders(job_id, data, font)
+        jobs.update_meta(job_id, status="DONE", outputs=outputs,
+                         n_questions=len(questions))
+        return {"status": "DONE", "outputs": outputs, "n_questions": len(questions)}
     except Exception as e:
         jobs.update_meta(job_id, status="FAILED", error=f"{type(e).__name__}: {e}")
         raise
