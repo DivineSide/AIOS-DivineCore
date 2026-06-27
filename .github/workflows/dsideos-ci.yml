@@ -114,10 +114,17 @@ jobs:
           key: ${{ secrets.HETZNER_SSH_KEY }}
           script: |
             cd /root/DsideOS
-            export DSIDEOS_IMAGE_TAG=sha-${{ github.sha }}
+            TAG=sha-${{ github.sha }}
+            export DSIDEOS_IMAGE_TAG=$TAG
             echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose -f docker-compose.prod.yml pull api worker beat
-            docker compose -f docker-compose.prod.yml up -d
+            # the compose api/worker images default to :latest when the env var
+            # isn't present (e.g. a manual `compose up` later). Re-point :latest at
+            # the just-deployed sha so the running containers never drift back to a
+            # stale image. Then force-recreate the backend services.
+            docker tag ghcr.io/divineside/dsideos-api:$TAG    ghcr.io/divineside/dsideos-api:latest
+            docker tag ghcr.io/divineside/dsideos-worker:$TAG ghcr.io/divineside/dsideos-worker:latest
+            docker compose -f docker-compose.prod.yml up -d --force-recreate api worker beat
             docker image prune -f
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
