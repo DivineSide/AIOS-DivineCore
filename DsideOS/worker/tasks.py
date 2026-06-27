@@ -45,6 +45,25 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 # ── input routing — the format-agnostic core ─────────────────────────────────
 
+# a .docx is a zip of XML; python-docx fully inflates it with no size cap, so a
+# small "zip bomb" can inflate to many GB and OOM the worker. Reject anything that
+# decompresses past this ceiling or with an extreme compression ratio.
+_MAX_UNCOMPRESSED_MB = 300
+_MAX_ZIP_RATIO = 120
+
+
+def _check_zip_bomb(path: Path) -> None:
+    import zipfile
+    try:
+        with zipfile.ZipFile(path) as zf:
+            comp = sum(i.compress_size for i in zf.infolist()) or 1
+            uncomp = sum(i.file_size for i in zf.infolist())
+    except zipfile.BadZipFile:
+        raise ValueError("Corrupt or invalid .docx file.")
+    if uncomp > _MAX_UNCOMPRESSED_MB * 1024 * 1024 or (uncomp / comp) > _MAX_ZIP_RATIO:
+        raise ValueError("Document is too large or suspiciously compressed.")
+
+
 def _extract_any(file_path: Path) -> dict:
     """Route ANY supported input file to the right extractor -> questions dict.
 
@@ -54,6 +73,7 @@ def _extract_any(file_path: Path) -> dict:
     """
     ext = file_path.suffix.lower()
     if ext == ".docx":
+        _check_zip_bomb(file_path)
         import extract_docx
         return extract_docx.extract(file_path)
     if ext == ".pdf":
@@ -65,9 +85,21 @@ def _extract_any(file_path: Path) -> dict:
     raise ValueError(f"Unsupported input format: {ext}")
 
 
+def _safe_name(raw: str) -> str:
+    """Sanitise a user-supplied paper name into a safe filename stem. The name
+    flows into output paths (OUTPUT_DIR / f"{name}.docx"), so a value like
+    "../../etc/cron.d/x" must not be able to escape the output dir. Strip path
+    separators, drop traversal, and fall back to a default."""
+    import re
+    base = os.path.basename(str(raw or "")).replace("\\", "").replace("/", "")
+    base = base.lstrip(".").strip()
+    base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", base)  # also drop Windows-illegal chars
+    return base[:120] or "Paper"
+
+
 def _wrap_questions(questions: list[dict], meta: dict) -> dict:
     """Build the universal top-level JSON the pipeline/builders consume."""
-    name = meta.get("paper_name", "Paper")
+    name = _safe_name(meta.get("paper_name", "Paper"))
     return {
         "filename": f"{name}.docx",
         "ppt_filename": f"{name} (Class).pptx",

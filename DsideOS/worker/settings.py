@@ -33,5 +33,10 @@ class Settings(BaseSettings):
     # Max upload size (MB) — guards against giant files.
     MAX_UPLOAD_MB: int = 50
 
+    # Optional shared bearer token. When set, every /api route requires
+    # `Authorization: Bearer <token>`. Leave blank to keep the API open (e.g.
+    # when it's only reachable via the authenticated console proxy on localhost).
+    DSIDEOS_API_TOKEN: str = ""
+
 
 settings = Settings()

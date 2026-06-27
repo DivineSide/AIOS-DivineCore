@@ -20,7 +20,9 @@ the frontend polls GET /api/jobs/{id} and downloads from GET /api/files/{id}/{na
 """
 import json
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+import secrets
+
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from worker import jobs
@@ -41,6 +43,21 @@ app = FastAPI(title="DsideOS — Content Pipeline", version="0.1.0")
 SUPPORTED_UPLOAD_EXTS = {".docx", ".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
 
+def require_token(authorization: str = Header(default="")) -> None:
+    """Defence-in-depth API auth. If DSIDEOS_API_TOKEN is configured, every
+    protected route requires `Authorization: Bearer <token>` (constant-time
+    compared). If the token is blank the check is a no-op — the API is then
+    expected to be reachable only via the authenticated console proxy on
+    localhost (the public nginx /api route was removed)."""
+    expected = settings.DSIDEOS_API_TOKEN
+    if not expected:
+        return
+    prefix = "Bearer "
+    supplied = authorization[len(prefix):] if authorization.startswith(prefix) else ""
+    if not supplied or not secrets.compare_digest(supplied, expected):
+        raise HTTPException(401, "Unauthorized")
+
+
 @app.get("/")
 def health():
     return {"ok": True, "service": "dsideos-content", "version": app.version}
@@ -49,20 +66,41 @@ def health():
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _save_upload(job_id: str, file: UploadFile) -> None:
-    ext = ("." + file.filename.rsplit(".", 1)[-1].lower()) if "." in file.filename else ""
+    # SECURITY: never use the client-supplied filename as a path component — a
+    # name like "../../etc/cron.d/x.docx" or an absolute path would let an upload
+    # write outside the job dir (arbitrary file write -> RCE). Take only the
+    # extension from the (validated) name and write to a server-generated path.
+    raw = file.filename or ""
+    ext = ("." + raw.rsplit(".", 1)[-1].lower()) if "." in raw else ""
     if ext not in SUPPORTED_UPLOAD_EXTS:
         raise HTTPException(400, f"Unsupported format {ext!r}. "
                                  f"Supported: {sorted(SUPPORTED_UPLOAD_EXTS)}")
-    data = file.file.read()
-    if len(data) > settings.MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(413, f"File exceeds {settings.MAX_UPLOAD_MB} MB limit.")
-    dest = jobs.input_dir(job_id) / file.filename
+
+    # Read with a hard cap, in chunks, so a huge upload can't be fully buffered
+    # into RAM before the size check (DoS). Stop + reject as soon as we exceed it.
+    max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
+    chunks, total = [], 0
+    while True:
+        chunk = file.file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(413, f"File exceeds {settings.MAX_UPLOAD_MB} MB limit.")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+
+    input_dir = jobs.input_dir(job_id)
+    dest = (input_dir / f"upload{ext}").resolve()
+    # defence-in-depth: ensure the write stays inside the job's input dir
+    if not str(dest).startswith(str(input_dir.resolve())):
+        raise HTTPException(400, "Invalid upload path.")
     dest.write_bytes(data)
 
 
 # ── upload-driven endpoints ─────────────────────────────────────────────────
 
-@app.post("/api/extract", response_model=JobAccepted)
+@app.post("/api/extract", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def extract(file: UploadFile = File(...)):
     """Any input file -> universal questions JSON. (Step 1 of the pipeline.)"""
     job_id = jobs.new_id()
@@ -72,7 +110,7 @@ def extract(file: UploadFile = File(...)):
     return JobAccepted(job_id=job_id)
 
 
-@app.post("/api/full", response_model=JobAccepted)
+@app.post("/api/full", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def full(
     file: UploadFile = File(...),
     paper_name: str = Form("Paper"),
@@ -104,7 +142,7 @@ VALID_SUBJECTS = {
 }
 
 
-@app.post("/api/generate", response_model=JobAccepted)
+@app.post("/api/generate", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def generate(
     subject: str = Form(...),
     count: int = Form(...),
@@ -146,19 +184,19 @@ def _dispatch_questions_task(task, req: BuildRequest, workflow: str) -> JobAccep
     return JobAccepted(job_id=job_id)
 
 
-@app.post("/api/build", response_model=JobAccepted)
+@app.post("/api/build", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def build(req: BuildRequest):
     """W1: questions JSON -> branded paper + class deck + answer key."""
     return _dispatch_questions_task(build_task, req, "build")
 
 
-@app.post("/api/answer-key", response_model=JobAccepted)
+@app.post("/api/answer-key", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def answer_key(req: BuildRequest):
     """W3: questions JSON -> standalone answer-key PDF."""
     return _dispatch_questions_task(answer_key_task, req, "answer_key")
 
 
-@app.post("/api/solutions", response_model=JobAccepted)
+@app.post("/api/solutions", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def solutions(req: BuildRequest):
     """W2: questions JSON -> teacher solution doc (question/options/answer/explanation)."""
     return _dispatch_questions_task(solutions_task, req, "solutions")
@@ -166,7 +204,7 @@ def solutions(req: BuildRequest):
 
 # ── polling + download ────────────────────────────────────────────────────────
 
-@app.get("/api/jobs/{job_id}", response_model=JobStatus)
+@app.get("/api/jobs/{job_id}", response_model=JobStatus, dependencies=[Depends(require_token)])
 def job_status(job_id: str):
     meta = jobs.read_meta(job_id)
     if not meta:
@@ -184,7 +222,7 @@ def job_status(job_id: str):
     )
 
 
-@app.get("/api/files/{job_id}/{name}")
+@app.get("/api/files/{job_id}/{name}", dependencies=[Depends(require_token)])
 def download(job_id: str, name: str):
     if "/" in name or "\\" in name or ".." in name:
         raise HTTPException(400, "Invalid filename.")
