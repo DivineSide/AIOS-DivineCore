@@ -191,13 +191,26 @@ def run(input_path: Path | None = None, font: str | None = None) -> dict:
         build_paper_format2.build(src, paper_out, font=font)
     else:
         build_paper.build(src, paper_out, font=font)
+    # 3b. also render the paper as a PDF. The .docx is Kruti Dev encoded, so it
+    # only reads correctly on a machine with the Kruti Dev font installed; the
+    # PDF embeds the font (rendered by LibreOffice server-side, which has it) so
+    # the Hindi displays correctly for everyone. Keep the .docx too (editable).
+    paper_pdf_out = paper_out.with_suffix(".pdf")
+    outputs = [deck_out, sol_out, paper_out, akey_out]
+    try:
+        build_answer_key._docx_to_pdf(paper_out, paper_pdf_out)
+        outputs.append(paper_pdf_out)
+    except Exception as e:
+        # don't fail the whole job if PDF conversion hiccups — ship the docx.
+        print(f"[run_pipeline] paper PDF conversion failed ({type(e).__name__}: {e}); "
+              f"delivering .docx only", file=sys.stderr)
     # 4. simple one-page answer-key PDF (owner request)
     build_answer_key.build(src, akey_out, font=font)
 
     n, n_flag, flagged = review_summary(data)
     return {
         "input": src,
-        "outputs": [deck_out, sol_out, paper_out, akey_out],
+        "outputs": outputs,
         "questions": n,
         "flagged": flagged,
         "n_flagged": n_flag,
