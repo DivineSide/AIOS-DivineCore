@@ -44,6 +44,9 @@ services:
       # Client branded assets (IP — not in the image). Provisioned on the server.
       - ./assets/resources:/app/clients/target-academy/resources:ro
       - ./assets/templates:/app/clients/target-academy/templates:ro
+      # Licensed Kruti Dev fonts (gitignored, not in image) - needed by
+      # LibreOffice to render the Hindi paper PDF correctly.
+      - ./assets/fonts:/usr/share/fonts/truetype/dsideos:ro
     depends_on:
       - redis
 
@@ -72,6 +75,17 @@ services:
     environment:
       # The frontend calls the backend at the same origin under /api.
       - NEXT_PUBLIC_API_BASE=/api
+    depends_on:
+      - api
+
+  # ── DSideOS console (Next.js, server-side auth + backend proxy) ──
+  console:
+    image: ghcr.io/divineside/dsideos-console:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    env_file:
+      - .env.console
     depends_on:
       - api
 
