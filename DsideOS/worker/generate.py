@@ -40,7 +40,7 @@ SONNET = "claude-sonnet-4-6"
 TOPICS_DIVISOR = 5       # ~N/5 distinct topics from Haiku
 BOOK_TOP_K = 3           # book passages per topic
 PYQ_TOP_K = 3            # PYQ style examples per topic
-BOOK_THRESHOLD = 0.25
+BOOK_THRESHOLD = 0.20
 PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book text
 
 # Fallback topic labels when no PYQs exist yet for a subject
@@ -117,7 +117,8 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
         f"These are real exam questions for the subject '{subject}':\n\n{examples}\n\n"
         f"What distinct topics/concepts do these exam questions test? "
         f"Return exactly {n_topics} topic strings as a JSON array of strings, "
-        f"no prose. Example: [\"topic one\", \"topic two\"]"
+        f"no prose. Write each topic in Hindi (Devanagari script). "
+        f"Example: [\"उत्तराखंड का गठन\", \"गढ़वाल राज्य का इतिहास\"]"
     )
     msg = _client().messages.create(
         model=HAIKU,
@@ -163,6 +164,19 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
             if key not in seen_pyqs:
                 seen_pyqs.add(key)
                 pyq_examples.append({**p, "from_topic": topic})
+
+    # Fallback: if RAG returned nothing (topics were in wrong language / too abstract),
+    # do a direct lookup using the subject's canonical Hindi label at a lower threshold.
+    if not book_chunks:
+        fallback_topic = SUBJECT_LABELS.get(subject, subject.replace("-", " "))
+        passages = await rag.rag_lookup(
+            stem=fallback_topic, top_k=BOOK_TOP_K * 3, threshold=0.15, subject=subject
+        )
+        for p in passages:
+            key = (p.get("book", ""), p.get("topic", ""))
+            if key not in seen_books:
+                seen_books.add(key)
+                book_chunks.append({**p, "from_topic": fallback_topic})
 
     return book_chunks, pyq_examples
 
