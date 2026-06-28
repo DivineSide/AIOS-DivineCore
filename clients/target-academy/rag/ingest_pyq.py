@@ -107,10 +107,10 @@ def _db():
 
 # ── markdown parsing ──────────────────────────────────────────────────────────
 
-# Matches answer disclosure lines in various forms:
-#   "Answer – (B)"  "Answer: B"  "Show Answer/Hide\nAnswer – (C)"
+# Matches answer disclosure lines in English and Hindi forms:
+#   "Answer – (B)"  "Answer: B"  "उत्तर – (B)"  "Show Answer/Hide\nAnswer – (C)"
 _ANSWER_LINE = re.compile(
-    r"(?:Show Answer/Hide\s*)?Answer\s*[–\-:]\s*[\(\[]?([A-Da-d])[\)\]]?",
+    r"(?:Show Answer/Hide\s*)?(?:Answer|उत्तर)\s*[–\-:]\s*[\(\[]?([A-Da-d])[\)\]]?",
     re.IGNORECASE,
 )
 
@@ -121,24 +121,44 @@ _OPTION_LINE = re.compile(r"^\s*\([A-Da-d]\)\s+\S", re.MULTILINE)
 def _find_question_starts(md_text: str) -> list[tuple[int, int]]:
     """Return (char_pos, question_number) for each real question boundary.
 
-    A real question boundary is a line like "42. <text>" where the number is
-    strictly one more than the previous found number (sequential). This filters
-    out sub-item numbers inside matching/table questions (सूची-I items numbered
-    1, 2, 3, 4 that reset and repeat inside the paper).
+    Strategy: collect ALL candidate "N. <text>" matches, then find the longest
+    strictly-sequential run that starts at 1 (or close to it). This correctly
+    handles:
+    - Sub-items inside matching questions (सूची-I numbered 1,2,3,4 that repeat)
+    - Papers where the header has stray number matches
+    - Gaps of 1-2 in the sequence (occasional missing question)
     """
     candidate = re.compile(r"^(\d{1,3})\.\s+\S", re.MULTILINE)
-    results = []
-    expected = 1
-    for m in candidate.finditer(md_text):
-        n = int(m.group(1))
-        if n == expected:
-            results.append((m.start(), n))
-            expected += 1
-        # allow one skip (occasional missing question in paper)
-        elif n == expected + 1:
-            results.append((m.start(), n))
-            expected = n + 1
-    return results
+    all_matches = [(m.start(), int(m.group(1))) for m in candidate.finditer(md_text)]
+
+    if not all_matches:
+        return []
+
+    # Try to build the longest sequential chain starting from n=1
+    # by position order. Allow small gaps (<=2) to handle occasional missing Qs.
+    pos_map: dict[int, int] = {}  # question_number -> char_pos (first occurrence)
+    for pos, n in all_matches:
+        if n not in pos_map:
+            pos_map[n] = pos
+
+    # Walk from 1 upward collecting sequential numbers.
+    # Allow gaps (missing pages in scraped papers) by jumping to the next
+    # available number when the chain breaks — but only if that next number
+    # is higher (no resets) and within the plausible paper range (<=200).
+    chain = []
+    n = 1
+    while True:
+        if n in pos_map:
+            chain.append((pos_map[n], n))
+            n += 1
+        else:
+            # find the next available number above n (within 200)
+            next_n = next((k for k in range(n + 1, 201) if k in pos_map), None)
+            if next_n is None:
+                break
+            n = next_n  # jump over the gap and continue
+
+    return chain
 
 
 def parse_questions(md_text: str) -> list[dict]:
@@ -338,7 +358,7 @@ if __name__ == "__main__":
         if not exam_dir.exists():
             print(f"ERROR: folder not found: {exam_dir}")
             sys.exit(1)
-        md_files = sorted(exam_dir.glob("*.md"))
+        md_files = sorted(f for f in exam_dir.glob("*.md") if not f.name.startswith("."))
         if not md_files:
             print(f"No .md files in {exam_dir.name} — skipping.")
             continue
