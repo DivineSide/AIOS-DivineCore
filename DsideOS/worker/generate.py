@@ -78,7 +78,8 @@ You have been given:
 2. STUDY MATERIAL — factual book excerpts. Every question you generate must be
    answerable from this material. Do not invent facts.
 
-Subject: "{subject}". Generate exactly {count} multiple-choice questions.
+Subject: "{subject}". Generate the number of multiple-choice questions requested
+in the user message.
 
 RULES:
 - Language: Hindi (Devanagari). English proper nouns stay in English.
@@ -256,15 +257,27 @@ def _gen_questions(subject: str, count: int,
 
 def _gen_batch(subject: str, count: int,
                book_material: str, pyq_material: str) -> list[dict]:
-    """One Sonnet call for up to MAX_QUESTIONS_PER_CALL questions."""
+    """One Sonnet call for up to MAX_QUESTIONS_PER_CALL questions.
+
+    The system prompt (rules + PYQ examples + book material) is byte-identical
+    across every batch of a single run — only the requested `count` changes, and
+    that lives in the user message. We cache the system block so batches 2..N read
+    the shared context at ~0.1x input cost instead of paying full price each time.
+    For a 100-question paper (6 batches) this cuts Sonnet input spend by ~5/6 on
+    the cached portion. Cache TTL is 5 min — comfortably longer than a full run.
+    """
     system = GEN_SYSTEM.format(
-        subject=subject, count=count,
+        subject=subject,
         pyq_examples=pyq_material, book_chunks=book_material,
     )
     msg = _client().messages.create(
         model=SONNET,
         max_tokens=MAX_OUTPUT_TOKENS,
-        system=system,
+        system=[{
+            "type": "text",
+            "text": system,
+            "cache_control": {"type": "ephemeral"},
+        }],
         messages=[{"role": "user", "content": f"Generate exactly {count} questions now."}],
     )
     # A max_tokens stop means the JSON was cut mid-array — fail loud rather than
