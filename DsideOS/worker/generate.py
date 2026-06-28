@@ -66,8 +66,18 @@ PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book
 # (~25*270 ≈ 6750 tokens, safely under the 8192 cap). The stop_reason guard
 # catches any overrun and fails loud — no silent truncation.
 TOKENS_PER_QUESTION = 270
-MAX_OUTPUT_TOKENS = 8192
-MAX_QUESTIONS_PER_CALL = 25
+# Output budget + batch size are provider-aware:
+#  - Anthropic: 8192 cap, 25 q/call (~25*270 ≈ 6750, safely under).
+#  - Sarvam: the Starter tier caps max_tokens at 4096, AND sarvam-105b always
+#    reasons (the reasoning tokens count toward the cap and vary ~700-3000 per
+#    call). Verified: batches of 8-10 q return valid JSON under 4096; we use 8
+#    for a safe margin. Override both via env for a paid Sarvam tier.
+if GEN_PROVIDER == "sarvam":
+    MAX_OUTPUT_TOKENS = int(os.environ.get("SARVAM_MAX_TOKENS", "4096"))
+    MAX_QUESTIONS_PER_CALL = int(os.environ.get("SARVAM_BATCH", "8"))
+else:
+    MAX_OUTPUT_TOKENS = 8192
+    MAX_QUESTIONS_PER_CALL = 25
 
 VALID_ANSWERS = {"a", "b", "c", "d"}
 
