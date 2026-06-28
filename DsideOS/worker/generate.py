@@ -19,9 +19,12 @@ This module only owns phases 1-3 and exposes one coroutine:
 """
 import asyncio
 import json
+import logging
 import os
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 import anthropic
 
@@ -36,21 +39,24 @@ import query as rag  # noqa: E402  (pyq_rag_lookup, rag_lookup)
 
 HAIKU = "claude-haiku-4-5-20251001"
 SONNET = "claude-sonnet-4-6"
+GEN_MODEL = HAIKU  # swap to SONNET if quality is insufficient
 
 # RAG depth — how many results to fetch per topic from each table
 TOPICS_DIVISOR = 5       # ~N/5 distinct topics from Haiku
-BOOK_TOP_K = 3           # book passages per topic
-PYQ_TOP_K = 3            # PYQ style examples per topic
+BOOK_TOP_K = 2           # book passages per topic (fallback fetches BOOK_TOP_K*3=6)
+PYQ_TOP_K = 2            # PYQ style examples per topic; total capped at PYQ_CAP
+PYQ_CAP = 12             # style saturates at ~8 examples; 12 gives a buffer
 BOOK_THRESHOLD = 0.20
 BOOK_FALLBACK_THRESHOLD = 0.15   # looser net for the empty-result fallback
 PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book text
 
-# Sonnet output budget. Devanagari is token-heavy (~2-4 tokens/char), so a Hindi
-# MCQ (stem + 4 options + reason) runs ~300-450 output tokens. We batch large
-# requests so a single call never approaches the 8192 cap and truncates the JSON.
-TOKENS_PER_QUESTION = 450
+# Sonnet output budget. Devanagari factual MCQs (stem + 4 options + reason,
+# no solution) run ~220-280 output tokens. We batch at 25 questions per call
+# (~25*270 ≈ 6750 tokens, safely under the 8192 cap). The stop_reason guard
+# catches any overrun and fails loud — no silent truncation.
+TOKENS_PER_QUESTION = 270
 MAX_OUTPUT_TOKENS = 8192
-MAX_QUESTIONS_PER_CALL = 18      # ~18 * 450 ≈ 8100, comfortably under the cap
+MAX_QUESTIONS_PER_CALL = 25
 
 VALID_ANSWERS = {"a", "b", "c", "d"}
 
@@ -183,6 +189,8 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
                 seen_pyqs.add(key)
                 pyq_examples.append({**p, "from_topic": topic})
 
+    pyq_examples = pyq_examples[:PYQ_CAP]
+
     # Fallback: trigger when retrieval is empty OR too thin to ground `count`
     # questions (topics were wrong-language / too abstract). Use the subject's
     # canonical Hindi label — English never embeds well against the Hindi corpus.
@@ -271,7 +279,7 @@ def _gen_batch(subject: str, count: int,
         pyq_examples=pyq_material, book_chunks=book_material,
     )
     msg = _client().messages.create(
-        model=SONNET,
+        model=GEN_MODEL,
         max_tokens=MAX_OUTPUT_TOKENS,
         system=[{
             "type": "text",
@@ -287,6 +295,15 @@ def _gen_batch(subject: str, count: int,
             f"Sonnet hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} "
             f"questions — output truncated. Lower MAX_QUESTIONS_PER_CALL."
         )
+    u = msg.usage
+    cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
+    cache_write = getattr(u, "cache_creation_input_tokens", 0) or 0
+    logger.info(
+        "BATCH model=%s count=%d | input=%d cache_read=%d cache_write=%d output=%d | "
+        "tokens_per_q=%.1f",
+        GEN_MODEL, count, u.input_tokens, cache_read, cache_write, u.output_tokens,
+        u.output_tokens / count if count else 0,
+    )
     text = msg.content[0].text.strip() if msg.content else ""
     return _parse_json_array(text)
 
