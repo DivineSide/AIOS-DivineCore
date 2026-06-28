@@ -19,8 +19,8 @@ the frontend polls GET /api/jobs/{id} and downloads from GET /api/files/{id}/{na
     GET  /api/files/{id}/{name}   download one output
 """
 import json
-
 import secrets
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -37,8 +37,21 @@ from worker.tasks import (
 )
 
 from .schemas import BuildRequest, JobAccepted, JobStatus
+from worker.celery_app import celery_app
 
-app = FastAPI(title="DsideOS — Content Pipeline", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Warm the Celery broker connection at startup so the first HTTP request
+    # doesn't hit a cold / uninitialized connection pool.
+    try:
+        celery_app.connection().ensure_connection(max_retries=3)
+    except Exception:
+        pass
+    yield
+
+
+app = FastAPI(title="DsideOS — Content Pipeline", version="0.1.0", lifespan=lifespan)
 
 SUPPORTED_UPLOAD_EXTS = {".docx", ".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
@@ -106,7 +119,7 @@ def extract(file: UploadFile = File(...)):
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="extract")
     _save_upload(job_id, file)              # file on disk BEFORE dispatch
-    extract_task.apply_async(args=[job_id], task_id=job_id)
+    extract_task.apply_async(args=[job_id], task_id=job_id, retry=True)
     return JobAccepted(job_id=job_id)
 
 
@@ -130,7 +143,7 @@ def full(
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="full", **meta)
     _save_upload(job_id, file)
-    full_task.apply_async(args=[job_id, meta], task_id=job_id)
+    full_task.apply_async(args=[job_id, meta], task_id=job_id, retry=True)
     return JobAccepted(job_id=job_id)
 
 
@@ -169,7 +182,7 @@ def generate(
     }
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="generate", subject=subject, **meta)
-    generate_task.apply_async(args=[job_id, subject, count, meta], task_id=job_id)
+    generate_task.apply_async(args=[job_id, subject, count, meta], task_id=job_id, retry=True)
     return JobAccepted(job_id=job_id)
 
 
@@ -180,7 +193,7 @@ def _dispatch_questions_task(task, req: BuildRequest, workflow: str) -> JobAccep
     meta = req.meta.model_dump()
     job_id = jobs.new_id()
     jobs.create(job_id, workflow=workflow, **meta)
-    task.apply_async(args=[job_id, questions, meta], task_id=job_id)
+    task.apply_async(args=[job_id, questions, meta], task_id=job_id, retry=True)
     return JobAccepted(job_id=job_id)
 
 
