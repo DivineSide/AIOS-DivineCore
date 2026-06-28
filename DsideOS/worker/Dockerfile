@@ -29,6 +29,7 @@ RUN fc-cache -f -v || true
 # App code: the backend + the pipeline it imports in place.
 COPY DsideOS/ /app/DsideOS/
 COPY clients/target-academy/pipeline/ /app/clients/target-academy/pipeline/
+COPY clients/target-academy/rag/ /app/clients/target-academy/rag/
 
 # NOTE: the builders need the client's branded assets at runtime —
 #   clients/target-academy/resources/ (front-page.docx, etc.)
