@@ -39,7 +39,18 @@ import query as rag  # noqa: E402  (pyq_rag_lookup, rag_lookup)
 
 HAIKU = "claude-haiku-4-5-20251001"
 SONNET = "claude-sonnet-4-6"
-GEN_MODEL = HAIKU  # swap to SONNET if quality is insufficient
+GEN_MODEL = HAIKU  # Anthropic model used when GEN_PROVIDER=anthropic
+
+# ── Generation provider ──────────────────────────────────────────────────────
+# "anthropic"-> Claude (HAIKU/SONNET above). Current default — keeps working with
+#               no new credentials.
+# "sarvam"   -> Sarvam's Hindi-native LLM (cleaner Devanagari, ~30x cheaper than
+#               Haiku on output). OpenAI-compatible. Needs SARVAM_API_KEY.
+# Flip via the GEN_PROVIDER env var on the worker — no code change needed. Set
+# GEN_PROVIDER=sarvam + SARVAM_API_KEY once the Sarvam key is provisioned.
+GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "anthropic").lower()
+SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-105b")
+SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
 
 # RAG depth — how many results to fetch per topic from each table
 TOPICS_DIVISOR = 5       # ~N/5 distinct topics from Haiku
@@ -115,6 +126,21 @@ OUTPUT: Return ONLY a valid JSON array, no prose, no markdown fences:
 
 def _client() -> anthropic.Anthropic:
     return anthropic.Anthropic()
+
+
+_sarvam = None
+
+
+def _sarvam_client():
+    """Lazily build the Sarvam client (OpenAI-compatible). Reused across batches."""
+    global _sarvam
+    if _sarvam is None:
+        from openai import OpenAI
+        key = os.environ.get("SARVAM_API_KEY", "")
+        if not key:
+            raise RuntimeError("SARVAM_API_KEY not set (required for GEN_PROVIDER=sarvam).")
+        _sarvam = OpenAI(base_url=SARVAM_BASE_URL, api_key=key)
+    return _sarvam
 
 
 # ── Phase 1 — subject -> topics (Haiku) ──────────────────────────────────────
@@ -278,6 +304,15 @@ def _gen_batch(subject: str, count: int,
         subject=subject,
         pyq_examples=pyq_material, book_chunks=book_material,
     )
+    user = f"Generate exactly {count} questions now."
+    if GEN_PROVIDER == "sarvam":
+        text = _gen_batch_sarvam(system, user, count)
+    else:
+        text = _gen_batch_anthropic(system, user, count)
+    return _parse_json_array(text)
+
+
+def _gen_batch_anthropic(system: str, user: str, count: int) -> str:
     msg = _client().messages.create(
         model=GEN_MODEL,
         max_tokens=MAX_OUTPUT_TOKENS,
@@ -286,13 +321,13 @@ def _gen_batch(subject: str, count: int,
             "text": system,
             "cache_control": {"type": "ephemeral"},
         }],
-        messages=[{"role": "user", "content": f"Generate exactly {count} questions now."}],
+        messages=[{"role": "user", "content": user}],
     )
     # A max_tokens stop means the JSON was cut mid-array — fail loud rather than
     # silently returning the [] that _parse_json_array gives for truncated input.
     if msg.stop_reason == "max_tokens":
         raise RuntimeError(
-            f"Sonnet hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} "
+            f"{GEN_MODEL} hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} "
             f"questions — output truncated. Lower MAX_QUESTIONS_PER_CALL."
         )
     u = msg.usage
@@ -304,8 +339,50 @@ def _gen_batch(subject: str, count: int,
         GEN_MODEL, count, u.input_tokens, cache_read, cache_write, u.output_tokens,
         u.output_tokens / count if count else 0,
     )
-    text = msg.content[0].text.strip() if msg.content else ""
-    return _parse_json_array(text)
+    return msg.content[0].text.strip() if msg.content else ""
+
+
+def _gen_batch_sarvam(system: str, user: str, count: int) -> str:
+    """Sarvam (Hindi-native, OpenAI-compatible). System+user as chat messages."""
+    # Sarvam turns reasoning on by default, and reasoning tokens count toward the
+    # completion budget — for straight JSON MCQ output we don't need it, and it
+    # would eat into MAX_OUTPUT_TOKENS. Request minimal reasoning; tolerate SDKs
+    # that don't accept the param.
+    extra = {"reasoning_effort": os.environ.get("SARVAM_REASONING", "low")}
+    try:
+        resp = _sarvam_client().chat.completions.create(
+            model=SARVAM_MODEL,
+            max_tokens=MAX_OUTPUT_TOKENS,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            **extra,
+        )
+    except TypeError:
+        # older OpenAI client without reasoning_effort kwarg — retry without it
+        resp = _sarvam_client().chat.completions.create(
+            model=SARVAM_MODEL,
+            max_tokens=MAX_OUTPUT_TOKENS,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+    choice = resp.choices[0]
+    # length finish_reason = truncated mid-array; fail loud like the Anthropic path.
+    if choice.finish_reason == "length":
+        raise RuntimeError(
+            f"{SARVAM_MODEL} hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} "
+            f"questions — output truncated. Lower MAX_QUESTIONS_PER_CALL or raise the plan cap."
+        )
+    u = resp.usage
+    logger.info(
+        "BATCH model=%s count=%d | input=%d output=%d | tokens_per_q=%.1f",
+        SARVAM_MODEL, count, getattr(u, "prompt_tokens", 0), getattr(u, "completion_tokens", 0),
+        (getattr(u, "completion_tokens", 0) / count) if count else 0,
+    )
+    return (choice.message.content or "").strip()
 
 
 # ── orchestrator ─────────────────────────────────────────────────────────────
