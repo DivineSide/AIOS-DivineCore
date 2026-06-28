@@ -118,32 +118,72 @@ async def rag_lookup(
     return await asyncio.to_thread(_search, embedding, top_k, threshold, subject)
 
 
-def _pyq_fetch(subject: str, top_k: int) -> list[dict]:
-    """Random sample of PYQ rows for a subject — used in Phase 1 to infer the
-    topics an exam tends to test. No embedding needed (random, not semantic)."""
+def _pyq_search(embedding: list[float], subject: str, top_k: int,
+                threshold: float) -> list[dict]:
+    """Semantic search on pyq_chunks — same cosine similarity as book_chunks
+    but hits the PYQ table. Returns questions whose meaning is close to the
+    query embedding, preserving framing + distractor style."""
     conn = _db()
+    vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
     sql = """
-        SELECT chunk_text, source_file
+        SELECT
+            chunk_text,
+            source_file,
+            1 - (embedding <=> %s::vector) AS similarity
         FROM pyq_chunks
         WHERE subject = %s
-        ORDER BY RANDOM()
+        ORDER BY embedding <=> %s::vector
         LIMIT %s
     """
     with conn.cursor() as cur:
-        cur.execute(sql, (subject, top_k))
+        cur.execute(sql, (vec_str, subject, vec_str, top_k * 2))
         rows = cur.fetchall()
-    return [{"text": chunk_text, "source_file": source_file}
-            for chunk_text, source_file in rows]
+    results = []
+    for chunk_text, source_file, similarity in rows:
+        if similarity >= threshold:
+            results.append({
+                "text":        chunk_text,
+                "source_file": source_file,
+                "similarity":  round(float(similarity), 4),
+            })
+        if len(results) >= top_k:
+            break
+    return results
+
+
+async def pyq_rag_lookup(
+    topic: str,
+    subject: str,
+    top_k: int = 5,
+    threshold: float = 0.20,
+) -> list[dict]:
+    """Semantic search on pyq_chunks for past questions relevant to a topic.
+    Returns [] on any error (table may not exist yet — fail soft)."""
+    try:
+        embedding = await asyncio.to_thread(_embed, topic)
+        return await asyncio.to_thread(_pyq_search, embedding, subject, top_k, threshold)
+    except Exception:
+        return []
 
 
 async def pyq_lookup(subject: str, top_k: int = 20) -> list[dict]:
-    """Fetch up to top_k random previous-year questions for a subject. Returns
-    [] if the pyq_chunks table is empty / has no rows for the subject (the
-    generate pipeline handles that by falling back to a subject-derived topic)."""
+    """Random fetch fallback — kept for backwards compatibility but no longer
+    used by the generate pipeline (pyq_rag_lookup replaced it)."""
     try:
-        return await asyncio.to_thread(_pyq_fetch, subject, top_k)
+        conn = _db()
+        sql = """
+            SELECT chunk_text, source_file
+            FROM pyq_chunks
+            WHERE subject = %s
+            ORDER BY RANDOM()
+            LIMIT %s
+        """
+        with conn.cursor() as cur:
+            cur.execute(sql, (subject, top_k))
+            rows = cur.fetchall()
+        return [{"text": chunk_text, "source_file": source_file}
+                for chunk_text, source_file in rows]
     except Exception:
-        # table may not exist yet (Mayank ingests separately) — fail soft
         return []
 
 

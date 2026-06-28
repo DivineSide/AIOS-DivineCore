@@ -31,33 +31,43 @@ RAG = REPO_ROOT / "clients" / "target-academy" / "rag"
 if str(RAG) not in sys.path:
     sys.path.insert(0, str(RAG))
 
-import query as rag  # noqa: E402  (pyq_lookup, rag_lookup)
+import query as rag  # noqa: E402  (pyq_rag_lookup, rag_lookup)
 
 HAIKU = "claude-haiku-4-5-20251001"
 SONNET = "claude-sonnet-4-6"
 
-# how many topics to mine relative to question count, and RAG depth per topic
-TOPICS_DIVISOR = 5      # ~N/5 distinct topics
-RAG_TOP_K = 3
-RAG_THRESHOLD = 0.25
-PYQ_SAMPLE = 20
+# RAG depth — how many results to fetch per topic from each table
+TOPICS_DIVISOR = 5       # ~N/5 distinct topics from Haiku
+BOOK_TOP_K = 3           # book passages per topic
+PYQ_TOP_K = 3            # PYQ style examples per topic
+BOOK_THRESHOLD = 0.25
+PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book text
 
-# readable subject names for the fallback topic when there are no PYQs yet
+# Fallback topic labels when no PYQs exist yet for a subject
 SUBJECT_LABELS = {
-    "uk-history": "उत्तराखंड का इतिहास",
-    "uk-geography": "उत्तराखंड का भूगोल",
-    "uk-culture": "उत्तराखंड की संस्कृति",
-    "uk-general-studies": "उत्तराखंड सामान्य अध्ययन",
-    "general-gk": "सामान्य ज्ञान",
-    "hindi": "सामान्य हिंदी",
+    "uk-history":          "उत्तराखंड का इतिहास",
+    "uk-geography":        "उत्तराखंड का भूगोल",
+    "uk-culture":          "उत्तराखंड की संस्कृति",
+    "uk-general-studies":  "उत्तराखंड सामान्य अध्ययन",
+    "general-gk":          "सामान्य ज्ञान",
+    "hindi":               "सामान्य हिंदी",
 }
 
+# The system prompt receives both PYQ examples (style) and book passages (facts).
+# PYQ examples teach Sonnet HOW to frame questions; book passages teach it WHAT to say.
 GEN_SYSTEM = """You are an Indian competitive-exam question writer for UKSSSC, UPPSC, and similar
 state PSC papers.
 
-You have been given excerpts from official study material for the subject: "{subject}".
-Generate exactly {count} multiple-choice questions based ONLY on information present
-in these excerpts. Do not invent facts.
+You have been given:
+1. REAL PAST EXAM QUESTIONS (PYQ EXAMPLES) — study these carefully. Mirror their:
+   - Question framing and sentence structure
+   - Hindi register and formality level
+   - Option length and distractor style
+   - Difficulty level and concept depth
+2. STUDY MATERIAL — factual book excerpts. Every question you generate must be
+   answerable from this material. Do not invent facts.
+
+Subject: "{subject}". Generate exactly {count} multiple-choice questions.
 
 RULES:
 - Language: Hindi (Devanagari). English proper nouns stay in English.
@@ -78,88 +88,112 @@ OUTPUT: Return ONLY a valid JSON array, no prose, no markdown fences:
   }}
 ]
 
-STUDY MATERIAL:
-{chunks}"""
+━━━ PYQ EXAMPLES (style reference) ━━━
+{pyq_examples}
+
+━━━ STUDY MATERIAL (factual source) ━━━
+{book_chunks}"""
 
 
 def _client() -> anthropic.Anthropic:
-    # ANTHROPIC_API_KEY is put into the env by tasks.py / settings before import
     return anthropic.Anthropic()
 
 
-# ── Phase 1 — PYQ -> topics (Haiku) ──────────────────────────────────────────
+# ── Phase 1 — subject -> topics (Haiku) ──────────────────────────────────────
 
 async def _extract_topics(subject: str, count: int) -> list[str]:
+    """Use Haiku to derive N/5 distinct exam topics for the subject.
+    Seeds Haiku with a random PYQ sample so it understands what this exam
+    actually tests — not a generic topic list."""
     n_topics = max(1, count // TOPICS_DIVISOR)
-    pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SAMPLE)
 
-    if not pyqs:
-        # no PYQs ingested yet — fall back to a single subject-derived topic so
-        # Phase 2/3 still run (the handoff explicitly asks for this).
+    # seed with a small random sample just for topic discovery (cheap, no embedding)
+    seed_pyqs = await rag.pyq_lookup(subject, top_k=15)
+    if not seed_pyqs:
         return [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
 
-    examples = "\n".join(f"- {p['text']}" for p in pyqs)
+    examples = "\n".join(f"- {p['text'][:300]}" for p in seed_pyqs)
     prompt = (
         f"These are real exam questions for the subject '{subject}':\n\n{examples}\n\n"
         f"What distinct topics/concepts do these exam questions test? "
         f"Return exactly {n_topics} topic strings as a JSON array of strings, "
         f"no prose. Example: [\"topic one\", \"topic two\"]"
     )
-    client = _client()
-    msg = client.messages.create(
+    msg = _client().messages.create(
         model=HAIKU,
-        max_tokens=1024,
+        max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = msg.content[0].text.strip()
-    topics = _parse_json_array(text)
-    # keep only non-empty strings; fall back if parsing yielded nothing
+    topics = _parse_json_array(msg.content[0].text.strip())
     topics = [t for t in topics if isinstance(t, str) and t.strip()]
     if not topics:
         return [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
     return topics[:n_topics]
 
 
-# ── Phase 2 — topics -> book chunks (RAG, no LLM) ────────────────────────────
+# ── Phase 2 — topics -> book chunks + PYQ style examples (RAG, no LLM) ───────
 
-async def _collect_chunks(topics: list[str], subject: str) -> list[dict]:
-    seen = set()
-    collected = []
+async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict], list[dict]]:
+    """For each topic, semantic-search both tables in parallel:
+    - book_chunks  → factual source material (what to say)
+    - pyq_chunks   → real past questions on that topic (how to say it)
+    Returns (book_chunks, pyq_examples) deduplicated."""
+    seen_books = set()
+    seen_pyqs = set()
+    book_chunks = []
+    pyq_examples = []
+
     for topic in topics:
+        # semantic search on book_chunks for factual grounding
         passages = await rag.rag_lookup(
-            stem=topic, top_k=RAG_TOP_K, threshold=RAG_THRESHOLD, subject=subject
+            stem=topic, top_k=BOOK_TOP_K, threshold=BOOK_THRESHOLD, subject=subject
         )
         for p in passages:
             key = (p.get("book", ""), p.get("topic", ""))
-            if key in seen:
-                continue
-            seen.add(key)
-            collected.append({**p, "from_topic": topic})
-    return collected
+            if key not in seen_books:
+                seen_books.add(key)
+                book_chunks.append({**p, "from_topic": topic})
+
+        # semantic search on pyq_chunks for style + framing reference
+        pyqs = await rag.pyq_rag_lookup(
+            topic=topic, subject=subject, top_k=PYQ_TOP_K, threshold=PYQ_THRESHOLD
+        )
+        for p in pyqs:
+            key = (p.get("source_file", ""), p.get("text", "")[:80])
+            if key not in seen_pyqs:
+                seen_pyqs.add(key)
+                pyq_examples.append({**p, "from_topic": topic})
+
+    return book_chunks, pyq_examples
 
 
-# ── Phase 3 — chunks -> questions (Sonnet) ───────────────────────────────────
+# ── Phase 3 — book chunks + PYQ examples -> questions (Sonnet) ───────────────
 
-def _gen_questions(subject: str, count: int, chunks: list[dict]) -> list[dict]:
-    material = "\n\n".join(
+def _gen_questions(subject: str, count: int,
+                   book_chunks: list[dict], pyq_examples: list[dict]) -> list[dict]:
+    book_material = "\n\n".join(
         f"[{i+1}] (book: {c.get('book','')}, topic: {c.get('topic','')})\n{c.get('text','')}"
-        for i, c in enumerate(chunks)
+        for i, c in enumerate(book_chunks)
     )
-    system = GEN_SYSTEM.format(subject=subject, count=count, chunks=material)
-    client = _client()
-    msg = client.messages.create(
+    pyq_material = "\n\n".join(
+        f"[{i+1}] (topic: {p.get('from_topic','')})\n{p.get('text','')}"
+        for i, p in enumerate(pyq_examples)
+    ) if pyq_examples else "(No PYQ examples available yet — use standard UKSSSC framing.)"
+
+    system = GEN_SYSTEM.format(
+        subject=subject, count=count,
+        pyq_examples=pyq_material, book_chunks=book_material,
+    )
+    msg = _client().messages.create(
         model=SONNET,
         max_tokens=8192,
         system=system,
-        messages=[{"role": "user",
-                   "content": f"Generate exactly {count} questions now."}],
+        messages=[{"role": "user", "content": f"Generate exactly {count} questions now."}],
     )
-    text = msg.content[0].text.strip()
-    questions = _parse_json_array(text)
+    questions = _parse_json_array(msg.content[0].text.strip())
 
-    # normalise: renumber, attach sources for traceability, keep only valid shapes
+    src_books = sorted({c.get("book", "") for c in book_chunks if c.get("book")})
     out = []
-    src_books = sorted({c.get("book", "") for c in chunks if c.get("book")})
     for i, q in enumerate(questions, 1):
         if not isinstance(q, dict) or not q.get("stem"):
             continue
@@ -176,14 +210,13 @@ def _gen_questions(subject: str, count: int, chunks: list[dict]) -> list[dict]:
 async def generate_questions(subject: str, count: int) -> list[dict]:
     """subject + count -> list of Question dicts (n, stem, options, answer, ...)."""
     topics = await _extract_topics(subject, count)
-    chunks = await _collect_chunks(topics, subject)
-    if not chunks:
-        # no study material matched — surface a clear error rather than empty paper
+    book_chunks, pyq_examples = await _collect_material(topics, subject)
+    if not book_chunks:
         raise RuntimeError(
             f"No study material found for subject '{subject}'. "
             f"Ensure book_chunks has content for this subject."
         )
-    return _gen_questions(subject, count, chunks)
+    return _gen_questions(subject, count, book_chunks, pyq_examples)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
