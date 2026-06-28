@@ -112,7 +112,10 @@ RULES:
 - Language: Hindi (Devanagari). English proper nouns stay in English.
 - Each question: exactly 4 options (a), (b), (c), (d)
 - Difficulty mix: 30% easy, 50% medium, 20% hard
-- No repeated concepts across questions
+- VARIETY IS CRITICAL: every question must test a DIFFERENT fact, person, date,
+  place, event or concept. Spread questions ACROSS the whole study material —
+  do not cluster on one event or ask the same thing reworded. Never produce two
+  questions with the same answer concept.
 - Distractors must be plausible — not obviously wrong
 - For numerical/reasoning questions: include a worked solution in the "solution" field
 
@@ -268,18 +271,27 @@ def _gen_questions(subject: str, count: int,
 
     # Batch so a single call never approaches MAX_OUTPUT_TOKENS and truncates the
     # JSON. Hindi output is token-heavy — count=100 in one call would overrun.
+    # Each batch is a separate call, so without cross-batch context the batches
+    # collide on the same few topics (heavy repetition). Thread the stems already
+    # generated into each subsequent batch as an explicit "do not repeat" list so
+    # later batches diversify away from earlier ones.
     raw_questions: list[dict] = []
     remaining = count
     while remaining > 0:
         batch = min(remaining, MAX_QUESTIONS_PER_CALL)
-        raw_questions.extend(_gen_batch(subject, batch, book_material, pyq_material))
+        prior_stems = [q.get("stem", "") for q in raw_questions if q.get("stem")]
+        raw_questions.extend(
+            _gen_batch(subject, batch, book_material, pyq_material, avoid=prior_stems)
+        )
         remaining -= batch
 
-    # Validate + renumber. Drop anything the builders can't render: a question
-    # needs a stem, exactly 4 options, and an answer letter in a-d. (Builders
-    # index LABELS by the answer letter and assume 4 options — a bad row would
-    # crash build_solution / build_deck, failing the whole job.)
+    # Validate + renumber + dedup. Drop anything the builders can't render: a
+    # question needs a stem, exactly 4 options, and an answer letter in a-d.
+    # (Builders index LABELS by the answer letter and assume 4 options — a bad
+    # row would crash build_solution / build_deck, failing the whole job.) Also
+    # drop near-duplicate stems that slipped past the cross-batch avoidance.
     out = []
+    seen_stems = set()
     n = 1
     for q in raw_questions:
         if not isinstance(q, dict) or not q.get("stem"):
@@ -290,6 +302,11 @@ def _gen_questions(subject: str, count: int,
         ans = str(q.get("answer", "")).strip().lower()
         if ans not in VALID_ANSWERS:
             continue
+        # dedup on a normalised stem (lowercased, whitespace-collapsed)
+        norm = " ".join(str(q["stem"]).split()).lower()
+        if norm in seen_stems:
+            continue
+        seen_stems.add(norm)
         q["answer"] = ans
         q["n"] = n
         n += 1
@@ -300,21 +317,33 @@ def _gen_questions(subject: str, count: int,
 
 
 def _gen_batch(subject: str, count: int,
-               book_material: str, pyq_material: str) -> list[dict]:
-    """One Sonnet call for up to MAX_QUESTIONS_PER_CALL questions.
+               book_material: str, pyq_material: str,
+               avoid: list[str] | None = None) -> list[dict]:
+    """One model call for up to MAX_QUESTIONS_PER_CALL questions.
 
     The system prompt (rules + PYQ examples + book material) is byte-identical
-    across every batch of a single run — only the requested `count` changes, and
-    that lives in the user message. We cache the system block so batches 2..N read
-    the shared context at ~0.1x input cost instead of paying full price each time.
-    For a 100-question paper (6 batches) this cuts Sonnet input spend by ~5/6 on
-    the cached portion. Cache TTL is 5 min — comfortably longer than a full run.
+    across every batch of a single run — only the user message changes. The
+    cached system block lets batches 2..N read the shared context cheaply
+    (Anthropic path). `avoid` is the list of stems already generated this run;
+    we tell the model not to repeat them so batches diversify instead of all
+    circling the same one or two topics.
     """
     system = GEN_SYSTEM.format(
         subject=subject,
         pyq_examples=pyq_material, book_chunks=book_material,
     )
     user = f"Generate exactly {count} questions now."
+    if avoid:
+        # cap the list so it can't blow the prompt; the most recent are the most
+        # likely to be re-hit, so keep the tail.
+        recent = avoid[-40:]
+        joined = "\n".join(f"- {s}" for s in recent)
+        user += (
+            "\n\nThese questions were ALREADY generated for this paper. Do NOT "
+            "repeat them or ask the same fact in different words. Cover DIFFERENT "
+            "topics, people, dates, places and concepts from the study material:\n"
+            + joined
+        )
     if GEN_PROVIDER == "sarvam":
         text = _gen_batch_sarvam(system, user, count)
     else:
