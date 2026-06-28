@@ -20,6 +20,7 @@ Usage: python build_solution.py [questions.json] [out.docx]
 import copy
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 from docx import Document
@@ -37,7 +38,8 @@ _FONT = DEFAULT_FONT
 BASE         = Path(__file__).resolve().parents[1]
 FRONT_PAGE_DOCX = BASE / "resources" / "front-page.docx"
 LOGO_IMG     = BASE / "templates" / "docx_image1.jpeg"
-WATERMARK_IMG= BASE / "templates" / "watermark.png"
+# watermark is regenerated each build -> writable temp file, not the :ro
+# templates mount (writing there raises OSError [Errno 30]).
 
 LATIN  = "Times New Roman"
 BODY_PT = 12
@@ -225,8 +227,10 @@ def build(questions_path: Path, out_path: Path, font: str = DEFAULT_FONT):
             body.remove(child)
 
     # Watermark on first (only) section
-    make_watermark(LOGO_IMG, WATERMARK_IMG)
-    add_watermark_header(doc.sections[0], WATERMARK_IMG)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _wm:
+        watermark_img = Path(_wm.name)
+    make_watermark(LOGO_IMG, watermark_img)
+    add_watermark_header(doc.sections[0], watermark_img)
 
     # Title
     title = tight(doc.add_paragraph(), after=2)

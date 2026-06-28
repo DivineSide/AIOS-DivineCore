@@ -18,6 +18,7 @@ Usage: python build_paper.py [questions.json] [out.docx]
 import copy
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 from docx import Document
@@ -33,7 +34,10 @@ from krutidev import DEFAULT_FONT, render_runs  # noqa: E402
 BASE = Path(__file__).resolve().parents[1]
 FRONT_PAGE_DOCX = BASE / "resources" / "front-page.docx"  # made by extract_front_page.py
 LOGO_IMG = BASE / "templates" / "docx_image1.jpeg"
-WATERMARK_IMG = BASE / "templates" / "watermark.png"
+# The watermark is regenerated from LOGO_IMG on every build, so it must be
+# written to a WRITABLE path. templates/ is mounted read-only in production
+# (client IP, :ro) — writing watermark.png there raises OSError [Errno 30].
+# Generate it into a temp file instead.
 
 LATIN = "Times New Roman"
 
@@ -218,8 +222,11 @@ def build(questions_path: Path, out_path: Path, font: str = DEFAULT_FONT):
     _IMG_BASE = questions_path.resolve().parent  # crops resolve beside the JSON
     data = json.loads(questions_path.read_text(encoding="utf-8"))
     doc = Document(str(FRONT_PAGE_DOCX))  # their real front page, original sections
-    make_watermark(LOGO_IMG, WATERMARK_IMG)  # always regenerate (recipe may change)
-    add_watermark_header(doc.sections[-1], WATERMARK_IMG)
+    # regenerate the watermark into a writable temp file (templates/ is :ro)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _wm:
+        watermark_img = Path(_wm.name)
+    make_watermark(LOGO_IMG, watermark_img)  # always regenerate (recipe may change)
+    add_watermark_header(doc.sections[-1], watermark_img)
     first_q_para = add_questions(doc, data["questions"])
     # questions must start on a fresh page after the front matter
     ppr = first_q_para._p.get_or_add_pPr()

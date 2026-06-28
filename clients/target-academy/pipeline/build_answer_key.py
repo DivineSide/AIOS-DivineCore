@@ -15,6 +15,7 @@ Usage: python build_answer_key.py [questions.json] [out.pdf]
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from docx import Document
@@ -29,7 +30,8 @@ from krutidev import DEFAULT_FONT, render_runs  # noqa: E402
 BASE = Path(__file__).resolve().parents[1]
 FRONT_PAGE_DOCX = BASE / "resources" / "front-page.docx"
 LOGO_IMG = BASE / "templates" / "docx_image1.jpeg"
-WATERMARK_IMG = BASE / "templates" / "watermark.png"
+# watermark is regenerated each build -> write to a writable temp file, not the
+# read-only (:ro) templates mount (which raises OSError [Errno 30]).
 
 LATIN = "Times New Roman"
 _FONT = DEFAULT_FONT  # set by build(); add_mixed() reads it via render_runs()
@@ -121,8 +123,10 @@ def _build_docx(questions_path: Path, docx_path: Path):
     # Force single column on the (only) section so the grid fills full width
     _set_columns(doc.sections[-1], 1)
 
-    _make_watermark(LOGO_IMG, WATERMARK_IMG)
-    _add_watermark_header(doc.sections[-1], WATERMARK_IMG)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _wm:
+        watermark_img = Path(_wm.name)
+    _make_watermark(LOGO_IMG, watermark_img)
+    _add_watermark_header(doc.sections[-1], watermark_img)
 
     # Title
     title_text = data.get("answer_key_title") or "उत्तरमाला"
