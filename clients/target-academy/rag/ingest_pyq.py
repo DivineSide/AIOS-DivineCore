@@ -107,15 +107,38 @@ def _db():
 
 # ── markdown parsing ──────────────────────────────────────────────────────────
 
-# Matches "1.", "42.", "100." at the start of a line — question boundaries.
-_Q_BOUNDARY = re.compile(r"^(\d{1,3})\.\s+", re.MULTILINE)
-
 # Matches answer disclosure lines in various forms:
 #   "Answer – (B)"  "Answer: B"  "Show Answer/Hide\nAnswer – (C)"
 _ANSWER_LINE = re.compile(
     r"(?:Show Answer/Hide\s*)?Answer\s*[–\-:]\s*[\(\[]?([A-Da-d])[\)\]]?",
     re.IGNORECASE,
 )
+
+# MCQ options always start with (A), (B), (C), (D) — used to anchor question blocks.
+_OPTION_LINE = re.compile(r"^\s*\([A-Da-d]\)\s+\S", re.MULTILINE)
+
+
+def _find_question_starts(md_text: str) -> list[tuple[int, int]]:
+    """Return (char_pos, question_number) for each real question boundary.
+
+    A real question boundary is a line like "42. <text>" where the number is
+    strictly one more than the previous found number (sequential). This filters
+    out sub-item numbers inside matching/table questions (सूची-I items numbered
+    1, 2, 3, 4 that reset and repeat inside the paper).
+    """
+    candidate = re.compile(r"^(\d{1,3})\.\s+\S", re.MULTILINE)
+    results = []
+    expected = 1
+    for m in candidate.finditer(md_text):
+        n = int(m.group(1))
+        if n == expected:
+            results.append((m.start(), n))
+            expected += 1
+        # allow one skip (occasional missing question in paper)
+        elif n == expected + 1:
+            results.append((m.start(), n))
+            expected = n + 1
+    return results
 
 
 def parse_questions(md_text: str) -> list[dict]:
@@ -125,7 +148,7 @@ def parse_questions(md_text: str) -> list[dict]:
       text   — stem + options, clean of answer/nav lines (this is what gets embedded)
       answer — correct letter a-d, or "" if not found
     """
-    starts = [(m.start(), int(m.group(1))) for m in _Q_BOUNDARY.finditer(md_text)]
+    starts = _find_question_starts(md_text)
     if not starts:
         return []
 
