@@ -42,13 +42,18 @@ from worker.celery_app import celery_app
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Warm the Celery broker connection at startup so the first HTTP request
-    # doesn't hit a cold / uninitialized connection pool.
-    try:
-        celery_app.connection().ensure_connection(max_retries=3)
-    except Exception:
-        pass
     yield
+
+
+def _dispatch(task, *args, task_id: str):
+    """Dispatch a Celery task using a fresh broker connection every time.
+
+    Using a fresh connection avoids the kombu ConnectionPool stale-socket bug
+    that surfaces when apply_async is called from uvicorn's thread pool after
+    the pooled connection has gone idle and been closed by Redis.
+    """
+    with celery_app.connection_for_write() as conn:
+        task.apply_async(args=list(args), task_id=task_id, connection=conn)
 
 
 app = FastAPI(title="DsideOS — Content Pipeline", version="0.1.0", lifespan=lifespan)
@@ -119,7 +124,7 @@ def extract(file: UploadFile = File(...)):
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="extract")
     _save_upload(job_id, file)              # file on disk BEFORE dispatch
-    extract_task.apply_async(args=[job_id], task_id=job_id, retry=True)
+    _dispatch(extract_task, job_id, task_id=job_id)
     return JobAccepted(job_id=job_id)
 
 
@@ -143,7 +148,7 @@ def full(
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="full", **meta)
     _save_upload(job_id, file)
-    full_task.apply_async(args=[job_id, meta], task_id=job_id, retry=True)
+    _dispatch(full_task, job_id, meta, task_id=job_id)
     return JobAccepted(job_id=job_id)
 
 
@@ -182,7 +187,7 @@ def generate(
     }
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="generate", subject=subject, **meta)
-    generate_task.apply_async(args=[job_id, subject, count, meta], task_id=job_id, retry=True)
+    _dispatch(generate_task, job_id, subject, count, meta, task_id=job_id)
     return JobAccepted(job_id=job_id)
 
 
@@ -193,7 +198,7 @@ def _dispatch_questions_task(task, req: BuildRequest, workflow: str) -> JobAccep
     meta = req.meta.model_dump()
     job_id = jobs.new_id()
     jobs.create(job_id, workflow=workflow, **meta)
-    task.apply_async(args=[job_id, questions, meta], task_id=job_id, retry=True)
+    _dispatch(task, job_id, questions, meta, task_id=job_id)
     return JobAccepted(job_id=job_id)
 
 
