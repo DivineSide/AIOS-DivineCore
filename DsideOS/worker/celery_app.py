@@ -22,6 +22,11 @@ celery_app.conf.update(
     accept_content=["json"],
     result_expires=settings.JOB_TTL_HOURS * 3600,
     worker_prefetch_multiplier=1,     # long jobs — don't hoard the queue
+    # Retry broker connection on startup and on stale-connection errors
+    broker_connection_retry_on_startup=True,
+    broker_connection_retry=True,
+    broker_connection_max_retries=3,
+    broker_pool_limit=None,           # disable connection pool — reconnect per publish
     beat_schedule={
         "cleanup-expired-jobs": {
             "task": "worker.tasks.cleanup_jobs",
