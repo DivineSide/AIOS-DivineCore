@@ -17,6 +17,7 @@ This module only owns phases 1-3 and exposes one coroutine:
     questions = await generate_questions(subject, count)
     # -> list[dict] each matching the Question schema (n, stem, options, answer, ...)
 """
+import asyncio
 import json
 import os
 import sys
@@ -154,26 +155,33 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
     book_chunks = []
     pyq_examples = []
 
-    for topic in topics:
-        # semantic search on book_chunks for factual grounding
-        passages = await rag.rag_lookup(
-            stem=topic, top_k=BOOK_TOP_K, threshold=BOOK_THRESHOLD, subject=subject
-        )
+    # Each topic = two independent embedding round-trips (book + PYQ). Fire them
+    # all concurrently — for count=100 (20 topics) this collapses 40 serial
+    # network round-trips to ~1-2. Results are merged in topic order afterwards
+    # so dedup stays deterministic. (Per-thread DB conns in query.py make the
+    # underlying _search calls safe to run in parallel.)
+    book_results, pyq_results = await asyncio.gather(
+        asyncio.gather(*(
+            rag.rag_lookup(stem=t, top_k=BOOK_TOP_K, threshold=BOOK_THRESHOLD, subject=subject)
+            for t in topics
+        )),
+        asyncio.gather(*(
+            rag.pyq_rag_lookup(topic=t, subject=subject, top_k=PYQ_TOP_K, threshold=PYQ_THRESHOLD)
+            for t in topics
+        )),
+    )
+
+    for topic, passages in zip(topics, book_results):
         for p in passages:
             _merge_book(p, topic, seen_books, book_chunks)
 
-        # semantic search on pyq_chunks for style + framing reference
-        pyqs = await rag.pyq_rag_lookup(
-            topic=topic, subject=subject, top_k=PYQ_TOP_K, threshold=PYQ_THRESHOLD
-        )
+    for topic, pyqs in zip(topics, pyq_results):
         for p in pyqs:
             key = (p.get("source_file", ""), p.get("text", "")[:80])
             if key not in seen_pyqs:
                 seen_pyqs.add(key)
                 pyq_examples.append({**p, "from_topic": topic})
 
-    # Fallback: if RAG returned nothing (topics were in wrong language / too abstract),
-    # do a direct lookup using the subject's canonical Hindi label at a lower threshold.
     # Fallback: trigger when retrieval is empty OR too thin to ground `count`
     # questions (topics were wrong-language / too abstract). Use the subject's
     # canonical Hindi label — English never embeds well against the Hindi corpus.

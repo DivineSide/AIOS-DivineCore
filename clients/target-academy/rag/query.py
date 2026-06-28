@@ -16,6 +16,7 @@ import asyncio
 import io
 import os
 import sys
+import threading
 from pathlib import Path
 
 # Only rewrap stdout/stderr when running as CLI — Celery's LoggingProxy has no .buffer
@@ -43,7 +44,12 @@ def _load_env():
 
 _load_env()
 _openai: OpenAI | None = None
-_db_conn = None
+
+# psycopg2 connections are NOT safe for concurrent use across threads. The
+# generate pipeline runs _search via asyncio.to_thread and fires several lookups
+# concurrently, so each thread gets its own connection (thread-local) rather than
+# sharing one global socket. The OpenAI client is thread-safe, so it stays shared.
+_thread_local = threading.local()
 
 
 def _oai() -> OpenAI:
@@ -54,13 +60,14 @@ def _oai() -> OpenAI:
 
 
 def _db():
-    global _db_conn
-    if _db_conn is None or _db_conn.closed:
+    conn = getattr(_thread_local, "conn", None)
+    if conn is None or conn.closed:
         url = os.environ.get("SUPABASE_DB_URL", "")
         if not url:
             raise RuntimeError("SUPABASE_DB_URL not set in .env")
-        _db_conn = psycopg2.connect(url)
-    return _db_conn
+        conn = psycopg2.connect(url)
+        _thread_local.conn = conn
+    return conn
 
 
 def _embed(text: str) -> list[float]:
