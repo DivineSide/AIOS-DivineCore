@@ -41,7 +41,17 @@ TOPICS_DIVISOR = 5       # ~N/5 distinct topics from Haiku
 BOOK_TOP_K = 3           # book passages per topic
 PYQ_TOP_K = 3            # PYQ style examples per topic
 BOOK_THRESHOLD = 0.20
+BOOK_FALLBACK_THRESHOLD = 0.15   # looser net for the empty-result fallback
 PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book text
+
+# Sonnet output budget. Devanagari is token-heavy (~2-4 tokens/char), so a Hindi
+# MCQ (stem + 4 options + reason) runs ~300-450 output tokens. We batch large
+# requests so a single call never approaches the 8192 cap and truncates the JSON.
+TOKENS_PER_QUESTION = 450
+MAX_OUTPUT_TOKENS = 8192
+MAX_QUESTIONS_PER_CALL = 18      # ~18 * 450 ≈ 8100, comfortably under the cap
+
+VALID_ANSWERS = {"a", "b", "c", "d"}
 
 # Fallback topic labels when no PYQs exist yet for a subject
 SUBJECT_LABELS = {
@@ -150,10 +160,7 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
             stem=topic, top_k=BOOK_TOP_K, threshold=BOOK_THRESHOLD, subject=subject
         )
         for p in passages:
-            key = (p.get("book", ""), p.get("topic", ""))
-            if key not in seen_books:
-                seen_books.add(key)
-                book_chunks.append({**p, "from_topic": topic})
+            _merge_book(p, topic, seen_books, book_chunks)
 
         # semantic search on pyq_chunks for style + framing reference
         pyqs = await rag.pyq_rag_lookup(
@@ -167,18 +174,28 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
 
     # Fallback: if RAG returned nothing (topics were in wrong language / too abstract),
     # do a direct lookup using the subject's canonical Hindi label at a lower threshold.
-    if not book_chunks:
+    # Fallback: trigger when retrieval is empty OR too thin to ground `count`
+    # questions (topics were wrong-language / too abstract). Use the subject's
+    # canonical Hindi label — English never embeds well against the Hindi corpus.
+    min_chunks = max(1, len(topics))
+    if len(book_chunks) < min_chunks:
         fallback_topic = SUBJECT_LABELS.get(subject, subject.replace("-", " "))
         passages = await rag.rag_lookup(
-            stem=fallback_topic, top_k=BOOK_TOP_K * 3, threshold=0.15, subject=subject
+            stem=fallback_topic, top_k=BOOK_TOP_K * 3,
+            threshold=BOOK_FALLBACK_THRESHOLD, subject=subject,
         )
         for p in passages:
-            key = (p.get("book", ""), p.get("topic", ""))
-            if key not in seen_books:
-                seen_books.add(key)
-                book_chunks.append({**p, "from_topic": fallback_topic})
+            _merge_book(p, fallback_topic, seen_books, book_chunks)
 
     return book_chunks, pyq_examples
+
+
+def _merge_book(p: dict, from_topic: str, seen_books: set, book_chunks: list) -> None:
+    """Dedup a book passage by (book, topic) and append it once."""
+    key = (p.get("book", ""), p.get("topic", ""))
+    if key not in seen_books:
+        seen_books.add(key)
+        book_chunks.append({**p, "from_topic": from_topic})
 
 
 # ── Phase 3 — book chunks + PYQ examples -> questions (Sonnet) ───────────────
@@ -194,29 +211,63 @@ def _gen_questions(subject: str, count: int,
         for i, p in enumerate(pyq_examples)
     ) if pyq_examples else "(No PYQ examples available yet — use standard UKSSSC framing.)"
 
+    src_books = sorted({c.get("book", "") for c in book_chunks if c.get("book")})
+
+    # Batch so a single call never approaches MAX_OUTPUT_TOKENS and truncates the
+    # JSON. Hindi output is token-heavy — count=100 in one call would overrun.
+    raw_questions: list[dict] = []
+    remaining = count
+    while remaining > 0:
+        batch = min(remaining, MAX_QUESTIONS_PER_CALL)
+        raw_questions.extend(_gen_batch(subject, batch, book_material, pyq_material))
+        remaining -= batch
+
+    # Validate + renumber. Drop anything the builders can't render: a question
+    # needs a stem, exactly 4 options, and an answer letter in a-d. (Builders
+    # index LABELS by the answer letter and assume 4 options — a bad row would
+    # crash build_solution / build_deck, failing the whole job.)
+    out = []
+    n = 1
+    for q in raw_questions:
+        if not isinstance(q, dict) or not q.get("stem"):
+            continue
+        opts = q.get("options")
+        if not isinstance(opts, list) or len(opts) != 4:
+            continue
+        ans = str(q.get("answer", "")).strip().lower()
+        if ans not in VALID_ANSWERS:
+            continue
+        q["answer"] = ans
+        q["n"] = n
+        n += 1
+        if src_books and not q.get("sources"):
+            q["sources"] = src_books
+        out.append(q)
+    return out
+
+
+def _gen_batch(subject: str, count: int,
+               book_material: str, pyq_material: str) -> list[dict]:
+    """One Sonnet call for up to MAX_QUESTIONS_PER_CALL questions."""
     system = GEN_SYSTEM.format(
         subject=subject, count=count,
         pyq_examples=pyq_material, book_chunks=book_material,
     )
     msg = _client().messages.create(
         model=SONNET,
-        max_tokens=8192,
+        max_tokens=MAX_OUTPUT_TOKENS,
         system=system,
         messages=[{"role": "user", "content": f"Generate exactly {count} questions now."}],
     )
-    questions = _parse_json_array(msg.content[0].text.strip())
-
-    src_books = sorted({c.get("book", "") for c in book_chunks if c.get("book")})
-    out = []
-    for i, q in enumerate(questions, 1):
-        if not isinstance(q, dict) or not q.get("stem"):
-            continue
-        q["n"] = i
-        q.setdefault("options", [])
-        if src_books and not q.get("sources"):
-            q["sources"] = src_books
-        out.append(q)
-    return out
+    # A max_tokens stop means the JSON was cut mid-array — fail loud rather than
+    # silently returning the [] that _parse_json_array gives for truncated input.
+    if msg.stop_reason == "max_tokens":
+        raise RuntimeError(
+            f"Sonnet hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} "
+            f"questions — output truncated. Lower MAX_QUESTIONS_PER_CALL."
+        )
+    text = msg.content[0].text.strip() if msg.content else ""
+    return _parse_json_array(text)
 
 
 # ── orchestrator ─────────────────────────────────────────────────────────────
@@ -230,7 +281,13 @@ async def generate_questions(subject: str, count: int) -> list[dict]:
             f"No study material found for subject '{subject}'. "
             f"Ensure book_chunks has content for this subject."
         )
-    return _gen_questions(subject, count, book_chunks, pyq_examples)
+    questions = _gen_questions(subject, count, book_chunks, pyq_examples)
+    if not questions:
+        raise RuntimeError(
+            f"Generation produced no valid questions for subject '{subject}' "
+            f"(model output failed stem/options/answer validation)."
+        )
+    return questions
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
