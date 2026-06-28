@@ -48,6 +48,8 @@ jobs:
             clients/target-academy/pipeline/run_pipeline.py \
             clients/target-academy/pipeline/extract_docx.py \
             clients/target-academy/pipeline/generate_solutions.py \
+            clients/target-academy/rag/query.py \
+            DsideOS/worker/generate.py \
             DsideOS/worker/tasks.py DsideOS/api/main.py
 
       - name: Font switch self-tests (krutidev.py)
@@ -65,8 +67,10 @@ jobs:
           tnames = [n for n in celery_app.tasks if n.startswith("worker")]
           routes = sorted(r.path for r in app.routes if getattr(r, "path", "").startswith("/api"))
           assert "worker.tasks.full" in tnames, tnames
+          assert "worker.tasks.generate" in tnames, tnames
           assert "/api/full" in routes, routes
           assert "/api/extract" in routes, routes
+          assert "/api/generate" in routes, routes
           print("OK tasks:", tnames)
           print("OK routes:", routes)
           PY
