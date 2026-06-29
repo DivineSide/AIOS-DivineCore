@@ -130,10 +130,14 @@ RULES:
 - Language: Hindi (Devanagari). English proper nouns stay in English.
 - Each question: exactly 4 options (a), (b), (c), (d)
 - Difficulty mix: 30% easy, 50% medium, 20% hard
-- VARIETY IS CRITICAL: every question must test a DIFFERENT fact, person, date,
-  place, event or concept. Spread questions ACROSS the whole study material —
-  do not cluster on one event or ask the same thing reworded. Never produce two
-  questions with the same answer concept.
+- VARIETY IS CRITICAL — this is the most important rule:
+  * Maximum 1 question per named person, committee, treaty, event, or place.
+    If you already asked about "कौलशक सचमतत", do NOT ask about it again from
+    any angle — move to a completely different entity.
+  * Each question must test a fact from a DIFFERENT source entity than all
+    other questions in this batch. Spread across the full study material.
+  * Never ask about the same committee/person/place twice even with different
+    sub-questions (date, count, name, location are all the same entity).
 - Distractors must be plausible — not obviously wrong
 - For numerical/reasoning questions: include a worked solution in the "solution" field
 
@@ -378,7 +382,11 @@ def _gen_batch(subject: str, count: int,
         subject=subject,
         pyq_examples=pyq_material, book_chunks=book_material,
     )
-    user = f"Generate exactly {count} questions now."
+    user = (
+        f"Generate exactly {count} questions now. "
+        f"Each question must be about a DIFFERENT named entity (person, committee, "
+        f"treaty, place, event) — never two questions about the same entity."
+    )
     if avoid:
         # cap the list so it can't blow the prompt; the most recent are the most
         # likely to be re-hit, so keep the tail.
@@ -386,8 +394,7 @@ def _gen_batch(subject: str, count: int,
         joined = "\n".join(f"- {s}" for s in recent)
         user += (
             "\n\nThese questions were ALREADY generated for this paper. Do NOT "
-            "repeat them or ask the same fact in different words. Cover DIFFERENT "
-            "topics, people, dates, places and concepts from the study material:\n"
+            "repeat them or ask the same entity/fact in different words:\n"
             + joined
         )
     if GEN_PROVIDER == "sarvam":
