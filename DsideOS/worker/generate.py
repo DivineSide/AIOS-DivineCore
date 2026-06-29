@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import sys
 from pathlib import Path
 
@@ -218,10 +219,11 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
     - book_chunks  → factual source material (what to say)
     - pyq_chunks   → real past questions on that topic (how to say it)
     Returns (book_chunks, pyq_examples) deduplicated."""
-    seen_books = set()
-    seen_pyqs = set()
-    book_chunks = []
-    pyq_examples = []
+    seen_books: set = set()
+    seen_pyqs: set = set()
+    book_counts: dict = {}   # per-book passage count for BOOK_CHUNKS_PER_BOOK cap
+    book_chunks: list = []
+    pyq_examples: list = []
 
     # Each topic = two independent embedding round-trips (book + PYQ). Fire them
     # all concurrently — for count=100 (20 topics) this collapses 40 serial
@@ -241,7 +243,7 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
 
     for topic, passages in zip(topics, book_results):
         for p in passages:
-            _merge_book(p, topic, seen_books, book_chunks)
+            _merge_book(p, topic, seen_books, book_chunks, book_counts)
 
     for topic, pyqs in zip(topics, pyq_results):
         for p in pyqs:
@@ -251,9 +253,10 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
                 pyq_examples.append({**p, "from_topic": topic})
 
     pyq_examples = pyq_examples[:PYQ_CAP]
-    # Cap book chunks too so a large paper (many topics) can't build a giant
-    # prompt. The chunks are gathered in topic order, so this keeps a spread
-    # across topics rather than over-weighting any single one.
+    # Shuffle before the cap so the model doesn't see all passages from the same
+    # book consecutively — adjacent identical-source context causes within-batch
+    # repetition even when the cap limits the count.
+    random.shuffle(book_chunks)
     book_chunks = book_chunks[:BOOK_CAP]
 
     # Fallback: trigger when retrieval is empty OR too thin to ground `count`
@@ -267,17 +270,28 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
             threshold=BOOK_FALLBACK_THRESHOLD, subject=subject,
         )
         for p in passages:
-            _merge_book(p, fallback_topic, seen_books, book_chunks)
+            _merge_book(p, fallback_topic, seen_books, book_chunks, book_counts)
 
     return book_chunks, pyq_examples
 
 
-def _merge_book(p: dict, from_topic: str, seen_books: set, book_chunks: list) -> None:
-    """Dedup a book passage by (book, topic) and append it once."""
+BOOK_CHUNKS_PER_BOOK = 2   # max passages from the same book in the assembled prompt;
+                           # prevents one dense book from dominating and causing
+                           # the model to mine the same events repeatedly within a batch.
+
+def _merge_book(p: dict, from_topic: str, seen_books: set, book_chunks: list,
+                book_counts: dict | None = None) -> None:
+    """Dedup a book passage by (book, topic) and enforce a per-book cap."""
     key = (p.get("book", ""), p.get("topic", ""))
-    if key not in seen_books:
-        seen_books.add(key)
-        book_chunks.append({**p, "from_topic": from_topic})
+    if key in seen_books:
+        return
+    book_name = p.get("book", "")
+    if book_counts is not None:
+        if book_counts.get(book_name, 0) >= BOOK_CHUNKS_PER_BOOK:
+            return
+        book_counts[book_name] = book_counts.get(book_name, 0) + 1
+    seen_books.add(key)
+    book_chunks.append({**p, "from_topic": from_topic})
 
 
 # ── Phase 3 — book chunks + PYQ examples -> questions (Sonnet) ───────────────
