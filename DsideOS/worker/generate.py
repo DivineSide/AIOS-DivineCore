@@ -54,15 +54,17 @@ SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
 
 # RAG depth — how many results to fetch per topic from each table.
 # TOPICS_DIVISOR drives VARIETY: questions can only be as diverse as the topics
-# we retrieve material for. At 5 (the old value) a 10-question paper drew from
-# just 2 topics -> every question clustered on those (e.g. 4x Gardner). Aim for
-# ~2 questions per topic so the spread is wide: 10q -> ~5 topics, 50q -> ~25.
+# we retrieve material for. Aim for ~2 questions per topic:
+#   10q -> ~5 topics, 25q -> ~12 topics, 100q -> ~50 topics.
 TOPICS_DIVISOR = 2       # ~N/2 distinct topics (each yields ~2 questions)
-BOOK_TOP_K = 3           # book passages per topic (fallback fetches BOOK_TOP_K*3=9)
+PYQ_SEED_K = 40          # PYQs sampled for topic extraction — more = broader topic
+                         # spread from Haiku; 15 was too few and clustered on 2-3 topics
+BOOK_TOP_K = 4           # book passages per topic — raised from 3 so each topic
+                         # has more factual surface area to draw distinct questions from
 PYQ_TOP_K = 2            # PYQ style examples per topic; total capped at PYQ_CAP
 PYQ_CAP = 12             # style saturates at ~8 examples; 12 gives a buffer
-BOOK_CAP = 30            # cap total book passages so big papers don't over-grow
-                         # the prompt; 30 spans plenty of topics for variety
+BOOK_CAP = 60            # raised from 30 — with more topics and 4 passages each,
+                         # 30 was cutting off material that would have added variety
 BOOK_THRESHOLD = 0.20
 BOOK_FALLBACK_THRESHOLD = 0.15   # looser net for the empty-result fallback
 PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book text
@@ -179,8 +181,11 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
     actually tests — not a generic topic list."""
     n_topics = max(1, count // TOPICS_DIVISOR)
 
-    # seed with a small random sample just for topic discovery (cheap, no embedding)
-    seed_pyqs = await rag.pyq_lookup(subject, top_k=15)
+    # Fetch a broad random sample — more PYQs = more topic diversity for Haiku
+    # to extract from. 15 was too few and caused Haiku to return near-duplicate
+    # topics (e.g. 3 variations of "काल विभाजन"), which then pulled the same
+    # book chunks and produced repeated questions.
+    seed_pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SEED_K)
     if not seed_pyqs:
         return [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
 
@@ -190,6 +195,8 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
         f"What distinct topics/concepts do these exam questions test? "
         f"Return exactly {n_topics} topic strings as a JSON array of strings, "
         f"no prose. Write each topic in Hindi (Devanagari script). "
+        f"CRITICAL: every topic must be COMPLETELY DIFFERENT — no two topics should "
+        f"overlap or be rewordings of each other. Cover as wide a range as possible. "
         f"Example: [\"उत्तराखंड का गठन\", \"गढ़वाल राज्य का इतिहास\"]"
     )
     msg = _client().messages.create(
