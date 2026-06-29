@@ -1,16 +1,27 @@
 # -*- coding: utf-8 -*-
 """AI-generative question pipeline — subject + count -> N exam questions.
 
-Four phases (per the generate-endpoint handoff):
+Four phases:
 
   1. PYQ topic extraction (Haiku)  — sample real past questions for the subject,
      ask Haiku what concepts they test -> a short list of topic strings.
-  2. Topic -> book content (RAG)    — for each topic, semantic-search book_chunks
-     for the most relevant study material (no LLM).
-  3. Generate questions (Sonnet)    — feed the collected book excerpts to Sonnet,
-     get exactly N MCQs back as JSON.
-  4. Build                          — handled by the caller (generate_task), which
-     feeds the questions into the existing build pipeline.
+     PYQs serve dual purpose: topic signal (what this exam tests) + style signal
+     (how questions are framed). Haiku extracts topics FROM the PYQs, so the
+     topics always reflect real exam patterns for this subject.
+
+  2. Topic -> per-topic buckets (RAG) — for each topic, fetch its own dedicated
+     book chunks (facts) and PYQ examples (style). Returns a dict keyed by topic.
+     Keeping material per-topic is the structural guarantee of variety: Phase 3
+     generates questions for one topic at a time using ONLY that topic's context,
+     so the model can never drift into a neighbouring topic mid-batch.
+
+  3. Generate questions (per topic, isolated context) — iterate over topics,
+     each gets its own scoped model call with only its chunks + PYQ examples.
+     N questions are distributed across topics (count // n_topics per topic,
+     remainder distributed to first topics). A top-up loop catches any shortfall
+     from validation drops.
+
+  4. Build — handled by the caller (generate_task).
 
 This module only owns phases 1-3 and exposes one coroutine:
 
@@ -20,8 +31,8 @@ This module only owns phases 1-3 and exposes one coroutine:
 import asyncio
 import json
 import logging
+import math
 import os
-import random
 import sys
 from pathlib import Path
 
@@ -29,77 +40,46 @@ logger = logging.getLogger(__name__)
 
 import anthropic
 
-# the RAG helpers live with the client corpus; import them by path (same pattern
-# tasks.py uses to reach the pipeline).
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RAG = REPO_ROOT / "clients" / "target-academy" / "rag"
 if str(RAG) not in sys.path:
     sys.path.insert(0, str(RAG))
 
-import query as rag  # noqa: E402  (pyq_rag_lookup, rag_lookup)
+import query as rag  # noqa: E402
 
 HAIKU = "claude-haiku-4-5-20251001"
 SONNET = "claude-sonnet-4-6"
 GEN_MODEL = HAIKU  # Anthropic model used when GEN_PROVIDER=anthropic
 
-# ── Generation provider ──────────────────────────────────────────────────────
-# "anthropic"-> Claude (HAIKU/SONNET above). Current default — keeps working with
-#               no new credentials.
-# "sarvam"   -> Sarvam's Hindi-native LLM (cleaner Devanagari, ~30x cheaper than
-#               Haiku on output). OpenAI-compatible. Needs SARVAM_API_KEY.
-# Flip via the GEN_PROVIDER env var on the worker — no code change needed. Set
-# GEN_PROVIDER=sarvam + SARVAM_API_KEY once the Sarvam key is provisioned.
 GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "anthropic").lower()
 SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-105b")
 SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
 
-# RAG depth — how many results to fetch per topic from each table.
-# TOPICS_DIVISOR drives VARIETY: questions can only be as diverse as the topics
-# we retrieve material for. Aim for ~2 questions per topic:
-#   10q -> ~5 topics, 25q -> ~12 topics, 100q -> ~50 topics.
-TOPICS_DIVISOR = 2       # ~N/2 distinct topics (each yields ~2 questions)
-PYQ_SEED_K = 40          # PYQs sampled for topic extraction — more = broader topic
-                         # spread from Haiku; 15 was too few and clustered on 2-3 topics
-BOOK_TOP_K = 4           # book passages per topic — raised from 3 so each topic
-                         # has more factual surface area to draw distinct questions from
-PYQ_TOP_K = 2            # PYQ style examples per topic; total capped at PYQ_CAP
-PYQ_CAP = 12             # style saturates at ~8 examples; 12 gives a buffer
-BOOK_CAP = 60            # raised from 30 — with more topics and 4 passages each,
-                         # 30 was cutting off material that would have added variety
+# RAG depth per topic. Each topic gets its own dedicated context — these are
+# per-topic limits, not total limits. With topic isolation, BOOK_TOP_K=4 means
+# each topic's call sees exactly 4 book passages and 2 PYQ examples.
+TOPICS_DIVISOR = 2       # aim for ~count/2 distinct topics (2 questions per topic)
+PYQ_SEED_K = 40          # random PYQs fed to Haiku for topic extraction
+BOOK_TOP_K = 4           # book passages per topic
+PYQ_TOP_K = 2            # PYQ style examples per topic
 BOOK_THRESHOLD = 0.20
-BOOK_FALLBACK_THRESHOLD = 0.15   # looser net for the empty-result fallback
-PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book text
+BOOK_FALLBACK_THRESHOLD = 0.15
+PYQ_THRESHOLD = 0.20
 
-# Sonnet output budget. Devanagari factual MCQs (stem + 4 options + reason,
-# no solution) run ~220-280 output tokens. We batch at 25 questions per call
-# (~25*270 ≈ 6750 tokens, safely under the 8192 cap). The stop_reason guard
-# catches any overrun and fails loud — no silent truncation.
-TOKENS_PER_QUESTION = 270
-# Output budget + batch size are provider-aware:
-#  - Anthropic: 8192 cap, 25 q/call (~25*270 ≈ 6750, safely under).
-#  - Sarvam: the Starter tier caps max_tokens at 4096, AND sarvam-105b always
-#    reasons (the reasoning tokens count toward the cap and vary ~700-3000 per
-#    call). Verified: batches of 8-10 q return valid JSON under 4096; we use 8
-#    for a safe margin. Override both via env for a paid Sarvam tier.
+# Output token budget per model call. With topic isolation each call is small:
+# 4 book chunks + 2 PYQ examples + N questions (N = count // n_topics, usually 2).
+# Sarvam-105b reasons; reasoning tokens eat into MAX_OUTPUT_TOKENS. At 2q/call
+# the output is tiny (~540 tokens) so even with 1000 reasoning tokens we're safe
+# under 4096. Override via env for paid tier.
 if GEN_PROVIDER == "sarvam":
     MAX_OUTPUT_TOKENS = int(os.environ.get("SARVAM_MAX_TOKENS", "4096"))
-    MAX_QUESTIONS_PER_CALL = int(os.environ.get("SARVAM_BATCH", "8"))
+    MAX_QUESTIONS_PER_CALL = int(os.environ.get("SARVAM_BATCH", "4"))
 else:
     MAX_OUTPUT_TOKENS = 8192
     MAX_QUESTIONS_PER_CALL = 25
 
-# Hard cap on generation rounds. count/MAX_QUESTIONS_PER_CALL rounds are needed
-# just to reach `count` once; this allows that many again as top-up headroom for
-# dropped (invalid/duplicate) questions, so a normal short-fall is recovered but
-# a subject that genuinely can't yield `count` distinct questions can't loop
-# forever. ceil(count / batch) * 2, min 6.
-def _max_gen_attempts(count: int) -> int:
-    import math
-    return max(6, math.ceil(count / max(1, MAX_QUESTIONS_PER_CALL)) * 2)
-
 VALID_ANSWERS = {"a", "b", "c", "d"}
 
-# Fallback topic labels when no PYQs exist yet for a subject
 SUBJECT_LABELS = {
     "uk-history":          "उत्तराखंड का इतिहास",
     "uk-geography":        "उत्तराखंड का भूगोल",
@@ -109,10 +89,12 @@ SUBJECT_LABELS = {
     "hindi":               "सामान्य हिंदी",
 }
 
-# The system prompt receives both PYQ examples (style) and book passages (facts).
-# PYQ examples teach Sonnet HOW to frame questions; book passages teach it WHAT to say.
+# Per-topic system prompt. Each call is scoped to ONE topic — the model only
+# sees chunks and PYQ examples for that topic, so it can't drift elsewhere.
 GEN_SYSTEM = """You are an Indian competitive-exam question writer for UKSSSC, UPPSC, and similar
 state PSC papers.
+
+You are generating questions for the topic: "{topic}" (subject: {subject}).
 
 You have been given:
 1. REAL PAST EXAM QUESTIONS (PYQ EXAMPLES) — study these carefully. Mirror their:
@@ -120,26 +102,17 @@ You have been given:
    - Hindi register and formality level
    - Option length and distractor style
    - Difficulty level and concept depth
-2. STUDY MATERIAL — factual book excerpts. Every question you generate must be
-   answerable from this material. Do not invent facts.
-
-Subject: "{subject}". Generate the number of multiple-choice questions requested
-in the user message.
+2. STUDY MATERIAL — factual book excerpts about this topic. Every question you
+   generate must be answerable from this material. Do not invent facts.
 
 RULES:
 - Language: Hindi (Devanagari). English proper nouns stay in English.
 - Each question: exactly 4 options (a), (b), (c), (d)
-- Difficulty mix: 30% easy, 50% medium, 20% hard
-- VARIETY IS CRITICAL — this is the most important rule:
-  * Maximum 1 question per named person, committee, treaty, event, or place.
-    If you already asked about "कौलशक सचमतत", do NOT ask about it again from
-    any angle — move to a completely different entity.
-  * Each question must test a fact from a DIFFERENT source entity than all
-    other questions in this batch. Spread across the full study material.
-  * Never ask about the same committee/person/place twice even with different
-    sub-questions (date, count, name, location are all the same entity).
+- Difficulty: vary between easy, medium, and hard
+- Each question must test a DIFFERENT specific fact — different date, person,
+  place, event, or number. Never ask about the same entity twice.
 - Distractors must be plausible — not obviously wrong
-- For numerical/reasoning questions: include a worked solution in the "solution" field
+- For numerical/reasoning questions: include a worked solution in "solution" field
 
 OUTPUT: Return ONLY a valid JSON array, no prose, no markdown fences:
 [
@@ -155,7 +128,7 @@ OUTPUT: Return ONLY a valid JSON array, no prose, no markdown fences:
 ━━━ PYQ EXAMPLES (style reference) ━━━
 {pyq_examples}
 
-━━━ STUDY MATERIAL (factual source) ━━━
+━━━ STUDY MATERIAL (factual source for this topic only) ━━━
 {book_chunks}"""
 
 
@@ -167,7 +140,6 @@ _sarvam = None
 
 
 def _sarvam_client():
-    """Lazily build the Sarvam client (OpenAI-compatible). Reused across batches."""
     global _sarvam
     if _sarvam is None:
         from openai import OpenAI
@@ -181,15 +153,12 @@ def _sarvam_client():
 # ── Phase 1 — subject -> topics (Haiku) ──────────────────────────────────────
 
 async def _extract_topics(subject: str, count: int) -> list[str]:
-    """Use Haiku to derive N/5 distinct exam topics for the subject.
-    Seeds Haiku with a random PYQ sample so it understands what this exam
-    actually tests — not a generic topic list."""
+    """Use Haiku to derive N/TOPICS_DIVISOR distinct exam topics for the subject.
+    Seeds Haiku with a random PYQ sample — PYQs carry both the topic signal
+    (what this exam tests) and implicitly the style signal (what Haiku extracts).
+    More PYQs = broader topic diversity in the output."""
     n_topics = max(1, count // TOPICS_DIVISOR)
 
-    # Fetch a broad random sample — more PYQs = more topic diversity for Haiku
-    # to extract from. 15 was too few and caused Haiku to return near-duplicate
-    # topics (e.g. 3 variations of "काल विभाजन"), which then pulled the same
-    # book chunks and produced repeated questions.
     seed_pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SEED_K)
     if not seed_pyqs:
         return [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
@@ -216,24 +185,16 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
     return topics[:n_topics]
 
 
-# ── Phase 2 — topics -> book chunks + PYQ style examples (RAG, no LLM) ───────
+# ── Phase 2 — topics -> per-topic buckets (RAG, no LLM) ──────────────────────
 
-async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict], list[dict]]:
-    """For each topic, semantic-search both tables in parallel:
-    - book_chunks  → factual source material (what to say)
-    - pyq_chunks   → real past questions on that topic (how to say it)
-    Returns (book_chunks, pyq_examples) deduplicated."""
-    seen_books: set = set()
-    seen_pyqs: set = set()
-    book_counts: dict = {}   # per-book passage count for BOOK_CHUNKS_PER_BOOK cap
-    book_chunks: list = []
-    pyq_examples: list = []
+async def _collect_material(topics: list[str], subject: str) -> dict[str, dict]:
+    """For each topic, fetch its own dedicated book chunks and PYQ style examples
+    in parallel. Returns a dict keyed by topic:
+        {topic: {"book_chunks": [...], "pyq_examples": [...]}}
 
-    # Each topic = two independent embedding round-trips (book + PYQ). Fire them
-    # all concurrently — for count=100 (20 topics) this collapses 40 serial
-    # network round-trips to ~1-2. Results are merged in topic order afterwards
-    # so dedup stays deterministic. (Per-thread DB conns in query.py make the
-    # underlying _search calls safe to run in parallel.)
+    Each topic's bucket is self-contained — Phase 3 generates questions for one
+    topic at a time using ONLY that bucket, which is the structural guarantee
+    that questions from different topics never share context."""
     book_results, pyq_results = await asyncio.gather(
         asyncio.gather(*(
             rag.rag_lookup(stem=t, top_k=BOOK_TOP_K, threshold=BOOK_THRESHOLD, subject=subject)
@@ -245,89 +206,52 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
         )),
     )
 
-    for topic, passages in zip(topics, book_results):
-        for p in passages:
-            _merge_book(p, topic, seen_books, book_chunks, book_counts)
+    fallback_topic = SUBJECT_LABELS.get(subject, subject.replace("-", " "))
+    buckets: dict[str, dict] = {}
 
-    for topic, pyqs in zip(topics, pyq_results):
-        for p in pyqs:
-            key = (p.get("source_file", ""), p.get("text", "")[:80])
-            if key not in seen_pyqs:
-                seen_pyqs.add(key)
-                pyq_examples.append({**p, "from_topic": topic})
-
-    pyq_examples = pyq_examples[:PYQ_CAP]
-    # Shuffle before the cap so the model doesn't see all passages from the same
-    # book consecutively — adjacent identical-source context causes within-batch
-    # repetition even when the cap limits the count.
-    random.shuffle(book_chunks)
-    book_chunks = book_chunks[:BOOK_CAP]
-
-    # Fallback: trigger when retrieval is empty OR too thin to ground `count`
-    # questions (topics were wrong-language / too abstract). Use the subject's
-    # canonical Hindi label — English never embeds well against the Hindi corpus.
-    min_chunks = max(1, len(topics))
-    if len(book_chunks) < min_chunks:
-        fallback_topic = SUBJECT_LABELS.get(subject, subject.replace("-", " "))
-        passages = await rag.rag_lookup(
-            stem=fallback_topic, top_k=BOOK_TOP_K * 3,
-            threshold=BOOK_FALLBACK_THRESHOLD, subject=subject,
+    for topic, book_passages, pyq_passages in zip(topics, book_results, pyq_results):
+        if not book_passages:
+            # Topic string was too abstract or wrong language — fall back to
+            # the subject's canonical Hindi label for the embedding lookup.
+            book_passages = await rag.rag_lookup(
+                stem=fallback_topic, top_k=BOOK_TOP_K,
+                threshold=BOOK_FALLBACK_THRESHOLD, subject=subject,
+            )
+        buckets[topic] = {
+            "book_chunks": book_passages[:BOOK_TOP_K],
+            "pyq_examples": pyq_passages[:PYQ_TOP_K],
+        }
+        logger.info(
+            "BUCKET topic=%r | book_chunks=%d pyq_examples=%d",
+            topic, len(buckets[topic]["book_chunks"]), len(buckets[topic]["pyq_examples"]),
         )
-        for p in passages:
-            _merge_book(p, fallback_topic, seen_books, book_chunks, book_counts)
 
-    return book_chunks, pyq_examples
+    return buckets
 
 
-BOOK_CHUNKS_PER_BOOK = 2   # max passages from the same book in the assembled prompt;
-                           # prevents one dense book from dominating and causing
-                           # the model to mine the same events repeatedly within a batch.
-
-def _merge_book(p: dict, from_topic: str, seen_books: set, book_chunks: list,
-                book_counts: dict | None = None) -> None:
-    """Dedup a book passage by (book, topic) and enforce a per-book cap."""
-    key = (p.get("book", ""), p.get("topic", ""))
-    if key in seen_books:
-        return
-    book_name = p.get("book", "")
-    if book_counts is not None:
-        if book_counts.get(book_name, 0) >= BOOK_CHUNKS_PER_BOOK:
-            return
-        book_counts[book_name] = book_counts.get(book_name, 0) + 1
-    seen_books.add(key)
-    book_chunks.append({**p, "from_topic": from_topic})
-
-
-# ── Phase 3 — book chunks + PYQ examples -> questions (Sonnet) ───────────────
+# ── Phase 3 — per-topic isolated generation ───────────────────────────────────
 
 def _gen_questions(subject: str, count: int,
-                   book_chunks: list[dict], pyq_examples: list[dict]) -> list[dict]:
-    book_material = "\n\n".join(
-        f"[{i+1}] (book: {c.get('book','')}, topic: {c.get('topic','')})\n{c.get('text','')}"
-        for i, c in enumerate(book_chunks)
-    )
-    pyq_material = "\n\n".join(
-        f"[{i+1}] (topic: {p.get('from_topic','')})\n{p.get('text','')}"
-        for i, p in enumerate(pyq_examples)
-    ) if pyq_examples else "(No PYQ examples available yet — use standard UKSSSC framing.)"
+                   buckets: dict[str, dict]) -> list[dict]:
+    """Iterate over topics. Each topic gets its own model call with ONLY its
+    own book chunks and PYQ examples. Questions per topic are distributed evenly
+    (remainder goes to first topics). A global top-up loop recovers any shortfall
+    from validation drops without re-using a topic that already yielded enough."""
+    topics = list(buckets.keys())
+    n_topics = len(topics)
 
-    src_books = sorted({c.get("book", "") for c in book_chunks if c.get("book")})
+    # Distribute questions evenly across topics. E.g. count=10, n_topics=5 -> 2 each.
+    # count=11, n_topics=5 -> [3,2,2,2,2]. Each topic is responsible for its quota.
+    base = count // n_topics
+    remainder = count % n_topics
+    quota = [base + (1 if i < remainder else 0) for i in range(n_topics)]
 
-    # Generate in batches (a single call can't hold `count` questions without
-    # overrunning the token cap) and TOP UP until we have `count` VALID, UNIQUE
-    # questions. Validation drops un-renderable rows (need a stem, exactly 4
-    # options, answer a-d — a bad row would crash the builders) and dedup drops
-    # near-duplicate stems; without a top-up loop those drops make the paper come
-    # back short (ask 10, get 9). Each batch is told what's already been asked so
-    # it diversifies. Capped at MAX_GEN_ATTEMPTS extra rounds so a subject that
-    # genuinely can't yield `count` distinct questions can't loop forever.
     out: list[dict] = []
     seen_stems: set[str] = set()
 
-    def _accept(batch_questions: list[dict]) -> None:
-        for q in batch_questions:
-            if len(out) >= count:
-                return
+    def _accept(batch_qs: list[dict], src_books: list[str]) -> int:
+        accepted = 0
+        for q in batch_qs:
             if not isinstance(q, dict) or not q.get("stem"):
                 continue
             opts = q.get("options")
@@ -336,7 +260,7 @@ def _gen_questions(subject: str, count: int,
             ans = str(q.get("answer", "")).strip().lower()
             if ans not in VALID_ANSWERS:
                 continue
-            norm = " ".join(str(q["stem"]).split()).lower()  # dedup key
+            norm = " ".join(str(q["stem"]).split()).lower()
             if norm in seen_stems:
                 continue
             seen_stems.add(norm)
@@ -344,64 +268,104 @@ def _gen_questions(subject: str, count: int,
             if src_books and not q.get("sources"):
                 q["sources"] = src_books
             out.append(q)
+            accepted += 1
+        return accepted
 
-    attempts = 0
-    max_attempts = _max_gen_attempts(count)
-    while len(out) < count and attempts <= max_attempts:
-        need = count - len(out)
-        batch = min(need, MAX_QUESTIONS_PER_CALL)
-        prior_stems = list(seen_stems)
-        _accept(_gen_batch(subject, batch, book_material, pyq_material, avoid=prior_stems))
-        attempts += 1
+    for i, (topic, q) in enumerate(zip(topics, quota)):
+        if q == 0:
+            continue
+        bucket = buckets[topic]
+        book_chunks = bucket["book_chunks"]
+        pyq_examples = bucket["pyq_examples"]
+
+        if not book_chunks:
+            logger.warning("SKIP topic=%r — no book chunks", topic)
+            continue
+
+        src_books = sorted({c.get("book", "") for c in book_chunks if c.get("book")})
+        book_material = "\n\n".join(
+            f"[{j+1}] (book: {c.get('book','')}, topic: {c.get('topic','')})\n{c.get('text','')}"
+            for j, c in enumerate(book_chunks)
+        )
+        pyq_material = "\n\n".join(
+            f"[{j+1}]\n{p.get('text','')}"
+            for j, p in enumerate(pyq_examples)
+        ) if pyq_examples else "(No PYQ examples — use standard UKSSSC framing.)"
+
+        system = GEN_SYSTEM.format(
+            topic=topic, subject=subject,
+            pyq_examples=pyq_material, book_chunks=book_material,
+        )
+
+        # Generate in sub-batches if q > MAX_QUESTIONS_PER_CALL (e.g. 500q / 50 topics
+        # = 10q per topic; Sarvam batch=4 means 3 calls per topic). Top-up within the
+        # topic if validation drops some questions.
+        topic_out = 0
+        topic_attempts = 0
+        max_topic_attempts = max(4, math.ceil(q / max(1, MAX_QUESTIONS_PER_CALL)) * 2)
+
+        while topic_out < q and topic_attempts < max_topic_attempts:
+            need = q - topic_out
+            batch = min(need, MAX_QUESTIONS_PER_CALL)
+            user = (
+                f"Generate exactly {batch} questions about the topic '{topic}'. "
+                f"Each question must test a DIFFERENT specific fact from the study material."
+            )
+            try:
+                if GEN_PROVIDER == "sarvam":
+                    text = _gen_batch_sarvam(system, user, batch)
+                else:
+                    text = _gen_batch_anthropic(system, user, batch)
+                accepted = _accept(_parse_json_array(text), src_books)
+                topic_out += accepted
+            except RuntimeError as e:
+                logger.warning("TOPIC %r batch failed: %s", topic, e)
+                break
+            topic_attempts += 1
+
+        logger.info("TOPIC %r | quota=%d generated=%d", topic, q, topic_out)
+
+    # Top-up: if total is still short (topic with no chunks, validation drops),
+    # cycle through topics that have material and ask for 1 more question each.
+    topup_attempts = 0
+    max_topup = len(topics) * 2
+    while len(out) < count and topup_attempts < max_topup:
+        topic = topics[topup_attempts % n_topics]
+        bucket = buckets[topic]
+        if not bucket["book_chunks"]:
+            topup_attempts += 1
+            continue
+        src_books = sorted({c.get("book", "") for c in bucket["book_chunks"] if c.get("book")})
+        book_material = "\n\n".join(
+            f"[{j+1}] {c.get('text','')}" for j, c in enumerate(bucket["book_chunks"])
+        )
+        pyq_material = "\n\n".join(
+            p.get("text", "") for p in bucket["pyq_examples"]
+        ) or "(No PYQ examples.)"
+        system = GEN_SYSTEM.format(
+            topic=topic, subject=subject,
+            pyq_examples=pyq_material, book_chunks=book_material,
+        )
+        user = "Generate exactly 1 question about this topic."
+        try:
+            if GEN_PROVIDER == "sarvam":
+                text = _gen_batch_sarvam(system, user, 1)
+            else:
+                text = _gen_batch_anthropic(system, user, 1)
+            _accept(_parse_json_array(text), src_books)
+        except RuntimeError:
+            pass
+        topup_attempts += 1
 
     if len(out) < count:
         logger.warning(
-            "generate: only %d/%d unique valid questions after %d attempts for '%s' "
-            "(study material may be too narrow).", len(out), count, attempts, subject,
+            "generate: only %d/%d questions produced for '%s'.",
+            len(out), count, subject,
         )
 
-    # final renumber
     for i, q in enumerate(out, 1):
         q["n"] = i
     return out
-
-
-def _gen_batch(subject: str, count: int,
-               book_material: str, pyq_material: str,
-               avoid: list[str] | None = None) -> list[dict]:
-    """One model call for up to MAX_QUESTIONS_PER_CALL questions.
-
-    The system prompt (rules + PYQ examples + book material) is byte-identical
-    across every batch of a single run — only the user message changes. The
-    cached system block lets batches 2..N read the shared context cheaply
-    (Anthropic path). `avoid` is the list of stems already generated this run;
-    we tell the model not to repeat them so batches diversify instead of all
-    circling the same one or two topics.
-    """
-    system = GEN_SYSTEM.format(
-        subject=subject,
-        pyq_examples=pyq_material, book_chunks=book_material,
-    )
-    user = (
-        f"Generate exactly {count} questions now. "
-        f"Each question must be about a DIFFERENT named entity (person, committee, "
-        f"treaty, place, event) — never two questions about the same entity."
-    )
-    if avoid:
-        # cap the list so it can't blow the prompt; the most recent are the most
-        # likely to be re-hit, so keep the tail.
-        recent = avoid[-40:]
-        joined = "\n".join(f"- {s}" for s in recent)
-        user += (
-            "\n\nThese questions were ALREADY generated for this paper. Do NOT "
-            "repeat them or ask the same entity/fact in different words:\n"
-            + joined
-        )
-    if GEN_PROVIDER == "sarvam":
-        text = _gen_batch_sarvam(system, user, count)
-    else:
-        text = _gen_batch_anthropic(system, user, count)
-    return _parse_json_array(text)
 
 
 def _gen_batch_anthropic(system: str, user: str, count: int) -> str:
@@ -415,12 +379,9 @@ def _gen_batch_anthropic(system: str, user: str, count: int) -> str:
         }],
         messages=[{"role": "user", "content": user}],
     )
-    # A max_tokens stop means the JSON was cut mid-array — fail loud rather than
-    # silently returning the [] that _parse_json_array gives for truncated input.
     if msg.stop_reason == "max_tokens":
         raise RuntimeError(
-            f"{GEN_MODEL} hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} "
-            f"questions — output truncated. Lower MAX_QUESTIONS_PER_CALL."
+            f"{GEN_MODEL} hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} questions."
         )
     u = msg.usage
     cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
@@ -435,11 +396,6 @@ def _gen_batch_anthropic(system: str, user: str, count: int) -> str:
 
 
 def _gen_batch_sarvam(system: str, user: str, count: int) -> str:
-    """Sarvam (Hindi-native, OpenAI-compatible). System+user as chat messages."""
-    # Sarvam turns reasoning on by default, and reasoning tokens count toward the
-    # completion budget — for straight JSON MCQ output we don't need it, and it
-    # would eat into MAX_OUTPUT_TOKENS. Request minimal reasoning; tolerate SDKs
-    # that don't accept the param.
     extra = {"reasoning_effort": os.environ.get("SARVAM_REASONING", "low")}
     try:
         resp = _sarvam_client().chat.completions.create(
@@ -452,7 +408,6 @@ def _gen_batch_sarvam(system: str, user: str, count: int) -> str:
             **extra,
         )
     except TypeError:
-        # older OpenAI client without reasoning_effort kwarg — retry without it
         resp = _sarvam_client().chat.completions.create(
             model=SARVAM_MODEL,
             max_tokens=MAX_OUTPUT_TOKENS,
@@ -462,16 +417,15 @@ def _gen_batch_sarvam(system: str, user: str, count: int) -> str:
             ],
         )
     choice = resp.choices[0]
-    # length finish_reason = truncated mid-array; fail loud like the Anthropic path.
     if choice.finish_reason == "length":
         raise RuntimeError(
-            f"{SARVAM_MODEL} hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} "
-            f"questions — output truncated. Lower MAX_QUESTIONS_PER_CALL or raise the plan cap."
+            f"{SARVAM_MODEL} hit the {MAX_OUTPUT_TOKENS}-token cap generating {count} questions."
         )
     u = resp.usage
     logger.info(
         "BATCH model=%s count=%d | input=%d output=%d | tokens_per_q=%.1f",
-        SARVAM_MODEL, count, getattr(u, "prompt_tokens", 0), getattr(u, "completion_tokens", 0),
+        SARVAM_MODEL, count,
+        getattr(u, "prompt_tokens", 0), getattr(u, "completion_tokens", 0),
         (getattr(u, "completion_tokens", 0) / count) if count else 0,
     )
     return (choice.message.content or "").strip()
@@ -482,17 +436,19 @@ def _gen_batch_sarvam(system: str, user: str, count: int) -> str:
 async def generate_questions(subject: str, count: int) -> list[dict]:
     """subject + count -> list of Question dicts (n, stem, options, answer, ...)."""
     topics = await _extract_topics(subject, count)
-    book_chunks, pyq_examples = await _collect_material(topics, subject)
-    if not book_chunks:
+    buckets = await _collect_material(topics, subject)
+
+    # Fail if every topic came back empty (subject has no corpus)
+    if not any(b["book_chunks"] for b in buckets.values()):
         raise RuntimeError(
             f"No study material found for subject '{subject}'. "
             f"Ensure book_chunks has content for this subject."
         )
-    questions = _gen_questions(subject, count, book_chunks, pyq_examples)
+
+    questions = _gen_questions(subject, count, buckets)
     if not questions:
         raise RuntimeError(
-            f"Generation produced no valid questions for subject '{subject}' "
-            f"(model output failed stem/options/answer validation)."
+            f"Generation produced no valid questions for subject '{subject}'."
         )
     return questions
 
@@ -500,14 +456,12 @@ async def generate_questions(subject: str, count: int) -> list[dict]:
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _parse_json_array(text: str) -> list:
-    """Parse a JSON array out of a model response, tolerating markdown fences."""
     t = text.strip()
     if t.startswith("```"):
         t = t.split("```", 2)[1] if t.count("```") >= 2 else t.strip("`")
         if t.lstrip().startswith("json"):
             t = t.lstrip()[4:]
     t = t.strip()
-    # slice to the outermost [...] if there's surrounding prose
     start, end = t.find("["), t.rfind("]")
     if start != -1 and end != -1 and end > start:
         t = t[start:end + 1]
