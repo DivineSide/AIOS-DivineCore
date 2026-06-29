@@ -52,11 +52,17 @@ GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "anthropic").lower()
 SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-105b")
 SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
 
-# RAG depth — how many results to fetch per topic from each table
-TOPICS_DIVISOR = 5       # ~N/5 distinct topics from Haiku
-BOOK_TOP_K = 2           # book passages per topic (fallback fetches BOOK_TOP_K*3=6)
+# RAG depth — how many results to fetch per topic from each table.
+# TOPICS_DIVISOR drives VARIETY: questions can only be as diverse as the topics
+# we retrieve material for. At 5 (the old value) a 10-question paper drew from
+# just 2 topics -> every question clustered on those (e.g. 4x Gardner). Aim for
+# ~2 questions per topic so the spread is wide: 10q -> ~5 topics, 50q -> ~25.
+TOPICS_DIVISOR = 2       # ~N/2 distinct topics (each yields ~2 questions)
+BOOK_TOP_K = 3           # book passages per topic (fallback fetches BOOK_TOP_K*3=9)
 PYQ_TOP_K = 2            # PYQ style examples per topic; total capped at PYQ_CAP
 PYQ_CAP = 12             # style saturates at ~8 examples; 12 gives a buffer
+BOOK_CAP = 30            # cap total book passages so big papers don't over-grow
+                         # the prompt; 30 spans plenty of topics for variety
 BOOK_THRESHOLD = 0.20
 BOOK_FALLBACK_THRESHOLD = 0.15   # looser net for the empty-result fallback
 PYQ_THRESHOLD = 0.20     # slightly lower — PYQ phrasing varies more than book text
@@ -238,6 +244,10 @@ async def _collect_material(topics: list[str], subject: str) -> tuple[list[dict]
                 pyq_examples.append({**p, "from_topic": topic})
 
     pyq_examples = pyq_examples[:PYQ_CAP]
+    # Cap book chunks too so a large paper (many topics) can't build a giant
+    # prompt. The chunks are gathered in topic order, so this keeps a spread
+    # across topics rather than over-weighting any single one.
+    book_chunks = book_chunks[:BOOK_CAP]
 
     # Fallback: trigger when retrieval is empty OR too thin to ground `count`
     # questions (topics were wrong-language / too abstract). Use the subject's
