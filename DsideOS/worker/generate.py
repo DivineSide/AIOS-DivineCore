@@ -79,6 +79,15 @@ else:
     MAX_OUTPUT_TOKENS = 8192
     MAX_QUESTIONS_PER_CALL = 25
 
+# Hard cap on generation rounds. count/MAX_QUESTIONS_PER_CALL rounds are needed
+# just to reach `count` once; this allows that many again as top-up headroom for
+# dropped (invalid/duplicate) questions, so a normal short-fall is recovered but
+# a subject that genuinely can't yield `count` distinct questions can't loop
+# forever. ceil(count / batch) * 2, min 6.
+def _max_gen_attempts(count: int) -> int:
+    import math
+    return max(6, math.ceil(count / max(1, MAX_QUESTIONS_PER_CALL)) * 2)
+
 VALID_ANSWERS = {"a", "b", "c", "d"}
 
 # Fallback topic labels when no PYQs exist yet for a subject
@@ -269,50 +278,56 @@ def _gen_questions(subject: str, count: int,
 
     src_books = sorted({c.get("book", "") for c in book_chunks if c.get("book")})
 
-    # Batch so a single call never approaches MAX_OUTPUT_TOKENS and truncates the
-    # JSON. Hindi output is token-heavy — count=100 in one call would overrun.
-    # Each batch is a separate call, so without cross-batch context the batches
-    # collide on the same few topics (heavy repetition). Thread the stems already
-    # generated into each subsequent batch as an explicit "do not repeat" list so
-    # later batches diversify away from earlier ones.
-    raw_questions: list[dict] = []
-    remaining = count
-    while remaining > 0:
-        batch = min(remaining, MAX_QUESTIONS_PER_CALL)
-        prior_stems = [q.get("stem", "") for q in raw_questions if q.get("stem")]
-        raw_questions.extend(
-            _gen_batch(subject, batch, book_material, pyq_material, avoid=prior_stems)
-        )
-        remaining -= batch
+    # Generate in batches (a single call can't hold `count` questions without
+    # overrunning the token cap) and TOP UP until we have `count` VALID, UNIQUE
+    # questions. Validation drops un-renderable rows (need a stem, exactly 4
+    # options, answer a-d — a bad row would crash the builders) and dedup drops
+    # near-duplicate stems; without a top-up loop those drops make the paper come
+    # back short (ask 10, get 9). Each batch is told what's already been asked so
+    # it diversifies. Capped at MAX_GEN_ATTEMPTS extra rounds so a subject that
+    # genuinely can't yield `count` distinct questions can't loop forever.
+    out: list[dict] = []
+    seen_stems: set[str] = set()
 
-    # Validate + renumber + dedup. Drop anything the builders can't render: a
-    # question needs a stem, exactly 4 options, and an answer letter in a-d.
-    # (Builders index LABELS by the answer letter and assume 4 options — a bad
-    # row would crash build_solution / build_deck, failing the whole job.) Also
-    # drop near-duplicate stems that slipped past the cross-batch avoidance.
-    out = []
-    seen_stems = set()
-    n = 1
-    for q in raw_questions:
-        if not isinstance(q, dict) or not q.get("stem"):
-            continue
-        opts = q.get("options")
-        if not isinstance(opts, list) or len(opts) != 4:
-            continue
-        ans = str(q.get("answer", "")).strip().lower()
-        if ans not in VALID_ANSWERS:
-            continue
-        # dedup on a normalised stem (lowercased, whitespace-collapsed)
-        norm = " ".join(str(q["stem"]).split()).lower()
-        if norm in seen_stems:
-            continue
-        seen_stems.add(norm)
-        q["answer"] = ans
-        q["n"] = n
-        n += 1
-        if src_books and not q.get("sources"):
-            q["sources"] = src_books
-        out.append(q)
+    def _accept(batch_questions: list[dict]) -> None:
+        for q in batch_questions:
+            if len(out) >= count:
+                return
+            if not isinstance(q, dict) or not q.get("stem"):
+                continue
+            opts = q.get("options")
+            if not isinstance(opts, list) or len(opts) != 4:
+                continue
+            ans = str(q.get("answer", "")).strip().lower()
+            if ans not in VALID_ANSWERS:
+                continue
+            norm = " ".join(str(q["stem"]).split()).lower()  # dedup key
+            if norm in seen_stems:
+                continue
+            seen_stems.add(norm)
+            q["answer"] = ans
+            if src_books and not q.get("sources"):
+                q["sources"] = src_books
+            out.append(q)
+
+    attempts = 0
+    max_attempts = _max_gen_attempts(count)
+    while len(out) < count and attempts <= max_attempts:
+        need = count - len(out)
+        batch = min(need, MAX_QUESTIONS_PER_CALL)
+        prior_stems = list(seen_stems)
+        _accept(_gen_batch(subject, batch, book_material, pyq_material, avoid=prior_stems))
+        attempts += 1
+
+    if len(out) < count:
+        logger.warning(
+            "generate: only %d/%d unique valid questions after %d attempts for '%s' "
+            "(study material may be too narrow).", len(out), count, attempts, subject,
+        )
+
+    # final renumber
+    for i, q in enumerate(out, 1):
+        q["n"] = i
     return out
 
 
