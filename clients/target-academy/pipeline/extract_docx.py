@@ -149,19 +149,88 @@ def _clean_raw(raw: str) -> str:
     return "".join(result)
 
 
-def _call_one(chunk: str) -> list[dict]:
-    """Send one text chunk to the LLM (OpenAI primary, Claude fallback)."""
-    raw = complete(SYSTEM, USER_TMPL.format(body=chunk), model="fast", max_tokens=8_000)
-    raw = _clean_raw(raw)
+def _salvage_questions(raw: str) -> list[dict]:
+    """Recover whatever valid question objects we can from a malformed response.
+
+    The model occasionally returns JSON that won't parse as a whole — a trailing
+    comma, an unescaped backslash/quote from legacy Kruti-Dev text, a missing
+    delimiter, or extra data after the array. Rather than throw away the ENTIRE
+    chunk (which silently loses ~15 questions), scan the text for individual
+    {"n":..,"stem":..,"options":[..]} objects and json.loads each one on its own.
+    One bad object loses one question, not the whole chunk.
+    """
+    salvaged: list[dict] = []
+    # find each top-level object that starts with an "n" key (a question item)
+    for m in re.finditer(r'\{\s*"n"\s*:', raw):
+        start = m.start()
+        depth, in_str, esc = 0, False, False
+        for i in range(start, len(raw)):
+            ch = raw[i]
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == '"':
+                in_str = not in_str
+                continue
+            if in_str:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    frag = raw[start:i + 1]
+                    try:
+                        obj = json.loads(frag)
+                        if isinstance(obj, dict) and "n" in obj and obj.get("options"):
+                            salvaged.append(obj)
+                    except (ValueError, json.JSONDecodeError):
+                        pass  # this one object is unrecoverable; skip just it
+                    break
+    return salvaged
+
+
+def _parse_questions(raw: str) -> list[dict]:
+    """Parse a model response into a list of question dicts, tolerantly.
+
+    First try the clean whole-document parse; if that fails, salvage individual
+    objects so a single malformed item never costs us the whole chunk."""
     try:
         data = parse_json(raw)
-    except (ValueError, json.JSONDecodeError) as e:
-        print(f"  [extract_docx] JSON parse error: {e}", file=sys.stderr)
-        print(f"  [extract_docx] raw tail: {raw[-300:]}", file=sys.stderr)
-        return []
-    if isinstance(data, list):
-        return data
-    return data.get("questions", [])
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get("questions", [])
+    except (ValueError, json.JSONDecodeError):
+        pass
+    return _salvage_questions(raw)
+
+
+def _call_one(chunk: str, attempt: int = 1) -> list[dict]:
+    """Send one text chunk to the LLM (OpenAI primary, Claude fallback).
+
+    On a chunk that yields zero parseable questions, retry once — the model is
+    non-deterministic and a second pass usually returns clean JSON. Never
+    silently drops a chunk: salvages partial JSON and logs the outcome.
+    """
+    raw = complete(SYSTEM, USER_TMPL.format(body=chunk), model="fast", max_tokens=8_000)
+    raw = _clean_raw(raw)
+    questions = _parse_questions(raw)
+
+    if not questions and attempt < 2:
+        print(f"  [extract_docx] chunk parsed to 0 questions; retrying (attempt {attempt + 1})",
+              file=sys.stderr)
+        return _call_one(chunk, attempt + 1)
+
+    if not questions:
+        # genuinely couldn't recover anything from this chunk after a retry —
+        # make the loss LOUD instead of silently returning [] (the old bug).
+        print(f"  [extract_docx] WARNING: lost a chunk entirely after retry. "
+              f"raw tail: {raw[-300:]}", file=sys.stderr)
+    return questions
 
 
 def extract_from_text(body: str, label: str = "input") -> dict:
@@ -178,21 +247,35 @@ def extract_from_text(body: str, label: str = "input") -> dict:
 
     chunks = _chunk_body(body)
     all_questions: list[dict] = []
+    lost_chunks = 0
     for i, chunk in enumerate(chunks, 1):
         print(f"  [extract_docx] chunk {i}/{len(chunks)} ({len(chunk)} chars)...",
               file=sys.stderr)
         qs = _call_one(chunk)
         print(f"    -> {len(qs)} questions", file=sys.stderr)
+        if not qs:
+            lost_chunks += 1
         all_questions.extend(qs)
 
-    # deduplicate by question number (later chunk wins on overlap)
-    seen: dict[int, dict] = {}
+    # deduplicate by question number (later chunk wins on overlap). Items missing
+    # a usable "n" still count — key them by running order so they aren't dropped.
+    seen: dict = {}
+    fallback_n = 10_000
     for q in all_questions:
-        seen[q["n"]] = q
+        n = q.get("n")
+        if not isinstance(n, int):
+            n = fallback_n
+            fallback_n += 1
+        seen[n] = q
     questions = [seen[n] for n in sorted(seen)]
 
     if not questions:
-        raise ValueError(f"{label}: Claude returned no questions across {len(chunks)} chunks.")
+        raise ValueError(f"{label}: extractor returned no questions across {len(chunks)} chunks.")
+    if lost_chunks:
+        # surface partial loss rather than quietly shipping a short paper
+        print(f"  [extract_docx] NOTE: {lost_chunks}/{len(chunks)} chunk(s) yielded "
+              f"nothing even after retry; extracted {len(questions)} questions total.",
+              file=sys.stderr)
     return {"questions": questions}
 
 
