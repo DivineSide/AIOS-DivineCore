@@ -46,9 +46,13 @@ _TERMINAL_BAD = {"Failed"}
 
 
 def _key() -> str:
-    key = os.environ.get("SARVAM_API_KEY", "")
+    # Document Intelligence may be authorized under a DIFFERENT key than the chat
+    # key used for generation. Prefer a dedicated SARVAM_VISION_KEY if set; else
+    # fall back to the main SARVAM_API_KEY (works when one key covers both).
+    key = os.environ.get("SARVAM_VISION_KEY") or os.environ.get("SARVAM_API_KEY", "")
     if not key:
-        raise RuntimeError("SARVAM_API_KEY not set (required for Sarvam Vision).")
+        raise RuntimeError("Neither SARVAM_VISION_KEY nor SARVAM_API_KEY is set "
+                           "(required for Sarvam Vision).")
     return key
 
 
