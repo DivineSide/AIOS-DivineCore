@@ -109,6 +109,30 @@ def tight(para, after=2):
     return para
 
 
+def _keep_with_next(para):
+    """Set w:keepNext so this paragraph stays on the same page/column as the
+    paragraph that follows it."""
+    para.paragraph_format.keep_with_next = True
+
+
+def _keep_lines(para):
+    """Set w:keepLines so the paragraph's own lines don't split across a break."""
+    para.paragraph_format.keep_together = True
+
+
+def keep_question_together(paras):
+    """Glue all paragraphs of one question (stem + statements + options) so a
+    page/column break never lands BETWEEN a question and its options — the
+    'question here, options on the next page' bug. Every paragraph keeps its own
+    lines; every paragraph except the last keeps with the next."""
+    for i, p in enumerate(paras):
+        if p is None:
+            continue
+        _keep_lines(p)
+        if i < len(paras) - 1:
+            _keep_with_next(p)
+
+
 def make_watermark(logo_path: Path, out_path: Path, alpha=0.10):
     """Faint logo with TRUE alpha transparency (no background) — text stays
     readable regardless of how a renderer stacks the watermark vs text."""
@@ -165,19 +189,28 @@ def add_questions(doc, questions):
     first_q_para = None
     for q in questions:
         labels = _opt_labels(q)
+        # collect every paragraph this question produces so we can glue them
+        # together (no page/column break between a stem and its options).
+        q_paras = []
         p = tight(doc.add_paragraph())
+        q_paras.append(p)
         if first_q_para is None:
             first_q_para = p
         add_mixed(p, f"{q['n']}. {q['stem']}")
         for i, st in enumerate(q.get("statements") or [], start=1):
-            add_mixed(tight(doc.add_paragraph()), f"{i}. {st}")
+            sp = tight(doc.add_paragraph())
+            add_mixed(sp, f"{i}. {st}")
+            q_paras.append(sp)
         for left, right in q.get("match") or []:
             mp = tight(doc.add_paragraph())
             add_mixed(mp, left)
             add_latin(mp, "\t-\t")
             add_mixed(mp, right)
+            q_paras.append(mp)
         if q.get("lead_in"):
-            add_mixed(tight(doc.add_paragraph()), q["lead_in"])
+            lp = tight(doc.add_paragraph())
+            add_mixed(lp, q["lead_in"])
+            q_paras.append(lp)
         # the question's own diagram (Q3-type), embedded verbatim under the stem
         if q.get("image"):
             add_figure(doc, q["image"])
@@ -188,6 +221,7 @@ def add_questions(doc, questions):
                 op = tight(doc.add_paragraph(), 2)
                 add_latin(op, labels[i] + " ")
                 add_figure(doc, rel, max_w_cm=OPT_FIG_W_CM, max_h_cm=OPT_FIG_H_CM, para=op)
+                q_paras.append(op)
         else:
             opts = q["options"]
             if not q.get("long_options") and len(opts) == 4 and all(len(o) <= 20 for o in opts):
@@ -198,11 +232,15 @@ def add_questions(doc, questions):
                     add_latin(op, "\t\t")
                     add_latin(op, labels[i + 1] + " ")
                     add_mixed(op, opts[i + 1])
+                    q_paras.append(op)
             else:
                 for i, o in enumerate(opts):
                     op = tight(doc.add_paragraph())
                     add_latin(op, labels[i] + " ")
                     add_mixed(op, o)
+                    q_paras.append(op)
+        # keep the whole question (stem -> options) on one page/column
+        keep_question_together(q_paras)
         tight(doc.add_paragraph(), 6)
     return first_q_para
 
