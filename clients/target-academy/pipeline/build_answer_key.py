@@ -166,7 +166,9 @@ def _build_docx(questions_path: Path, docx_path: Path):
         cell_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         cell_p.paragraph_format.space_before = Pt(6)
         cell_p.paragraph_format.space_after = Pt(6)
-        add_latin(cell_p, f"{q['n']}. ({str(q['answer']).lower()})", size=13)
+        ans = str(q.get("answer", "")).strip().lower()
+        # no printed key in the source -> show a dash, not a misleading "(a)"/"()"
+        add_latin(cell_p, f"{q['n']}. ({ans})" if ans else f"{q['n']}. (—)", size=13)
 
     docx_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(docx_path))

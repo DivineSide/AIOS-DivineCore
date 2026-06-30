@@ -117,11 +117,12 @@ def _wrap_questions(questions: list[dict], meta: dict) -> dict:
 
 
 def _placeholder_answers(data: dict) -> None:
-    """When no answer key is provided, give every unanswered question a neutral
-    placeholder so the builders run, and flag it for review."""
+    """When a question has no answer in the source, DON'T fake one. Leave the
+    answer empty and flag it — the builders render a blank "—" with a clear
+    "answer key not provided" note instead of a misleading all-(a) key."""
     for q in data["questions"]:
         if not q.get("answer"):
-            q["answer"] = "a"
+            q["answer"] = ""          # blank, not a fake "a"
             q["flag"] = "उत्तर कुंजी उपलब्ध नहीं"
 
 

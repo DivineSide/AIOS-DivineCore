@@ -225,7 +225,8 @@ def add_answer_slide(prs, layout, banner, questions):
     add_mixed(para, "उत्तरमाला", 40, GOLD, bold=True)
     row = []
     for q in questions:
-        row.append(f"{q['n']}. ({q['answer']})")
+        ans = str(q.get("answer", "")).strip()
+        row.append(f"{q['n']}. ({ans or '—'})")
         if len(row) == 5:
             p = tf.add_paragraph()
             p.space_after = Pt(6)
