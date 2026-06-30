@@ -154,10 +154,17 @@ def set_columns(section, num, space_twips=567):
     cols.set(qn("w:space"), str(space_twips))
 
 
+def _opt_labels(q) -> list[str]:
+    """One label per option, generated so we never index past the end. Questions
+    can legitimately have 2-6+ options; a fixed list raised IndexError on more."""
+    n = max(len(q.get("options") or []), len(q.get("option_images") or []), 5)
+    return [f"({chr(ord('a') + i)})" if i < 26 else f"({i + 1})" for i in range(n)]
+
+
 def add_questions(doc, questions):
-    labels = ["(a)", "(b)", "(c)", "(d)", "(e)"]
     first_q_para = None
     for q in questions:
+        labels = _opt_labels(q)
         p = tight(doc.add_paragraph())
         if first_q_para is None:
             first_q_para = p
