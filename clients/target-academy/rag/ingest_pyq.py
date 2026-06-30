@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-PYQ ingestion — markdown exam papers → pyq_chunks table.
+PYQ ingestion — PDF exam papers → pyq_chunks table via Sarvam vision.
 
-Reads .md files from corpus/pyq/<exam-type>/, parses them question by question,
-classifies each question's subject using Haiku (uk-history, uk-geography, etc.),
-embeds with text-embedding-3-small, and stores in pyq_chunks.
+Reads PDF files from corpus/pyq/<exam-type>/, renders each page to an image,
+sends pages to Sarvam-105b (vision) to extract questions as structured JSON,
+classifies each question's subject using Haiku, embeds with text-embedding-3-small,
+and stores in pyq_chunks.
 
 Folder structure:
     corpus/pyq/
-    ├── lekhpal-patwari/   ← exam type (mixed subjects per paper)
+    ├── lekhpal-patwari/
     ├── vdo-vpdo/
     └── group-c/
-
-The exam-type folder name is stored in source_file for traceability.
-The subject column is per-question (classified by Haiku), not per-file.
 
 Usage:
     # ingest one exam folder
@@ -26,11 +24,13 @@ Usage:
     python ingest_pyq.py --exam group-c --dry-run
 """
 
+import base64
 import io
 import json
 import os
 import re
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 
@@ -41,37 +41,25 @@ import psycopg2
 from dotenv import load_dotenv
 from openai import OpenAI
 import anthropic
+import fitz  # PyMuPDF
 
 BASE    = Path(__file__).resolve().parents[1]
 PYQ_DIR = BASE / "corpus" / "pyq"
 
 EMBED_MODEL    = "text-embedding-3-small"
 CLASSIFY_MODEL = "claude-haiku-4-5-20251001"
+SARVAM_MODEL   = "sarvam-105b"
+PAGE_DPI       = 150   # render resolution — 150dpi is sharp enough for Hindi text
 EMBED_BATCH    = 64
 DB_BATCH       = 50
+PAGES_PER_CALL = 2     # pages per Sarvam vision call (stays under token cap)
 
 VALID_SUBJECTS = {
     "uk-history", "uk-geography", "uk-culture",
     "uk-general-studies", "general-gk", "hindi",
 }
 
-# Per-question subject classification. Haiku is cheap (~$0.0003 per 1k tokens).
-# 100 questions × ~150 tokens each ≈ $0.005 per paper — negligible.
-CLASSIFY_PROMPT = """Classify this Indian competitive exam question by subject.
-Return ONLY one of these exact codes — no explanation, no punctuation:
-
-uk-history        → Uttarakhand history, events, personalities, movements
-uk-geography      → Uttarakhand geography, rivers, peaks, districts, climate
-uk-culture        → Uttarakhand folk art, dance, music, festivals, traditions
-uk-general-studies → Uttarakhand polity, governance, schemes, current affairs, economy
-general-gk        → national GK, Indian polity/history, science, maths, reasoning, computer
-hindi             → Hindi grammar, literature, vocabulary, sentence correction
-
-Question:
-{question}"""
-
-
-# ── env + clients ─────────────────────────────────────────────────────────────
+# ── env + clients ──────────────────────────────────────────────────────────────
 
 def _load_env():
     for candidate in [BASE.parent.parent / ".env", BASE.parent / ".env", BASE / ".env"]:
@@ -80,8 +68,9 @@ def _load_env():
             return
 
 _load_env()
-_oai_client: OpenAI | None = None
+_oai_client:    OpenAI | None             = None
 _claude_client: anthropic.Anthropic | None = None
+_sarvam_client: OpenAI | None             = None   # OpenAI-compat, Sarvam base
 
 
 def _oai() -> OpenAI:
@@ -98,6 +87,21 @@ def _claude() -> anthropic.Anthropic:
     return _claude_client
 
 
+def _sarvam() -> OpenAI:
+    global _sarvam_client
+    if _sarvam_client is None:
+        key = os.environ.get("SARVAM_API_KEY", "")
+        if not key:
+            raise RuntimeError("SARVAM_API_KEY not set in .env")
+        _sarvam_client = OpenAI(
+            api_key=key,
+            base_url="https://api.sarvam.ai/v1",
+            timeout=120,
+            max_retries=2,
+        )
+    return _sarvam_client
+
+
 def _db():
     url = os.environ.get("SUPABASE_DB_URL", "")
     if not url:
@@ -105,98 +109,146 @@ def _db():
     return psycopg2.connect(url, connect_timeout=30)
 
 
-# ── markdown parsing ──────────────────────────────────────────────────────────
+# ── PDF → images ───────────────────────────────────────────────────────────────
 
-# Matches answer disclosure lines in English and Hindi forms:
-#   "Answer – (B)"  "Answer: B"  "उत्तर – (B)"  "Show Answer/Hide\nAnswer – (C)"
-_ANSWER_LINE = re.compile(
-    r"(?:Show Answer/Hide\s*)?(?:Answer|उत्तर)\s*[–\-:]\s*[\(\[]?([A-Da-d])[\)\]]?",
-    re.IGNORECASE,
-)
-
-# MCQ options always start with (A), (B), (C), (D) — used to anchor question blocks.
-_OPTION_LINE = re.compile(r"^\s*\([A-Da-d]\)\s+\S", re.MULTILINE)
-
-
-def _find_question_starts(md_text: str) -> list[tuple[int, int]]:
-    """Return (char_pos, question_number) for each real question boundary.
-
-    Strategy: collect ALL candidate "N. <text>" matches, then find the longest
-    strictly-sequential run that starts at 1 (or close to it). This correctly
-    handles:
-    - Sub-items inside matching questions (सूची-I numbered 1,2,3,4 that repeat)
-    - Papers where the header has stray number matches
-    - Gaps of 1-2 in the sequence (occasional missing question)
-    """
-    candidate = re.compile(r"^(\d{1,3})\.\s+\S", re.MULTILINE)
-    all_matches = [(m.start(), int(m.group(1))) for m in candidate.finditer(md_text)]
-
-    if not all_matches:
-        return []
-
-    # Try to build the longest sequential chain starting from n=1
-    # by position order. Allow small gaps (<=2) to handle occasional missing Qs.
-    pos_map: dict[int, int] = {}  # question_number -> char_pos (first occurrence)
-    for pos, n in all_matches:
-        if n not in pos_map:
-            pos_map[n] = pos
-
-    # Walk from 1 upward collecting sequential numbers.
-    # Allow gaps (missing pages in scraped papers) by jumping to the next
-    # available number when the chain breaks — but only if that next number
-    # is higher (no resets) and within the plausible paper range (<=200).
-    chain = []
-    n = 1
-    while True:
-        if n in pos_map:
-            chain.append((pos_map[n], n))
-            n += 1
-        else:
-            # find the next available number above n (within 200)
-            next_n = next((k for k in range(n + 1, 201) if k in pos_map), None)
-            if next_n is None:
-                break
-            n = next_n  # jump over the gap and continue
-
-    return chain
+def pdf_to_page_images(pdf_path: Path, dpi: int = PAGE_DPI) -> list[bytes]:
+    """Render each page of a PDF to PNG bytes."""
+    doc = fitz.open(str(pdf_path))
+    zoom = dpi / 72.0
+    mat  = fitz.Matrix(zoom, zoom)
+    images = []
+    for page in doc:
+        pix = page.get_pixmap(matrix=mat)
+        images.append(pix.tobytes("png"))
+    doc.close()
+    return images
 
 
-def parse_questions(md_text: str) -> list[dict]:
-    """Split a markdown PYQ paper into individual question dicts.
-
-    Returns: [{n, text, answer}]
-      text   — stem + options, clean of answer/nav lines (this is what gets embedded)
-      answer — correct letter a-d, or "" if not found
-    """
-    starts = _find_question_starts(md_text)
-    if not starts:
-        return []
-
-    questions = []
-    for i, (pos, n) in enumerate(starts):
-        end = starts[i + 1][0] if i + 1 < len(starts) else len(md_text)
-        block = md_text[pos:end].strip()
-
-        ans_match = _ANSWER_LINE.search(block)
-        answer = ans_match.group(1).lower() if ans_match else ""
-
-        # strip answer + nav lines so they don't pollute the embedding
-        clean = _ANSWER_LINE.sub("", block)
-        clean = re.sub(r"Show Answer/Hide\s*", "", clean, flags=re.IGNORECASE)
-        clean = clean.strip()
-
-        if len(clean) < 20:  # skip stray header fragments
-            continue
-
-        questions.append({"n": n, "text": clean, "answer": answer})
-
-    return questions
+def _b64(png_bytes: bytes) -> str:
+    return base64.b64encode(png_bytes).decode()
 
 
-# ── subject classification ────────────────────────────────────────────────────
+# ── Sarvam vision extraction ───────────────────────────────────────────────────
+
+_EXTRACT_SYSTEM = """\
+You are an expert Hindi exam paper transcriber for Indian state PSC/SSC exams.
+You will be given one or more pages from an exam paper (UKSSSC / UKPSC / similar).
+
+Extract every MCQ question you can see and return a JSON array with this shape:
+[
+  {
+    "n": <integer question number>,
+    "text": "<question stem + all options in Devanagari, exactly as printed>"
+  },
+  ...
+]
+
+Rules:
+- Transcribe Hindi Devanagari EXACTLY — no spelling correction, no translation.
+- Include the question number and all four options (क/ख/ग/घ or A/B/C/D) in "text".
+- Skip section headings, instructions, and non-MCQ content.
+- If a page has no MCQ questions, return an empty array [].
+- Return ONLY the JSON array, no prose, no markdown fences.
+"""
+
+
+def _extract_questions_from_pages(page_images: list[bytes], start_page: int) -> list[dict]:
+    """Send a batch of page images to Sarvam vision → [{n, text}]."""
+    content = []
+    for i, png in enumerate(page_images):
+        content.append({
+            "type": "text",
+            "text": f"Page {start_page + i + 1}:",
+        })
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{_b64(png)}"},
+        })
+    content.append({
+        "type": "text",
+        "text": "Extract all MCQ questions from these pages and return a JSON array.",
+    })
+
+    resp = _sarvam().chat.completions.create(
+        model=SARVAM_MODEL,
+        max_tokens=4096,
+        messages=[
+            {"role": "system", "content": _EXTRACT_SYSTEM},
+            {"role": "user",   "content": content},
+        ],
+    )
+    raw = resp.choices[0].message.content.strip()
+
+    # strip markdown fences if present
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    # try to pull the array out of surrounding text
+    m = re.search(r"\[.*\]", raw, re.DOTALL)
+    if m:
+        try:
+            parsed = json.loads(m.group(0))
+            if isinstance(parsed, list):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    print(f"    WARNING: could not parse JSON from pages {start_page+1}-{start_page+len(page_images)}")
+    return []
+
+
+def extract_questions_from_pdf(pdf_path: Path) -> list[dict]:
+    """Full extraction: render PDF → call Sarvam in page batches → deduplicated list."""
+    print(f"  Rendering PDF to images ({PAGE_DPI}dpi)...")
+    page_images = pdf_to_page_images(pdf_path)
+    total_pages = len(page_images)
+    print(f"  {total_pages} pages rendered.")
+
+    all_questions: dict[int, dict] = {}  # keyed by n to deduplicate
+    for i in range(0, total_pages, PAGES_PER_CALL):
+        batch = page_images[i: i + PAGES_PER_CALL]
+        print(f"  Calling Sarvam vision: pages {i+1}-{i+len(batch)} of {total_pages}...", flush=True)
+        try:
+            questions = _extract_questions_from_pages(batch, start_page=i)
+            new = 0
+            for q in questions:
+                n = int(q.get("n", 0))
+                text = str(q.get("text", "")).strip()
+                if n > 0 and len(text) > 10 and n not in all_questions:
+                    all_questions[n] = {"n": n, "text": text}
+                    new += 1
+            print(f"    → {new} new questions (total so far: {len(all_questions)})")
+        except Exception as e:
+            print(f"    ERROR on pages {i+1}-{i+len(batch)}: {e}")
+
+    # return sorted by question number
+    return [all_questions[n] for n in sorted(all_questions)]
+
+
+# ── subject classification ─────────────────────────────────────────────────────
+
+_CLASSIFY_PROMPT = """Classify this Indian competitive exam question by subject.
+Return ONLY one of these exact codes — no explanation, no punctuation:
+
+uk-history        → Uttarakhand history, events, personalities, movements
+uk-geography      → Uttarakhand geography, rivers, peaks, districts, climate
+uk-culture        → Uttarakhand folk art, dance, music, festivals, traditions
+uk-general-studies → Uttarakhand polity, governance, schemes, current affairs, economy
+general-gk        → national GK, Indian polity/history, science, maths, reasoning, computer
+hindi             → Hindi grammar, literature, vocabulary, sentence correction
+
+Question:
+{question}"""
+
 
 def classify_subjects(questions: list[dict]) -> list[str]:
-    """Classify each question's subject with Haiku. Returns codes in same order."""
     subjects = []
     total = len(questions)
     print(f"  Classifying {total} questions with Haiku...")
@@ -209,7 +261,7 @@ def classify_subjects(questions: list[dict]) -> list[str]:
                 max_tokens=20,
                 messages=[{
                     "role": "user",
-                    "content": CLASSIFY_PROMPT.format(question=q["text"][:600]),
+                    "content": _CLASSIFY_PROMPT.format(question=q["text"][:600]),
                 }],
             )
             code = msg.content[0].text.strip().lower().strip(".")
@@ -221,7 +273,7 @@ def classify_subjects(questions: list[dict]) -> list[str]:
     return subjects
 
 
-# ── embedding ─────────────────────────────────────────────────────────────────
+# ── embedding ──────────────────────────────────────────────────────────────────
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     all_embeddings: list[list[float]] = []
@@ -233,7 +285,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return all_embeddings
 
 
-# ── already ingested? ─────────────────────────────────────────────────────────
+# ── already ingested? ──────────────────────────────────────────────────────────
 
 def _already_ingested(source_file: str) -> bool:
     try:
@@ -250,10 +302,9 @@ def _already_ingested(source_file: str) -> bool:
         return False
 
 
-# ── store ─────────────────────────────────────────────────────────────────────
+# ── store ──────────────────────────────────────────────────────────────────────
 
 def store_rows(rows: list[dict]):
-    """rows: [{subject, source_file, chunk_text, embedding}]"""
     conn = _db()
     inserted = 0
     with conn.cursor() as cur:
@@ -278,31 +329,28 @@ def store_rows(rows: list[dict]):
     conn.close()
 
 
-# ── per-file ingestion ────────────────────────────────────────────────────────
+# ── per-file ingestion ─────────────────────────────────────────────────────────
 
-def ingest_file(md_path: Path, dry_run: bool = False):
-    source_file = md_path.name
-    exam_type   = md_path.parent.name
+def ingest_file(pdf_path: Path, dry_run: bool = False):
+    source_file = pdf_path.name
 
     print(f"\n{'='*60}")
     print(f"File     : {source_file}")
-    print(f"Exam type: {exam_type}")
+    print(f"Exam type: {pdf_path.parent.name}")
     print(f"{'='*60}")
 
     if not dry_run and _already_ingested(source_file):
         print("  Already in DB — skipping.")
         return
 
-    text = md_path.read_text(encoding="utf-8")
-    questions = parse_questions(text)
-    print(f"  Parsed {len(questions)} questions.")
+    questions = extract_questions_from_pdf(pdf_path)
+    print(f"  Extracted {len(questions)} questions.")
 
     if not questions:
-        print("  No questions found — check markdown format.")
+        print("  No questions found — check PDF quality.")
         return
 
     subjects = classify_subjects(questions)
-
     dist = Counter(subjects)
     print(f"  Subject distribution: {dict(dist)}")
 
@@ -329,13 +377,13 @@ def ingest_file(md_path: Path, dry_run: bool = False):
     print(f"  DONE: {len(rows)} chunks stored for '{source_file}'")
 
 
-# ── main ──────────────────────────────────────────────────────────────────────
+# ── main ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Ingest PYQ markdown papers into pyq_chunks."
+        description="Ingest PYQ PDF papers into pyq_chunks via Sarvam vision."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
@@ -345,7 +393,7 @@ if __name__ == "__main__":
     group.add_argument("--all", action="store_true", help="Ingest all exam folders")
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Parse + classify only — no embeddings, no DB writes",
+        help="Extract + classify only — no embeddings, no DB writes",
     )
     args = parser.parse_args()
 
@@ -358,11 +406,11 @@ if __name__ == "__main__":
         if not exam_dir.exists():
             print(f"ERROR: folder not found: {exam_dir}")
             sys.exit(1)
-        md_files = sorted(f for f in exam_dir.glob("*.md") if not f.name.startswith("."))
-        if not md_files:
-            print(f"No .md files in {exam_dir.name} — skipping.")
+        pdf_files = sorted(f for f in exam_dir.glob("*.pdf") if not f.name.startswith("."))
+        if not pdf_files:
+            print(f"No .pdf files in {exam_dir.name} — skipping.")
             continue
-        for md_file in md_files:
-            ingest_file(md_file, dry_run=args.dry_run)
+        for pdf_file in pdf_files:
+            ingest_file(pdf_file, dry_run=args.dry_run)
 
     print("\nAll done.")
