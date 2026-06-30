@@ -1,6 +1,7 @@
 .env
 .venv/
 __pycache__/
+temp_pkg/
 *.pyc
 *.pyo
 AGENTS.md
