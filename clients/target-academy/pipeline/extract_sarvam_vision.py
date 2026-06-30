@@ -179,10 +179,28 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
     return "\n".join(md_parts)
 
 
+def _html_to_text(s: str) -> str:
+    """Strip Sarvam's HTML wrapper to plain text. The OCR output wraps content in
+    <table>/<tr>/<td>/<br> markup; feeding that raw to the question extractor
+    bloats it (~80k chars vs ~30k of real text) and adds noise. Convert row/cell/
+    break tags to whitespace, drop the rest, and unescape entities — the
+    Devanagari is already clean Unicode."""
+    import html as _html
+    import re as _re
+    # turn structural tags into line/space breaks so question boundaries survive
+    s = _re.sub(r"(?i)<\s*br\s*/?>", "\n", s)
+    s = _re.sub(r"(?i)</\s*(tr|p|div|h[1-6]|li)\s*>", "\n", s)
+    s = _re.sub(r"(?i)</\s*(td|th)\s*>", "  ", s)
+    s = _re.sub(r"(?s)<[^>]+>", "", s)        # drop all remaining tags
+    s = _html.unescape(s)
+    # collapse the blank-line explosion the table stripping leaves behind
+    s = _re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
+
+
 def _text_from_zip(zip_bytes: bytes) -> list[str]:
-    """Pull every text/markdown/html file out of the Sarvam output ZIP, in page
-    order. HTML is fine — the downstream extractor reads plain text out of it
-    (and Devanagari is already clean Unicode here)."""
+    """Pull text out of the Sarvam output ZIP, in page order, HTML stripped to
+    plain readable text (Devanagari is already clean Unicode here)."""
     import zipfile
     parts = []
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
@@ -192,7 +210,8 @@ def _text_from_zip(zip_bytes: bytes) -> list[str]:
         preferred = [n for n in names if not n.lower().endswith(".json")] or names
         for n in preferred:
             try:
-                parts.append(zf.read(n).decode("utf-8", "replace"))
+                raw = zf.read(n).decode("utf-8", "replace")
+                parts.append(_html_to_text(raw) if n.lower().endswith(".html") else raw)
             except Exception:
                 pass
     return parts

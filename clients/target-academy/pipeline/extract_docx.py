@@ -31,7 +31,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 from llm import complete, parse_json  # noqa: E402
 from krutidev import krutidev_to_unicode  # noqa: E402
 
-MAX_CHARS = 60_000   # a 140-Q paper is ~25k chars of text; gives headroom
+# Headroom for BOTH paths: the .docx text layer is ~25k chars for a 140-Q paper,
+# but Sarvam Vision OCR output is much larger (it wraps content in HTML table
+# markup) — a 100-Q paper came back ~80k chars. Cap high enough not to reject a
+# legitimate OCR result (which previously fell back to the garbled text path),
+# while still guarding against a runaway input.
+MAX_CHARS = 250_000
 
 # Devanagari Unicode block — used to tell converted Hindi from raw Kruti-Dev
 # (which is ASCII-range Latin "gibberish" like "LFkku gSaA").
