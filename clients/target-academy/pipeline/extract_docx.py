@@ -29,8 +29,88 @@ from docx import Document
 
 sys.path.insert(0, str(Path(__file__).parent))
 from llm import complete, parse_json  # noqa: E402
+from krutidev import krutidev_to_unicode  # noqa: E402
 
 MAX_CHARS = 60_000   # a 140-Q paper is ~25k chars of text; gives headroom
+
+# Devanagari Unicode block — used to tell converted Hindi from raw Kruti-Dev
+# (which is ASCII-range Latin "gibberish" like "LFkku gSaA").
+_DEVANAGARI = re.compile(r"[ऀ-ॿ]")
+# ASCII letters that, in bulk, signal unconverted Kruti-Dev legacy text.
+_LATINISH = re.compile(r"[A-Za-z]")
+
+
+def _devanagari_ratio(s: str) -> float:
+    """Fraction of letter-characters that are Devanagari. ~1.0 = clean Hindi,
+    near 0 with many Latin letters = raw Kruti-Dev that never got converted."""
+    deva = len(_DEVANAGARI.findall(s))
+    latin = len(_LATINISH.findall(s))
+    total = deva + latin
+    return deva / total if total else 1.0
+
+
+def _looks_like_krutidev(s: str) -> bool:
+    """A Hindi-language field that is mostly Latin letters is almost certainly
+    raw Kruti-Dev the model failed to transliterate. English-only option text
+    (rare) is short, so require some length before flagging."""
+    if not s or len(s) < 4:
+        return False
+    return _devanagari_ratio(s) < 0.4 and len(_LATINISH.findall(s)) >= 4
+
+
+# A run of Kruti-Dev: Latin letters mixed with the punctuation/digits the legacy
+# encoding uses (] [ { } % : ; etc.), long enough to be real text not a stray word.
+_KD_RUN = re.compile(r"[A-Za-z][A-Za-z0-9 \]\[{}%:;,.'\"&+/=#-]{3,}")
+
+
+def _clean_krutidev(s: str) -> str:
+    """Deterministically repair Kruti-Dev that the model failed to transliterate.
+
+    The model often converts the FIRST part of a long field and leaves the rest
+    as raw Kruti-Dev ("नकशा ,द द{kk esa] dk LFkku..."), so judging the whole
+    string misses these. Instead, find each embedded run of Kruti-Dev and convert
+    just that run — the same deterministic table the builders use, in reverse.
+    No LLM involved.
+    """
+    if not s:
+        return s
+
+    # whole-string case: clearly all Kruti-Dev -> convert the whole thing
+    if _looks_like_krutidev(s):
+        converted = krutidev_to_unicode(s)
+        if _devanagari_ratio(converted) > _devanagari_ratio(s):
+            return converted
+
+    # mixed case: convert only the Latin-gibberish runs embedded in the Hindi
+    def _sub(m):
+        run = m.group(0)
+        conv = krutidev_to_unicode(run)
+        # only swap in the conversion if it actually became Devanagari
+        return conv if _DEVANAGARI.search(conv) else run
+
+    return _KD_RUN.sub(_sub, s)
+
+
+def _recover_or_drop(questions: list[dict]) -> list[dict]:
+    """Convert-then-drop (Mayank's call): deterministically fix any stem/option
+    the model left in raw Kruti-Dev; then drop a question that is STILL gibberish
+    so the output never shows garbage. Returns the cleaned list."""
+    cleaned, dropped = [], 0
+    for q in questions:
+        if q.get("stem"):
+            q["stem"] = _clean_krutidev(q["stem"])
+        if isinstance(q.get("options"), list):
+            q["options"] = [_clean_krutidev(o) if isinstance(o, str) else o
+                            for o in q["options"]]
+        # after recovery, is the stem still gibberish? if so, drop the question.
+        if q.get("stem") and _looks_like_krutidev(q["stem"]):
+            dropped += 1
+            continue
+        cleaned.append(q)
+    if dropped:
+        print(f"  [extract_docx] dropped {dropped} question(s) that stayed "
+              f"un-convertible Kruti-Dev gibberish after recovery", file=sys.stderr)
+    return cleaned
 
 SYSTEM = """You extract MCQs from Indian exam paper text and return JSON.
 
@@ -268,6 +348,11 @@ def extract_from_text(body: str, label: str = "input") -> dict:
             fallback_n += 1
         seen[n] = q
     questions = [seen[n] for n in sorted(seen)]
+
+    # Recover any text the model left in raw Kruti-Dev (it tends to give up on
+    # the transliteration late in a long response); drop anything still gibberish
+    # so the paper never renders garbage.
+    questions = _recover_or_drop(questions)
 
     if not questions:
         raise ValueError(f"{label}: extractor returned no questions across {len(chunks)} chunks.")
