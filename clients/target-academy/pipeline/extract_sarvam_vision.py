@@ -28,6 +28,7 @@ This module only produces CLEAN TEXT. extract_docx.extract_from_text() then turn
 that text into the universal questions JSON, so all the salvage/dedup logic is
 shared.
 """
+import io
 import os
 import sys
 import time
@@ -142,24 +143,59 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
     if state in _TERMINAL_BAD or state not in _TERMINAL_OK:
         raise RuntimeError(f"Sarvam Vision job {job_id} ended in state {state!r}")
 
-    # 6. download links
+    # 6. download links. download_urls is a dict {filename: {file_url, ...}} and
+    #    the real output is a single ZIP ("document.zip") containing the OCR text
+    #    files (md/html/txt/json) — NOT loose files. (Verified against the live API.)
     d = client.post(f"{BASE_URL}/{job_id}/download-files", headers=_headers())
     d.raise_for_status()
     download_urls = d.json().get("download_urls", {})
 
-    # 7. fetch the markdown output (prefer .md, else any non-pdf text file)
+    # normalise to (name, url) pairs whether dict-of-dicts or dict-of-strings
+    files = []
+    if isinstance(download_urls, dict):
+        for name, meta in download_urls.items():
+            url = meta.get("file_url") if isinstance(meta, dict) else meta
+            if url:
+                files.append((name, url))
+    if not files:
+        raise RuntimeError(f"Sarvam Vision job {job_id} returned no download URLs")
+
     md_parts = []
-    for name, meta in download_urls.items():
-        url = meta.get("file_url") if isinstance(meta, dict) else meta
-        if not url or name.lower().endswith(".pdf"):
-            continue
-        if name.lower().endswith((".md", ".txt", ".json", ".html")):
+    for name, url in files:
+        lname = name.lower()
+        if lname.endswith(".zip"):
+            blob = client.get(url)
+            blob.raise_for_status()
+            md_parts.extend(_text_from_zip(blob.content))
+        elif lname.endswith((".md", ".txt", ".json", ".html")):
             got = client.get(url)
             got.raise_for_status()
             md_parts.append(got.text)
+        # ignore .pdf (the re-rendered source) and anything else
+
+    md_parts = [p for p in md_parts if p and p.strip()]
     if not md_parts:
         raise RuntimeError(f"Sarvam Vision job {job_id} produced no text output")
     return "\n".join(md_parts)
+
+
+def _text_from_zip(zip_bytes: bytes) -> list[str]:
+    """Pull every text/markdown/html file out of the Sarvam output ZIP, in page
+    order. HTML is fine — the downstream extractor reads plain text out of it
+    (and Devanagari is already clean Unicode here)."""
+    import zipfile
+    parts = []
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        names = sorted(n for n in zf.namelist()
+                       if n.lower().endswith((".md", ".txt", ".html", ".json")))
+        # prefer md/txt/html over json if both exist; json is the structured dump
+        preferred = [n for n in names if not n.lower().endswith(".json")] or names
+        for n in preferred:
+            try:
+                parts.append(zf.read(n).decode("utf-8", "replace"))
+            except Exception:
+                pass
+    return parts
 
 
 def digitize_to_text(src: Path, language: str = "hi-IN") -> str:
