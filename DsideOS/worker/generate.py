@@ -62,9 +62,9 @@ TOPICS_DIVISOR = 4       # aim for ~count/4 distinct topics (4 questions per top
 PYQ_SEED_K = 40          # random PYQs fed to Haiku for topic extraction
 BOOK_TOP_K = 4           # book passages per topic
 PYQ_TOP_K = 2            # PYQ style examples per topic
-BOOK_THRESHOLD = 0.20
-BOOK_FALLBACK_THRESHOLD = 0.15
-PYQ_THRESHOLD = 0.20
+BOOK_THRESHOLD = 0.15
+BOOK_FALLBACK_THRESHOLD = 0.10
+PYQ_THRESHOLD = 0.15
 
 # Output token budget per model call. With topic isolation each call is small:
 # 4 book chunks + 2 PYQ examples + N questions (N = count // n_topics, usually 2).
