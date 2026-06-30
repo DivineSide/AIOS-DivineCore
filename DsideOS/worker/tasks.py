@@ -64,13 +64,16 @@ def _check_zip_bomb(path: Path) -> None:
         raise ValueError("Document is too large or suspiciously compressed.")
 
 
-def _extract_any(file_path: Path) -> dict:
-    """Route ANY supported input file to the right extractor -> questions dict.
+# Sarvam Vision (document OCR) is the DEFAULT extraction path: it reads the doc
+# as an image and returns clean Unicode, sidestepping the Kruti-Dev/English
+# ambiguity that garbles the legacy .docx text layer. Set USE_SARVAM_VISION=0 to
+# force the old text-layer path.
+_USE_SARVAM_VISION = os.environ.get("USE_SARVAM_VISION", "1") == "1"
 
-    .docx              -> extract_docx (text path, Unicode out)
-    .pdf               -> extract_pdf  (auto: digital text vs scanned vision)
-    .png/.jpg/.jpeg    -> extract_vision (Claude Vision)
-    """
+
+def _extract_text_layer(file_path: Path) -> dict:
+    """The original per-type extractors (text layer / Claude Vision). Used as the
+    fallback when Sarvam Vision is unavailable or fails."""
     ext = file_path.suffix.lower()
     if ext == ".docx":
         _check_zip_bomb(file_path)
@@ -83,6 +86,34 @@ def _extract_any(file_path: Path) -> dict:
         import extract_vision
         return extract_vision.extract([file_path])
     raise ValueError(f"Unsupported input format: {ext}")
+
+
+def _extract_any(file_path: Path) -> dict:
+    """Route ANY supported input file to questions dict.
+
+    DEFAULT: Sarvam Vision OCR -> clean Unicode text -> shared question structuring.
+    FALLBACK: the legacy text-layer extractors (extract_docx/pdf/vision) if Sarvam
+    Vision is disabled, errors, or yields no questions.
+    """
+    ext = file_path.suffix.lower()
+    if ext == ".docx":
+        _check_zip_bomb(file_path)
+
+    if _USE_SARVAM_VISION:
+        try:
+            import extract_sarvam_vision
+            import extract_docx
+            text = extract_sarvam_vision.digitize_to_text(file_path)
+            data = extract_docx.extract_from_text(text, label=file_path.name)
+            if data.get("questions"):
+                return data
+            print("  [extract] Sarvam Vision yielded no questions; "
+                  "falling back to text layer", file=sys.stderr)
+        except Exception as e:
+            print(f"  [extract] Sarvam Vision failed ({type(e).__name__}: {e}); "
+                  f"falling back to text layer", file=sys.stderr)
+
+    return _extract_text_layer(file_path)
 
 
 def _safe_name(raw: str) -> str:
