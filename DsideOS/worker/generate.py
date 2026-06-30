@@ -72,7 +72,7 @@ PYQ_THRESHOLD = 0.20
 # the output is tiny (~540 tokens) so even with 1000 reasoning tokens we're safe
 # under 4096. Override via env for paid tier.
 if GEN_PROVIDER == "sarvam":
-    MAX_OUTPUT_TOKENS = int(os.environ.get("SARVAM_MAX_TOKENS", "4096"))
+    MAX_OUTPUT_TOKENS = int(os.environ.get("SARVAM_MAX_TOKENS", "8192"))
     MAX_QUESTIONS_PER_CALL = int(os.environ.get("SARVAM_BATCH", "4"))
 else:
     MAX_OUTPUT_TOKENS = 8192
@@ -153,10 +153,10 @@ def _sarvam_client():
 # ── Phase 1 — subject -> topics (Haiku) ──────────────────────────────────────
 
 async def _extract_topics(subject: str, count: int) -> list[str]:
-    """Use Haiku to derive N/TOPICS_DIVISOR distinct exam topics for the subject.
-    Seeds Haiku with a random PYQ sample — PYQs carry both the topic signal
-    (what this exam tests) and implicitly the style signal (what Haiku extracts).
-    More PYQs = broader topic diversity in the output."""
+    """Use Sarvam to derive N/TOPICS_DIVISOR distinct exam topics for the subject.
+    Sarvam owns all Hindi generation — topic strings are Hindi and feed directly
+    into the RAG query and the Phase 3 system prompt, so clean Hindi here matters.
+    Seeds Sarvam with a random PYQ sample for topic signal."""
     n_topics = max(1, count // TOPICS_DIVISOR)
 
     seed_pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SEED_K)
@@ -173,12 +173,16 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
         f"overlap or be rewordings of each other. Cover as wide a range as possible. "
         f"Example: [\"उत्तराखंड का गठन\", \"गढ़वाल राज्य का इतिहास\"]"
     )
-    msg = _client().messages.create(
-        model=HAIKU,
-        max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    topics = _parse_json_array(msg.content[0].text.strip())
+    if GEN_PROVIDER == "sarvam":
+        raw = _gen_batch_sarvam("You are a helpful assistant.", prompt, n_topics)
+    else:
+        msg = _client().messages.create(
+            model=HAIKU,
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text.strip() if msg.content else ""
+    topics = _parse_json_array(raw)
     topics = [t for t in topics if isinstance(t, str) and t.strip()]
     if not topics:
         return [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
@@ -316,7 +320,8 @@ def _gen_questions(subject: str, count: int,
                     text = _gen_batch_sarvam(system, user, batch)
                 else:
                     text = _gen_batch_anthropic(system, user, batch)
-                accepted = _accept(_parse_json_array(text), src_books)
+                parsed = _parse_json_array(text) or _repair_json(text)
+                accepted = _accept(parsed, src_books)
                 topic_out += accepted
             except RuntimeError as e:
                 logger.warning("TOPIC %r batch failed: %s", topic, e)
@@ -429,6 +434,33 @@ def _gen_batch_sarvam(system: str, user: str, count: int) -> str:
         (getattr(u, "completion_tokens", 0) / count) if count else 0,
     )
     return (choice.message.content or "").strip()
+
+
+# ── JSON repair (Haiku) ───────────────────────────────────────────────────────
+
+_JSON_REPAIR_SYSTEM = (
+    "You are a JSON repair tool. The user will send malformed or truncated JSON. "
+    "Return ONLY the repaired valid JSON array. No prose, no markdown fences, no explanation."
+)
+
+
+def _repair_json(text: str) -> list:
+    """If _parse_json_array fails, ask Haiku to repair the JSON structure.
+    Haiku touches structure only — it never rewrites Hindi content."""
+    try:
+        msg = _client().messages.create(
+            model=HAIKU,
+            max_tokens=4096,
+            system=_JSON_REPAIR_SYSTEM,
+            messages=[{"role": "user", "content": text}],
+        )
+        repaired = msg.content[0].text.strip() if msg.content else ""
+        result = _parse_json_array(repaired)
+        logger.info("JSON_REPAIR recovered %d questions", len(result))
+        return result
+    except Exception as e:
+        logger.warning("JSON_REPAIR failed: %s", e)
+        return []
 
 
 # ── orchestrator ─────────────────────────────────────────────────────────────
