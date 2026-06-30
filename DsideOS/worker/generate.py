@@ -58,7 +58,7 @@ SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
 # RAG depth per topic. Each topic gets its own dedicated context — these are
 # per-topic limits, not total limits. With topic isolation, BOOK_TOP_K=4 means
 # each topic's call sees exactly 4 book passages and 2 PYQ examples.
-TOPICS_DIVISOR = 2       # aim for ~count/2 distinct topics (2 questions per topic)
+TOPICS_DIVISOR = 4       # aim for ~count/4 distinct topics (4 questions per topic)
 PYQ_SEED_K = 40          # random PYQs fed to Haiku for topic extraction
 BOOK_TOP_K = 4           # book passages per topic
 PYQ_TOP_K = 2            # PYQ style examples per topic
@@ -157,7 +157,7 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
     Sarvam owns all Hindi generation — topic strings are Hindi and feed directly
     into the RAG query and the Phase 3 system prompt, so clean Hindi here matters.
     Seeds Sarvam with a random PYQ sample for topic signal."""
-    n_topics = max(1, count // TOPICS_DIVISOR)
+    n_topics = max(1, min(count // TOPICS_DIVISOR, 20))  # cap at 20 to stay under 4096 output tokens
 
     seed_pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SEED_K)
     if not seed_pyqs:
