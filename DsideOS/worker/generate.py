@@ -72,7 +72,7 @@ PYQ_THRESHOLD = 0.20
 # the output is tiny (~540 tokens) so even with 1000 reasoning tokens we're safe
 # under 4096. Override via env for paid tier.
 if GEN_PROVIDER == "sarvam":
-    MAX_OUTPUT_TOKENS = int(os.environ.get("SARVAM_MAX_TOKENS", "8192"))
+    MAX_OUTPUT_TOKENS = int(os.environ.get("SARVAM_MAX_TOKENS", "4096"))
     MAX_QUESTIONS_PER_CALL = int(os.environ.get("SARVAM_BATCH", "4"))
 else:
     MAX_OUTPUT_TOKENS = 8192
