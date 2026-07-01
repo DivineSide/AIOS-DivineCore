@@ -158,10 +158,20 @@ def _runs(text):
     return [(t, LATIN if is_latin else deva_font) for t, is_latin in runs]
 
 
+def _no_split_rows(tbl):
+    """Mark every row w:cantSplit so one question's table never breaks across a
+    page (options landing on the next page). Word then floats the whole table to
+    the next page if it doesn't fit."""
+    for row in tbl.rows:
+        trPr = row._tr.get_or_add_trPr()
+        trPr.append(_el("w:cantSplit", **{"w:val": "true"}))
+
+
 def add_question_table(doc, q):
     tbl = doc.add_table(rows=8, cols=3)
     _apply_tblPr(tbl)
     _apply_tblGrid(tbl)
+    _no_split_rows(tbl)
 
     rows = tbl.rows
 
@@ -182,17 +192,35 @@ def add_question_table(doc, q):
     _fill_plain(rows[1].cells[1], "multiple_choice",
                 width=COL1_W + COL2_W, span=2, bold=False)
 
-    # Rows 2–5: Option | <text> | incorrect
+    # Which option (0-based) is the correct one, if the pipeline marked it from
+    # the institute DB. Blank/absent answer -> no option marked correct (all
+    # "incorrect", as before — the teacher fills it in).
+    ans = str(q.get("answer", "")).strip().lower()
+    correct_idx = "abcdef".index(ans) if ans in "abcdef" else -1
+
+    # Rows 2–5: Option | <text> | correct/incorrect
     for i, opt in enumerate(q["options"][:4]):
         row = rows[2 + i]
         _fill_label(row.cells[0], "Option")
         _fill_runs(row.cells[1], _runs(opt), width=COL1_W, bold=False)
-        _fill_plain(row.cells[2], "incorrect", width=COL2_W, bold=False)
+        _fill_plain(row.cells[2], "correct" if i == correct_idx else "incorrect",
+                    width=COL2_W, bold=False)
 
-    # Row 6: Solution | (blank, colspan 2)
+    # Row 6: Solution | <solution text or blank, colspan 2>
     _fill_label(rows[6].cells[0], "Solution")
-    _fill_plain(rows[6].cells[1], "",
-                width=COL1_W + COL2_W, span=2, bold=False)
+    solution = str(q.get("solution", "")).strip()
+    if solution:
+        _apply_tcPr(rows[6].cells[1]._tc, COL1_W + COL2_W, span=2)
+        tc2 = rows[6].cells[1]._tc.getnext()
+        if tc2 is not None:
+            tc2.getparent().remove(tc2)
+        para = rows[6].cells[1].paragraphs[0]
+        _fmt_para(para)
+        for text, font in _runs(solution):
+            _add_run(para, text, bold=False, font=font)
+    else:
+        _fill_plain(rows[6].cells[1], "",
+                    width=COL1_W + COL2_W, span=2, bold=False)
 
     # Row 7: Marks | 1 | 0.25
     _fill_label(rows[7].cells[0], "Marks")
