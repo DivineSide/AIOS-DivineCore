@@ -96,22 +96,47 @@ def _clean_krutidev(s: str) -> str:
     return _KD_RUN.sub(_sub, s)
 
 
+# The OCR sometimes transcribes the paper's COVER PAGE (logo, "Target Academy",
+# the archer image) as if it were a question — "छवि में एक ... लोगो है ... एक
+# तीरंदाज का चित्र है". Detect a stem that is describing an image/logo rather than
+# asking a question, so we drop it instead of shipping a junk Q1.
+_COVER_MARKERS = ("छवि", "लोगो", "तीरंदाज", "चित्र है", "गोलाकार",
+                  "logo", "image", "archer", "blank page", "खाली")
+
+
+def _looks_like_cover(stem: str) -> bool:
+    if not stem:
+        return False
+    s = stem.lower()
+    hits = sum(1 for m in _COVER_MARKERS if m.lower() in s)
+    # a real question rarely stacks 2+ of these; a logo/cover description does
+    return hits >= 2
+
+
 def _recover_or_drop(questions: list[dict]) -> list[dict]:
     """Convert-then-drop (Mayank's call): deterministically fix any stem/option
     the model left in raw Kruti-Dev; then drop a question that is STILL gibberish
-    so the output never shows garbage. Returns the cleaned list."""
-    cleaned, dropped = [], 0
+    (or is actually the cover page transcribed as a question) so the output never
+    shows garbage. Returns the cleaned list."""
+    cleaned, dropped, covers = [], 0, 0
     for q in questions:
         if q.get("stem"):
             q["stem"] = _clean_krutidev(q["stem"])
         if isinstance(q.get("options"), list):
             q["options"] = [_clean_krutidev(o) if isinstance(o, str) else o
                             for o in q["options"]]
+        # drop the cover page mis-read as a question
+        if _looks_like_cover(q.get("stem", "")):
+            covers += 1
+            continue
         # after recovery, is the stem still gibberish? if so, drop the question.
         if q.get("stem") and _looks_like_krutidev(q["stem"]):
             dropped += 1
             continue
         cleaned.append(q)
+    if covers:
+        print(f"  [extract_docx] dropped {covers} cover/image-description "
+              f"pseudo-question(s)", file=sys.stderr)
     if dropped:
         print(f"  [extract_docx] dropped {dropped} question(s) that stayed "
               f"un-convertible Kruti-Dev gibberish after recovery", file=sys.stderr)

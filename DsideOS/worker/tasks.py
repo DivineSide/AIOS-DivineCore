@@ -289,10 +289,24 @@ def full_task(self, job_id: str, meta: dict):
     try:
         src = next(jobs.input_dir(job_id).iterdir())
         extracted = _extract_any(src)
-        jobs.update_meta(job_id, stage="build",
+        jobs.update_meta(job_id, stage="review",
                          n_questions=len(extracted.get("questions", [])))
 
         data = _wrap_questions(extracted["questions"], meta)
+        # light OCR proofread (only obvious typos; proper nouns/facts untouched)
+        try:
+            import proofread
+            proofread.proofread(data)
+        except Exception as e:
+            print(f"[full_task] proofread skipped ({type(e).__name__}: {e})", flush=True)
+        # mark the correct option + solution from the institute DB, when confident;
+        # leave blank otherwise (never guess)
+        try:
+            import answer_from_rag
+            answer_from_rag.mark_answers(data)
+        except Exception as e:
+            print(f"[full_task] answer-marking skipped ({type(e).__name__}: {e})", flush=True)
+        jobs.update_meta(job_id, stage="build")
         _placeholder_answers(data)
         outputs = _run_builders(job_id, data, font)
         jobs.update_meta(job_id, status="DONE", outputs=outputs,
