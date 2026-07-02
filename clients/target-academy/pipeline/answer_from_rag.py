@@ -139,22 +139,45 @@ def _mark_one(q: dict) -> bool:
     return True
 
 
+# Mark questions concurrently. Each question is independent network-bound work
+# (1 embedding + 1 DB search + 1 LLM call), so a thread pool overlaps the waits
+# and turns ~N*Xs of sequential latency into ~(N/workers)*Xs. On a 75-question
+# paper the sequential loop took ~4 min and blew past the frontend timeout; this
+# collapses it. Tunable/disable-able via env (set workers=1 to serialize).
+_MARK_WORKERS = max(1, int(os.environ.get("ANSWER_RAG_WORKERS", "8")))
+
+
+def _mark_one_safe(q: dict) -> bool:
+    """_mark_one wrapped so a single question's failure never sinks the pool."""
+    try:
+        return _mark_one(q)
+    except Exception as e:
+        print(f"  [answer-rag] q error ({type(e).__name__}: {e})", file=sys.stderr)
+        return False
+
+
 def mark_answers(data: dict) -> dict:
     """Mark answers for every question in-place, from the institute DB, when
-    confident. Leaves the rest blank. Never raises."""
+    confident. Leaves the rest blank. Never raises. Questions are marked
+    concurrently (thread pool) — each mutates its OWN dict, so this is safe."""
     if not ANSWER_FROM_RAG:
         return data
     questions = data.get("questions", [])
+    # only mark questions the source paper didn't already answer
+    todo = [q for q in questions if not q.get("answer")]
     marked = 0
-    for q in questions:
-        # don't overwrite an answer the source paper already printed
-        if q.get("answer"):
-            continue
+    if todo:
+        from concurrent.futures import ThreadPoolExecutor
+        workers = min(_MARK_WORKERS, len(todo))
         try:
-            if _mark_one(q):
-                marked += 1
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                marked = sum(1 for ok in pool.map(_mark_one_safe, todo) if ok)
         except Exception as e:
-            print(f"  [answer-rag] q error ({type(e).__name__}: {e})", file=sys.stderr)
+            # if the pool itself fails, fall back to a plain sequential pass so
+            # we never lose marking entirely.
+            print(f"  [answer-rag] pool failed ({type(e).__name__}: {e}); "
+                  f"marking sequentially", file=sys.stderr)
+            marked = sum(1 for q in todo if _mark_one_safe(q))
     print(f"  [answer-rag] marked {marked}/{len(questions)} answers from the "
           f"institute database (rest left blank)", file=sys.stderr)
     return data
