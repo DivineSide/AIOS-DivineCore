@@ -159,19 +159,35 @@ def _runs(text):
 
 
 def _no_split_rows(tbl):
-    """Mark every row w:cantSplit so one question's table never breaks across a
-    page (options landing on the next page). Word then floats the whole table to
-    the next page if it doesn't fit."""
-    for row in tbl.rows:
+    """Keep one question's whole table on a SINGLE page.
+
+    Two things are needed and w:cantSplit alone is NOT enough:
+      1. w:cantSplit on each row — stops a single row from breaking mid-row.
+      2. w:keepNext on every paragraph of every row EXCEPT the last — this is
+         what actually stops the TABLE from breaking BETWEEN rows across a page
+         (the bug where Question/Type land on page 1 and the Options on page 2).
+         keepNext chains each row to the next, so Word floats the entire table
+         to the next page when it doesn't fit, rather than splitting it.
+    """
+    rows = tbl.rows
+    last = len(rows) - 1
+    for i, row in enumerate(rows):
         trPr = row._tr.get_or_add_trPr()
         trPr.append(_el("w:cantSplit", **{"w:val": "true"}))
+        if i == last:
+            continue  # the last row has nothing after it to keep with
+        for cell in row.cells:
+            for para in cell.paragraphs:
+                pPr = para._p.get_or_add_pPr()
+                # avoid stacking duplicate keepNext if a cell is revisited
+                if pPr.find(qn("w:keepNext")) is None:
+                    pPr.append(_el("w:keepNext", **{"w:val": "true"}))
 
 
 def add_question_table(doc, q):
     tbl = doc.add_table(rows=8, cols=3)
     _apply_tblPr(tbl)
     _apply_tblGrid(tbl)
-    _no_split_rows(tbl)
 
     rows = tbl.rows
 
@@ -226,6 +242,11 @@ def add_question_table(doc, q):
     _fill_label(rows[7].cells[0], "Marks")
     _fill_plain(rows[7].cells[1], "1",    width=COL1_W, bold=False)
     _fill_plain(rows[7].cells[2], "0.25", width=COL2_W, bold=False)
+
+    # Keep the whole question table on one page — MUST run AFTER all cells are
+    # filled, because the fill/colspan helpers replace paragraphs (which would
+    # drop a keepNext applied earlier).
+    _no_split_rows(tbl)
 
     # Blank separator paragraph
     sep = doc.add_paragraph()

@@ -113,12 +113,37 @@ def _looks_like_cover(stem: str) -> bool:
     return hits >= 2
 
 
+# Some source papers (esp. drafts) print the options as literal LABEL letters —
+# अ/ब/स/द (Hindi a/b/c/d) or a/b/c/d — with no actual answer text. Extracted
+# verbatim, they yield options like ['अ','ब','स','द'], which are meaningless in
+# the output (the teacher sees "अ / ब / स / द" as the choices, and marking one
+# "correct" is nonsense). Detect an option that is JUST a label placeholder.
+_LABEL_CHARS = set("अआइईउऊएऐओऔकखगघabcdefABCDEF")
+
+
+def _is_placeholder_option(opt: str) -> bool:
+    """True if the option is just a label letter (अ/ब/स/द, a/b/c...) with no
+    real content — i.e. after stripping brackets/dots/spaces it's <=1 letter."""
+    if not isinstance(opt, str):
+        return False
+    core = opt.strip().strip("().[]। :-").strip()
+    return len(core) <= 1
+
+
+def _all_options_placeholder(opts) -> bool:
+    """True if a question's options are ALL label placeholders (no real text),
+    so the question carries no usable answer choices."""
+    if not isinstance(opts, list) or len(opts) < 2:
+        return False
+    return all(_is_placeholder_option(o) for o in opts)
+
+
 def _recover_or_drop(questions: list[dict]) -> list[dict]:
     """Convert-then-drop (Mayank's call): deterministically fix any stem/option
     the model left in raw Kruti-Dev; then drop a question that is STILL gibberish
     (or is actually the cover page transcribed as a question) so the output never
     shows garbage. Returns the cleaned list."""
-    cleaned, dropped, covers = [], 0, 0
+    cleaned, dropped, covers, placeholders = [], 0, 0, 0
     for q in questions:
         if q.get("stem"):
             q["stem"] = _clean_krutidev(q["stem"])
@@ -133,6 +158,11 @@ def _recover_or_drop(questions: list[dict]) -> list[dict]:
         if q.get("stem") and _looks_like_krutidev(q["stem"]):
             dropped += 1
             continue
+        # drop a question whose options are ALL just label letters (अ/ब/स/द) —
+        # the source printed placeholders, not real choices, so it's unusable.
+        if _all_options_placeholder(q.get("options")):
+            placeholders += 1
+            continue
         cleaned.append(q)
     if covers:
         print(f"  [extract_docx] dropped {covers} cover/image-description "
@@ -140,6 +170,10 @@ def _recover_or_drop(questions: list[dict]) -> list[dict]:
     if dropped:
         print(f"  [extract_docx] dropped {dropped} question(s) that stayed "
               f"un-convertible Kruti-Dev gibberish after recovery", file=sys.stderr)
+    if placeholders:
+        print(f"  [extract_docx] dropped {placeholders} question(s) whose options "
+              f"were only label placeholders (अ/ब/स/द), not real choices",
+              file=sys.stderr)
     return cleaned
 
 SYSTEM = """You extract MCQs from Indian exam paper text and return JSON.

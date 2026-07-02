@@ -45,7 +45,7 @@ study material. Your ONLY job: decide whether THE PASSAGES THEMSELVES state the
 answer. This is a reading-comprehension task, NOT a general-knowledge quiz.
 
 Return ONLY JSON, no prose:
-{"answer":"a","confidence":"high|low","solution":"<one-line Hindi explanation quoting what the passage says>"}
+{"answer":"a","confidence":"high|low","solution":"<2-3 line Hindi explanation of WHY this option is correct>"}
 
 HARD RULES:
 - Use ONLY the passages. Completely ignore anything you personally know.
@@ -53,9 +53,21 @@ HARD RULES:
   one option correct. You must be able to point to the exact sentence.
 - If the passages do not contain the answer — even if you personally know it —
   set "confidence":"low" and "answer":"". Do NOT answer from memory.
-- The "solution" must QUOTE/paraphrase the supporting passage. If you cannot cite
-  a passage sentence, it is "low". Never write a solution that says the passages
-  don't mention it — that means "low"."""
+
+SOLUTION QUALITY (this is critical):
+- The "solution" must EXPLAIN WHY the correct option is right — the concept, the
+  reason, or the fact from the passage that makes it correct. Write it like a
+  teacher explaining to a student.
+- NEVER write a circular restatement. FORBIDDEN examples (these are NOT solutions):
+    * "X इस प्रश्न में बताया गया है।"  ("X is stated in the question.")
+    * "सही उत्तर X है क्योंकि यह सही है।"  ("The answer is X because it is correct.")
+    * simply repeating the correct option's text back.
+  If the only thing you can write is a restatement of the option, then you do NOT
+  actually have a grounded explanation — set "confidence":"low" and "answer":"".
+- A good solution names the underlying reason. E.g. for "सूचना प्रणाली में संचार
+  की प्रासंगिकता": explain that a communication system's purpose is the EXCHANGE of
+  important information between parties — that concept is why that option is correct,
+  not merely that the option appears."""
 
 _MARK_USER = """प्रश्न (Question): {stem}
 
@@ -78,6 +90,37 @@ def _rag_lookup_sync(stem, options):
     except Exception as e:
         print(f"  [answer-rag] lookup failed ({type(e).__name__}: {e})", file=sys.stderr)
         return []
+
+
+# Phrases that mark a circular non-explanation ("X is stated in the question /
+# book / passage" — i.e. it just points AT the answer instead of explaining it).
+_CIRCULAR_MARKERS = (
+    "इस प्रश्न में बताया गया", "प्रश्न में बताया गया", "में बताया गया है",
+    "सही उत्तर है", "सही विकल्प है", "उपरोक्त में सही",
+    "पुस्तक में", "किताब में", "अंश में बताया", "पाठ में बताया",
+    "stated in the question", "mentioned in the book", "is the correct",
+    "as stated", "given in the passage",
+)
+
+
+def _is_circular_solution(sol: str, correct_opt: str) -> bool:
+    """True if `sol` is a circular restatement rather than a real explanation:
+    it either uses a 'stated in the question/book' phrase, or is essentially just
+    the correct option's own text with little added reasoning."""
+    if not sol:
+        return True
+    s = sol.strip()
+    low = s.lower()
+    if any(m.lower() in low for m in _CIRCULAR_MARKERS):
+        return True
+    # If the solution is basically the correct option echoed back (option text is
+    # >=70% of the solution and the solution adds almost nothing), it's circular.
+    opt = (correct_opt or "").strip()
+    if opt and opt in s:
+        remainder = s.replace(opt, "").strip(" ।.\"'-—:")
+        if len(remainder) < 12:  # option text + a few filler chars = no real why
+            return True
+    return False
 
 
 def _mark_one(q: dict) -> bool:
@@ -121,8 +164,19 @@ def _mark_one(q: dict) -> bool:
     if not sol or any(marker in sol for marker in _NOT_GROUNDED):
         return False
 
+    # Reject a CIRCULAR / restatement "solution" — one that just says "X is
+    # stated in the question" or echoes the correct option's text back without
+    # explaining WHY. That's not a solution; ship the answer but NO solution
+    # rather than a fake one. (Mayank flagged: "This is just you saying it is
+    # mentioned in the book.")
+    correct_idx = _LETTERS.index(ans)
+    correct_opt = options[correct_idx] if correct_idx < len(options) else ""
+    if _is_circular_solution(sol, correct_opt):
+        sol = ""
+
     q["answer"] = ans
-    q["solution"] = sol
+    if sol:
+        q["solution"] = sol
     # Provenance: record WHICH institute book(s) grounded this answer so the
     # teacher solution doc shows a source line — a RAG-marked answer must be
     # visibly distinguishable from one the source paper printed. Use the BOOK
@@ -144,7 +198,18 @@ def _mark_one(q: dict) -> bool:
 # and turns ~N*Xs of sequential latency into ~(N/workers)*Xs. On a 75-question
 # paper the sequential loop took ~4 min and blew past the frontend timeout; this
 # collapses it. Tunable/disable-able via env (set workers=1 to serialize).
-_MARK_WORKERS = max(1, int(os.environ.get("ANSWER_RAG_WORKERS", "8")))
+def _mark_workers() -> int:
+    """Worker count for the marking pool. Robust to a bad env value (non-int ->
+    default) and CAPPED at 16 so a huge value can't open 100+ simultaneous DB
+    connections + LLM calls (each thread holds its own psycopg2 connection)."""
+    try:
+        n = int(os.environ.get("ANSWER_RAG_WORKERS", "8"))
+    except (TypeError, ValueError):
+        n = 8
+    return max(1, min(n, 16))
+
+
+_MARK_WORKERS = _mark_workers()
 
 
 def _mark_one_safe(q: dict) -> bool:
