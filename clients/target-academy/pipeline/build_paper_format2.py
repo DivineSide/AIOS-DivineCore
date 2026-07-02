@@ -210,9 +210,13 @@ def add_question_table(doc, q):
 
     # Which option (0-based) is the correct one, if the pipeline marked it from
     # the institute DB. Blank/absent answer -> no option marked correct (all
-    # "incorrect", as before — the teacher fills it in).
+    # "incorrect" — the teacher fills it in).
+    # NOTE: must test LIST membership, not `ans in "abcdef"`. A blank answer ""
+    # is a SUBSTRING of "abcdef" (`"" in "abcdef"` is True), so the old check
+    # let a blank through and `"abcdef".index("")` returned 0 -> Option A was
+    # falsely marked "correct" on EVERY unanswered question (a fabricated key).
     ans = str(q.get("answer", "")).strip().lower()
-    correct_idx = "abcdef".index(ans) if ans in "abcdef" else -1
+    correct_idx = list("abcdef").index(ans) if ans in list("abcdef") else -1
 
     # Rows 2–5: Option | <text> | correct/incorrect
     for i, opt in enumerate(q["options"][:4]):
