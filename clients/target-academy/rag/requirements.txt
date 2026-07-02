@@ -1,0 +1,8 @@
+# RAG ingestion + query tooling (ingest.py, ingest_pyq.py, query.py) — run manually.
+
+openai>=2.0.0
+anthropic>=0.111.0
+sarvamai>=0.1.0          # document_intelligence (Sarvam Vision) — ingest_pyq.py
+psycopg2-binary>=2.9.0
+python-dotenv>=1.0.0
+PyMuPDF>=1.24.0           # PDF splitting for the 10-page Sarvam job cap

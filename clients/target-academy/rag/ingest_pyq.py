@@ -1,11 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-PYQ ingestion — PDF exam papers → pyq_chunks table via Sarvam vision.
+PYQ ingestion — PDF exam papers → pyq_chunks table via Sarvam Vision.
 
-Reads PDF files from corpus/pyq/<exam-type>/, renders each page to an image,
-sends pages to Sarvam-105b (vision) to extract questions as structured JSON,
-classifies each question's subject using Haiku, embeds with text-embedding-3-small,
-and stores in pyq_chunks.
+Reads PDF files from corpus/pyq/<exam-type>/, splits them into <=10-page
+chunks (Sarvam's document-digitization job cap), runs each chunk through the
+Sarvam Vision document-intelligence API to get Markdown, parses the Markdown
+into individual questions, classifies each question's subject using Haiku,
+embeds with text-embedding-3-small, and stores in pyq_chunks.
+
+Why not sarvam-105b: that model is text-only (confirmed via a live 400 —
+"content must be a valid string"). Vision/OCR lives on a completely separate
+model, "sarvam-vision", exposed via the document-intelligence batch-job API
+(create_job -> upload_file -> start -> wait_until_complete -> download_output),
+not the chat-completions endpoint.
+
+These UKSSSC/UKPSC papers are bilingual: each question appears twice, once as
+an English block and once as a Hindi block (numbering resets/duplicates across
+the two halves — NOT one clean 1..N sequence). We keep only the Hindi blocks
+(English terms embedded inside a Hindi question, e.g. 'Bharat Stage Standards',
+are left alone — only whole blocks that are majority-Latin-script get dropped).
 
 Folder structure:
     corpus/pyq/
@@ -24,13 +37,13 @@ Usage:
     python ingest_pyq.py --exam group-c --dry-run
 """
 
-import base64
 import io
 import json
 import os
 import re
 import sys
 import tempfile
+import zipfile
 from collections import Counter
 from pathlib import Path
 
@@ -42,17 +55,17 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import anthropic
 import fitz  # PyMuPDF
+from sarvamai import SarvamAI
 
 BASE    = Path(__file__).resolve().parents[1]
 PYQ_DIR = BASE / "corpus" / "pyq"
 
-EMBED_MODEL    = "text-embedding-3-small"
-CLASSIFY_MODEL = "claude-haiku-4-5-20251001"
-SARVAM_MODEL   = "sarvam-105b"
-PAGE_DPI       = 150   # render resolution — 150dpi is sharp enough for Hindi text
-EMBED_BATCH    = 64
-DB_BATCH       = 50
-PAGES_PER_CALL = 2     # pages per Sarvam vision call (stays under token cap)
+EMBED_MODEL      = "text-embedding-3-small"
+CLASSIFY_MODEL   = "claude-haiku-4-5-20251001"
+EMBED_BATCH      = 64
+DB_BATCH         = 50
+SARVAM_PAGE_CAP  = 10     # document-digitization job hard limit
+HINDI_RATIO_MIN  = 0.4    # >=40% Devanagari-of-letters => treat block as Hindi
 
 VALID_SUBJECTS = {
     "uk-history", "uk-geography", "uk-culture",
@@ -68,9 +81,9 @@ def _load_env():
             return
 
 _load_env()
-_oai_client:    OpenAI | None             = None
+_oai_client:    OpenAI | None              = None
 _claude_client: anthropic.Anthropic | None = None
-_sarvam_client: OpenAI | None             = None   # OpenAI-compat, Sarvam base
+_sarvam_client: SarvamAI | None            = None
 
 
 def _oai() -> OpenAI:
@@ -87,18 +100,13 @@ def _claude() -> anthropic.Anthropic:
     return _claude_client
 
 
-def _sarvam() -> OpenAI:
+def _sarvam() -> SarvamAI:
     global _sarvam_client
     if _sarvam_client is None:
         key = os.environ.get("SARVAM_API_KEY", "")
         if not key:
             raise RuntimeError("SARVAM_API_KEY not set in .env")
-        _sarvam_client = OpenAI(
-            api_key=key,
-            base_url="https://api.sarvam.ai/v1",
-            timeout=120,
-            max_retries=2,
-        )
+        _sarvam_client = SarvamAI(api_subscription_key=key)
     return _sarvam_client
 
 
@@ -109,127 +117,121 @@ def _db():
     return psycopg2.connect(url, connect_timeout=30)
 
 
-# ── PDF → images ───────────────────────────────────────────────────────────────
+# ── PDF splitting (Sarvam caps a job at 10 pages) ───────────────────────────────
 
-def pdf_to_page_images(pdf_path: Path, dpi: int = PAGE_DPI) -> list[bytes]:
-    """Render each page of a PDF to PNG bytes."""
+def split_pdf(pdf_path: Path, tmp_dir: Path, max_pages: int = SARVAM_PAGE_CAP) -> list[Path]:
+    """Split a PDF into <=max_pages chunks. Returns paths to the chunk PDFs."""
     doc = fitz.open(str(pdf_path))
-    zoom = dpi / 72.0
-    mat  = fitz.Matrix(zoom, zoom)
-    images = []
-    for page in doc:
-        pix = page.get_pixmap(matrix=mat)
-        images.append(pix.tobytes("png"))
+    total = doc.page_count
+    chunk_paths = []
+    for i, start in enumerate(range(0, total, max_pages)):
+        end = min(start + max_pages, total) - 1
+        chunk = fitz.open()
+        chunk.insert_pdf(doc, from_page=start, to_page=end)
+        out_path = tmp_dir / f"{pdf_path.stem}_part{i+1}.pdf"
+        chunk.save(str(out_path))
+        chunk.close()
+        chunk_paths.append(out_path)
     doc.close()
-    return images
+    return chunk_paths
 
 
-def _b64(png_bytes: bytes) -> str:
-    return base64.b64encode(png_bytes).decode()
+# ── Sarvam Vision document digitization ─────────────────────────────────────────
+
+def digitize_pdf_chunk(pdf_path: Path) -> str:
+    """Run one <=10-page PDF through Sarvam Vision. Returns the extracted Markdown."""
+    job = _sarvam().document_intelligence.create_job(language="hi-IN", output_format="md")
+    job.upload_file(str(pdf_path))
+    job.start()
+    status = job.wait_until_complete(poll_interval=3.0, timeout=300)
+
+    if status.job_state != "Completed":
+        raise RuntimeError(f"Sarvam job {job.job_id} ended in state {status.job_state}: {status.error_message}")
+
+    with tempfile.TemporaryDirectory() as td:
+        zip_path = Path(td) / "output.zip"
+        job.download_output(str(zip_path))
+        with zipfile.ZipFile(zip_path) as zf:
+            md_names = [n for n in zf.namelist() if n.endswith(".md")]
+            if not md_names:
+                raise RuntimeError(f"No .md file in Sarvam output for {pdf_path.name}")
+            return zf.read(md_names[0]).decode("utf-8")
 
 
-# ── Sarvam vision extraction ───────────────────────────────────────────────────
-
-_EXTRACT_SYSTEM = """\
-You are an expert Hindi exam paper transcriber for Indian state PSC/SSC exams.
-You will be given one or more pages from an exam paper (UKSSSC / UKPSC / similar).
-
-Extract every MCQ question you can see and return a JSON array with this shape:
-[
-  {
-    "n": <integer question number>,
-    "text": "<question stem + all options in Devanagari, exactly as printed>"
-  },
-  ...
-]
-
-Rules:
-- Transcribe Hindi Devanagari EXACTLY — no spelling correction, no translation.
-- Include the question number and all four options (क/ख/ग/घ or A/B/C/D) in "text".
-- Skip section headings, instructions, and non-MCQ content.
-- If a page has no MCQ questions, return an empty array [].
-- Return ONLY the JSON array, no prose, no markdown fences.
-"""
+def digitize_pdf(pdf_path: Path) -> str:
+    """Split (if needed) + digitize a full PDF. Returns concatenated Markdown."""
+    with tempfile.TemporaryDirectory() as td:
+        chunks = split_pdf(pdf_path, Path(td))
+        print(f"  Split into {len(chunks)} chunk(s) of <= {SARVAM_PAGE_CAP} pages.")
+        all_md = []
+        for i, chunk_path in enumerate(chunks):
+            print(f"  Digitizing chunk {i+1}/{len(chunks)} ({chunk_path.name})...", flush=True)
+            try:
+                md = digitize_pdf_chunk(chunk_path)
+                all_md.append(md)
+                print(f"    OK — {len(md)} chars extracted.")
+            except Exception as e:
+                print(f"    ERROR on chunk {i+1}: {e}")
+        return "\n\n---\n\n".join(all_md)
 
 
-def _extract_questions_from_pages(page_images: list[bytes], start_page: int) -> list[dict]:
-    """Send a batch of page images to Sarvam vision → [{n, text}]."""
-    content = []
-    for i, png in enumerate(page_images):
-        content.append({
-            "type": "text",
-            "text": f"Page {start_page + i + 1}:",
-        })
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{_b64(png)}"},
-        })
-    content.append({
-        "type": "text",
-        "text": "Extract all MCQ questions from these pages and return a JSON array.",
-    })
+# ── Markdown parsing (bilingual: keep Hindi blocks only) ────────────────────────
 
-    resp = _sarvam().chat.completions.create(
-        model=SARVAM_MODEL,
-        max_tokens=4096,
-        messages=[
-            {"role": "system", "content": _EXTRACT_SYSTEM},
-            {"role": "user",   "content": content},
-        ],
-    )
-    raw = resp.choices[0].message.content.strip()
+# MCQ question starts: "12. <text>" at the start of a line.
+_QUESTION_START = re.compile(r"^(\d{1,3})\.\s+\S", re.MULTILINE)
 
-    # strip markdown fences if present
-    raw = re.sub(r"^```(?:json)?\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
-
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, list):
-            return parsed
-    except json.JSONDecodeError:
-        pass
-
-    # try to pull the array out of surrounding text
-    m = re.search(r"\[.*\]", raw, re.DOTALL)
-    if m:
-        try:
-            parsed = json.loads(m.group(0))
-            if isinstance(parsed, list):
-                return parsed
-        except json.JSONDecodeError:
-            pass
-
-    print(f"    WARNING: could not parse JSON from pages {start_page+1}-{start_page+len(page_images)}")
-    return []
+# Devanagari Unicode block: U+0900–U+097F
+_DEVANAGARI = re.compile(r"[ऀ-ॿ]")
+_LETTER     = re.compile(r"[^\W\d_]", re.UNICODE)  # any alphabetic char, any script
 
 
-def extract_questions_from_pdf(pdf_path: Path) -> list[dict]:
-    """Full extraction: render PDF → call Sarvam in page batches → deduplicated list."""
-    print(f"  Rendering PDF to images ({PAGE_DPI}dpi)...")
-    page_images = pdf_to_page_images(pdf_path)
-    total_pages = len(page_images)
-    print(f"  {total_pages} pages rendered.")
+def _devanagari_ratio(text: str) -> float:
+    letters = _LETTER.findall(text)
+    if not letters:
+        return 0.0
+    dev = sum(1 for c in letters if _DEVANAGARI.match(c))
+    return dev / len(letters)
 
-    all_questions: dict[int, dict] = {}  # keyed by n to deduplicate
-    for i in range(0, total_pages, PAGES_PER_CALL):
-        batch = page_images[i: i + PAGES_PER_CALL]
-        print(f"  Calling Sarvam vision: pages {i+1}-{i+len(batch)} of {total_pages}...", flush=True)
-        try:
-            questions = _extract_questions_from_pages(batch, start_page=i)
-            new = 0
-            for q in questions:
-                n = int(q.get("n", 0))
-                text = str(q.get("text", "")).strip()
-                if n > 0 and len(text) > 10 and n not in all_questions:
-                    all_questions[n] = {"n": n, "text": text}
-                    new += 1
-            print(f"    → {new} new questions (total so far: {len(all_questions)})")
-        except Exception as e:
-            print(f"    ERROR on pages {i+1}-{i+len(batch)}: {e}")
 
-    # return sorted by question number
-    return [all_questions[n] for n in sorted(all_questions)]
+def parse_questions(md_text: str) -> list[dict]:
+    """Split bilingual Sarvam-digitized Markdown into Hindi-only question dicts.
+
+    The source has each question appearing twice — once in English, once in
+    Hindi — with numbering that resets/duplicates across the two halves rather
+    than forming one clean sequence. Strategy: find every "N. <text>" block
+    regardless of order, classify each block's script by Devanagari ratio, keep
+    only Hindi-majority blocks, and merge duplicate Hindi blocks for the same N
+    (OCR sometimes splits one question across two fragments).
+    """
+    starts = [(m.start(), int(m.group(1))) for m in _QUESTION_START.finditer(md_text)]
+    if not starts:
+        return []
+
+    blocks = []
+    for i, (pos, n) in enumerate(starts):
+        end = starts[i + 1][0] if i + 1 < len(starts) else len(md_text)
+        text = md_text[pos:end].strip()
+        if len(text) >= 15:
+            blocks.append((n, text))
+
+    hindi_by_n: dict[int, list[str]] = {}
+    for n, text in blocks:
+        if _devanagari_ratio(text) >= HINDI_RATIO_MIN:
+            hindi_by_n.setdefault(n, []).append(text)
+
+    questions = []
+    for n in sorted(hindi_by_n):
+        # merge fragments for the same question number (longest text wins if
+        # duplicates look like near-repeats; otherwise concatenate fragments)
+        fragments = hindi_by_n[n]
+        if len(fragments) == 1:
+            merged = fragments[0]
+        else:
+            fragments = sorted(set(fragments), key=len, reverse=True)
+            merged = fragments[0]
+        questions.append({"n": n, "text": merged})
+
+    return questions
 
 
 # ── subject classification ─────────────────────────────────────────────────────
@@ -343,11 +345,12 @@ def ingest_file(pdf_path: Path, dry_run: bool = False):
         print("  Already in DB — skipping.")
         return
 
-    questions = extract_questions_from_pdf(pdf_path)
-    print(f"  Extracted {len(questions)} questions.")
+    md_text = digitize_pdf(pdf_path)
+    questions = parse_questions(md_text)
+    print(f"  Parsed {len(questions)} Hindi questions.")
 
     if not questions:
-        print("  No questions found — check PDF quality.")
+        print("  No questions found — check PDF/Markdown quality.")
         return
 
     subjects = classify_subjects(questions)
@@ -383,7 +386,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Ingest PYQ PDF papers into pyq_chunks via Sarvam vision."
+        description="Ingest PYQ PDF papers into pyq_chunks via Sarvam Vision."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
