@@ -238,50 +238,28 @@ def read_docx_text(path: Path) -> str:
     return "\n".join(lines)
 
 
-# How much each chunk re-includes from the previous one. A question that
-# straddles a chunk boundary (stem in chunk N, options in chunk N+1) was being
-# dropped by BOTH chunks (each saw an incomplete question). Re-feeding the tail
-# of the previous chunk makes the straddling question appear WHOLE in the next
-# chunk; the dedup-by-`n` in extract_from_text ("later chunk wins") then keeps
-# the complete copy. ~1 large question's worth of chars.
-CHUNK_OVERLAP = 800
-
-
 def _chunk_body(body: str) -> list[str]:
-    """Split body into ~CHUNK_CHARS chunks, breaking on newlines to avoid
-    cutting mid-question, with a small OVERLAP so a question straddling a
-    boundary still appears whole in one chunk (and isn't silently dropped).
+    """Split body into ~CHUNK_CHARS chunks, breaking on the last newline before
+    the cap so a question is never split mid-way. NO overlap.
 
-    CRITICAL: guarantee substantial forward progress each step. An earlier
-    version backed the next `start` up by CHUNK_OVERLAP from `end`; when `end`
-    was small (a short line followed by a long unbroken line), that backup went
-    before `start` and the loop advanced ~1 char at a time -> hundreds of tiny
-    chunks (826 in the wild) -> hundreds of slow LLM calls. Fix: the next start
-    is `end - overlap`, but NEVER less than `start + MIN_ADVANCE`, and the
-    overlap is capped so it can't exceed the chunk we just took.
+    History: an overlap was added to recover a question straddling a boundary,
+    but it backfired badly on real OCR text — re-feeding the tail made the LLM
+    return an empty [] for the heavily-overlapped later chunks (losing a whole
+    middle block of questions) AND duplicated boundary questions. Net result was
+    WORSE (74 questions with dupes vs 97 clean without overlap). Reverted to the
+    simple non-overlapping split; the rare boundary-straddle loss is far smaller
+    than the damage the overlap caused. The real fix for boundary questions is
+    structure-aware splitting (cut only at a question-number line), TODO later.
     """
     chunks, start = [], 0
-    n = len(body)
-    min_advance = max(1, CHUNK_CHARS // 2)  # always move forward at least half a chunk
-    while start < n:
-        end = min(start + CHUNK_CHARS, n)
-        if end < n:
+    while start < len(body):
+        end = min(start + CHUNK_CHARS, len(body))
+        if end < len(body):
             nl = body.rfind("\n", start, end)
             if nl > start:
                 end = nl
         chunks.append(body[start:end].strip())
-        if end >= n:
-            break
-        # overlap the tail so a boundary-straddling question appears whole next
-        # time — but cap the overlap to at most (this chunk length - min_advance)
-        # so we can't stall, then floor the next start at start + min_advance.
-        this_len = end - start
-        overlap = min(CHUNK_OVERLAP, max(0, this_len - min_advance))
-        nxt = max(start + min_advance, end - overlap)
-        # snap to a newline at/after nxt for clean question boundaries (but never
-        # backward past nxt, so progress is preserved).
-        nl2 = body.find("\n", nxt)
-        start = (nl2 + 1) if (0 <= nl2 < end) else nxt
+        start = end
     return [c for c in chunks if c]
 
 
