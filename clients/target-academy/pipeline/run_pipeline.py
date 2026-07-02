@@ -94,41 +94,51 @@ def validate(path: Path) -> dict:
         )
 
     crop_base = path.resolve().parent  # image paths resolve beside the JSON
-    problems = []
-    for i, q in enumerate(questions, start=1):
+
+    def _problem(q, i):
+        """Return a one-line reason this question is unusable, or None if it's OK.
+        Per-question — a bad question is DROPPED, it does not fail the whole job."""
         qid = q.get("n", i)
-        # every question needs n, stem, answer
         for k in ("n", "stem", "answer"):
             if k not in q:
-                problems.append(f"Q{qid}: missing '{k}'")
-        # options come EITHER as text "options" OR diagram "option_images"
+                return f"Q{qid}: missing '{k}'"
         opts = q.get("options")
         opt_imgs = q.get("option_images")
         n_opts = len(opt_imgs) if opt_imgs else (len(opts) if isinstance(opts, list) else 0)
         if not opt_imgs and (not isinstance(opts, list) or len(opts) < 2):
-            problems.append(f"Q{qid}: needs >= 2 options (text) or option_images (diagrams)")
-        elif "answer" in q:
-            # A blank answer is allowed (unmarked / no key). A non-blank answer
-            # must be a SINGLE valid option letter. NOTE: the old test used
-            # `ans not in "abcdef"[:n_opts]` — a SUBSTRING test, so junk like
-            # "ab" passed ("ab" in "abcd" is True) then crashed the builder at
-            # "abcdef".index("ab"). Test membership in the letter LIST instead.
+            return f"Q{qid}: needs >= 2 options (text) or option_images (diagrams)"
+        if "answer" in q:
+            # blank answer OK (unmarked); a non-blank one must be a single valid
+            # option letter (list membership, not substring — "ab" must not pass).
             ans = str(q["answer"]).strip().lower()
             if ans and ans not in list("abcdef"[:n_opts]):
-                problems.append(
-                    f"Q{qid}: answer '{q['answer']}' out of range for {n_opts} options"
-                )
-        # any referenced crop MUST exist on disk — a missing diagram in class is fatal
+                return f"Q{qid}: answer '{q['answer']}' out of range for {n_opts} options"
         for ref in ([q["image"]] if q.get("image") else []) + (opt_imgs or []):
             rp = Path(ref)
             if not (rp if rp.is_absolute() else crop_base / rp).exists():
-                problems.append(f"Q{qid}: image not found -> {ref}")
-    if problems:
+                return f"Q{qid}: image not found -> {ref}"
+        return None
+
+    # DROP bad questions, keep the good ones. A single malformed question (e.g.
+    # Q83 with <2 options, common on a hallucinated/draft source) must NOT kill
+    # the whole paper — the other ~98 good questions should still ship. Only fail
+    # the job if NOTHING usable remains.
+    good, dropped = [], []
+    for i, q in enumerate(questions, start=1):
+        why = _problem(q, i)
+        if why:
+            dropped.append(why)
+        else:
+            good.append(q)
+    if dropped:
+        print(f"  [run_pipeline] dropped {len(dropped)} unusable question(s): "
+              + "; ".join(dropped[:10])
+              + (" ..." if len(dropped) > 10 else ""), file=sys.stderr)
+    if not good:
         raise GateError(
-            f"{path.name} has {len(problems)} bad question(s):\n   "
-            + "\n   ".join(problems[:10])
-            + ("\n   ..." if len(problems) > 10 else "")
-        )
+            f"{path.name}: every question was unusable "
+            f"({len(dropped)} dropped). Nothing to build.")
+    data["questions"] = good
     return data
 
 
@@ -178,6 +188,11 @@ def run(input_path: Path | None = None, font: str | None = None) -> dict:
     """
     src = input_path or find_input()
     data = validate(src)
+    # validate() may have DROPPED unusable questions from `data`. The builders
+    # below read from the FILE `src`, not from `data`, so persist the cleaned
+    # question set back to disk — otherwise a dropped question (e.g. Q83 with <2
+    # options) would still reach the builders and crash/mis-render.
+    src.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     font = (font or data.get("font") or "krutidev").lower()
