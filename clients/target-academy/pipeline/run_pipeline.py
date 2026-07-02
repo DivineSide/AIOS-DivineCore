@@ -60,6 +60,34 @@ class GateError(Exception):
     """Raised when the input gate is not satisfied — pipeline must not start."""
 
 
+def _merge_pdfs(parts: list[Path], out_path: Path) -> bool:
+    """Concatenate the given PDFs (in order) into one PDF at out_path. Skips any
+    part that doesn't exist. Uses PyMuPDF (fitz), already a pipeline dep. Returns
+    True if the merged file was written, False on any failure (caller falls back
+    to shipping the separate files)."""
+    try:
+        import fitz  # PyMuPDF
+    except Exception as e:
+        print(f"[run_pipeline] PyMuPDF unavailable ({e}); skipping combined PDF",
+              file=sys.stderr)
+        return False
+    present = [p for p in parts if p and Path(p).is_file()]
+    if not present:
+        return False
+    try:
+        merged = fitz.open()
+        for p in present:
+            with fitz.open(str(p)) as doc:
+                merged.insert_pdf(doc)
+        merged.save(str(out_path))
+        merged.close()
+        return True
+    except Exception as e:
+        print(f"[run_pipeline] combined-PDF merge failed ({type(e).__name__}: {e})",
+              file=sys.stderr)
+        return False
+
+
 def find_input() -> Path:
     """Return the single JSON in review/input/, or refuse with a clear reason."""
     INPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -213,6 +241,25 @@ def run(input_path: Path | None = None, font: str | None = None) -> dict:
               f"delivering .docx only", file=sys.stderr)
     # 4. simple one-page answer-key PDF (owner request)
     build_answer_key.build(src, akey_out, font=font)
+
+    # 5. COMBINED all-in-one PDF: Question Paper -> Answer Key -> Solutions, in
+    # that order, as ONE file (Mayank's request). Needs the solution as a PDF too
+    # (it's only built as .docx), so render it, then merge the three PDFs. Best
+    # effort — if anything fails we still ship the separate files above.
+    complete_out = OUTPUT_DIR / f"{Path(paper_name).stem} - Complete.pdf"
+    sol_pdf_out = sol_out.with_suffix(".pdf")
+    try:
+        build_answer_key._docx_to_pdf(sol_out, sol_pdf_out)
+    except Exception as e:
+        print(f"[run_pipeline] solution PDF conversion failed "
+              f"({type(e).__name__}: {e}); combined PDF will omit solutions",
+              file=sys.stderr)
+        sol_pdf_out = None
+    # order: paper, then answer key, then solutions
+    if _merge_pdfs([paper_pdf_out, akey_out, sol_pdf_out], complete_out):
+        outputs.append(complete_out)
+        print(f"[run_pipeline] wrote combined PDF -> {complete_out.name}",
+              file=sys.stderr)
 
     n, n_flag, flagged = review_summary(data)
     return {
