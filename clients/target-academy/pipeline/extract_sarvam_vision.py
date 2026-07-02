@@ -46,19 +46,49 @@ _TERMINAL_OK = {"Completed", "PartiallyCompleted"}
 _TERMINAL_BAD = {"Failed"}
 
 
-def _key() -> str:
-    # Document Intelligence may be authorized under a DIFFERENT key than the chat
-    # key used for generation. Prefer a dedicated SARVAM_VISION_KEY if set; else
-    # fall back to the main SARVAM_API_KEY (works when one key covers both).
-    key = os.environ.get("SARVAM_VISION_KEY") or os.environ.get("SARVAM_API_KEY", "")
-    if not key:
-        raise RuntimeError("Neither SARVAM_VISION_KEY nor SARVAM_API_KEY is set "
-                           "(required for Sarvam Vision).")
-    return key
+def _keys() -> list[str]:
+    """All configured Sarvam keys, in priority order, deduped. We keep a POOL so
+    that when one key is exhausted (out of credits / rate-limited / revoked) we
+    rotate to the next before giving up on Sarvam entirely.
+
+    Sources (highest priority first):
+      SARVAM_VISION_KEYS / SARVAM_API_KEYS — comma-separated pools
+      SARVAM_VISION_KEY  / SARVAM_API_KEY  — single-key back-compat
+    """
+    raw = []
+    for var in ("SARVAM_VISION_KEYS", "SARVAM_API_KEYS",
+                "SARVAM_VISION_KEY", "SARVAM_API_KEY"):
+        val = os.environ.get(var, "")
+        if val:
+            raw.extend(val.split(","))
+    keys, seen = [], set()
+    for k in raw:
+        k = k.strip()
+        if k and k not in seen:
+            seen.add(k)
+            keys.append(k)
+    if not keys:
+        raise RuntimeError("No Sarvam key set (SARVAM_VISION_KEY[S] / "
+                           "SARVAM_API_KEY[S]) — required for Sarvam Vision.")
+    return keys
 
 
-def _headers() -> dict:
-    return {"api-subscription-key": _key()}
+def _headers(key: str) -> dict:
+    return {"api-subscription-key": key}
+
+
+# Errors that mean "this KEY is unusable — try the next one" (credits/auth/rate),
+# as opposed to a document/content error (retrying with another key won't help).
+_KEY_DEAD_SIGNALS = ("insufficient credit", "insufficient_credit", "credit",
+                     "quota", "rate limit", "rate_limit", "ratelimit",
+                     "unauthorized", "forbidden", "invalid api", "subscription",
+                     "authentication", "permission", "402", "401", "403", "429")
+
+
+def _is_key_dead(exc: Exception) -> bool:
+    """True when the failure is about the KEY (rotate), not the document."""
+    msg = str(exc).lower()
+    return any(sig in msg for sig in _KEY_DEAD_SIGNALS)
 
 
 def _client() -> httpx.Client:
@@ -103,16 +133,18 @@ def _split_pdf(pdf: Path) -> list[Path]:
     return chunks
 
 
-def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
-    """Run one <=10-page PDF through the Sarvam Vision job flow -> markdown text."""
+def _digitize_one(pdf: Path, client: httpx.Client, language: str, key: str) -> str:
+    """Run one <=10-page PDF through the Sarvam Vision job flow -> markdown text.
+    All requests use the SAME `key` (the pool rotates at the digitize_to_text
+    level, so a whole document is OCR'd on one key)."""
     # 1. create job
-    r = client.post(BASE_URL, headers=_headers(),
+    r = client.post(BASE_URL, headers=_headers(key),
                     json={"job_parameters": {"language": language, "output_format": "md"}})
     r.raise_for_status()
     job_id = r.json()["job_id"]
 
     # 2. get the presigned upload URL for our file
-    r = client.post(f"{BASE_URL}/upload-files", headers=_headers(),
+    r = client.post(f"{BASE_URL}/upload-files", headers=_headers(key),
                     json={"job_id": job_id, "files": [pdf.name]})
     r.raise_for_status()
     upload_urls = r.json().get("upload_urls", {})
@@ -130,7 +162,7 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
     # 4. start. Surface the response BODY on failure — a bare raise_for_status()
     # hides Sarvam's actual reason (e.g. an invalid job param or unsupported
     # output_format), which is exactly what we need to diagnose a 400.
-    st = client.post(f"{BASE_URL}/{job_id}/start", headers=_headers())
+    st = client.post(f"{BASE_URL}/{job_id}/start", headers=_headers(key))
     if st.status_code >= 400:
         body = ""
         try:
@@ -147,7 +179,7 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
     start_t = time.monotonic()
     state = "Accepted"
     while time.monotonic() - start_t < POLL_TIMEOUT_S:
-        s = client.get(f"{BASE_URL}/{job_id}/status", headers=_headers())
+        s = client.get(f"{BASE_URL}/{job_id}/status", headers=_headers(key))
         s.raise_for_status()
         state = s.json().get("job_state", "")
         if state in _TERMINAL_OK or state in _TERMINAL_BAD:
@@ -167,7 +199,7 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
     # 6. download links. download_urls is a dict {filename: {file_url, ...}} and
     #    the real output is a single ZIP ("document.zip") containing the OCR text
     #    files (md/html/txt/json) — NOT loose files. (Verified against the live API.)
-    d = client.post(f"{BASE_URL}/{job_id}/download-files", headers=_headers())
+    d = client.post(f"{BASE_URL}/{job_id}/download-files", headers=_headers(key))
     d.raise_for_status()
     download_urls = d.json().get("download_urls", {})
 
@@ -238,37 +270,22 @@ def _text_from_zip(zip_bytes: bytes) -> list[str]:
     return parts
 
 
-def digitize_to_text(src: Path, language: str = "hi-IN") -> str:
-    """Public entry: any uploaded doc -> clean Unicode text via Sarvam Vision.
-
-    Converts .docx -> PDF, splits to <=10-page chunks, OCRs each, concatenates.
-    Raises on any failure so the caller can fall back to the text-layer path.
-    """
-    ext = src.suffix.lower()
-    if ext == ".docx":
-        pdf = _docx_to_pdf(src)
-    elif ext == ".pdf":
-        pdf = src
-    elif ext in (".png", ".jpg", ".jpeg"):
-        # images go straight in (single "page")
-        with _client() as client:
-            return _digitize_one(src, client, language)
-    else:
-        raise ValueError(f"Sarvam Vision: unsupported input {src.name}")
-
-    chunks = _split_pdf(pdf)
-    texts = []
-    failed = 0
+def _digitize_chunks(chunks: list[Path], language: str, key: str) -> str:
+    """OCR every chunk on ONE key. Raises if the key is dead (credits/auth) so
+    the pool can rotate; salvages per-chunk on non-key errors (bad page)."""
+    texts, failed = [], 0
     with _client() as client:
         for i, chunk in enumerate(chunks, 1):
             print(f"  [sarvam-vision] OCR chunk {i}/{len(chunks)} ({chunk.name})...",
                   file=sys.stderr)
-            # SALVAGE: if one chunk's OCR fails, keep the pages that DID OCR
-            # instead of discarding the whole document to the garbled text path.
-            # Only give up entirely if EVERY chunk failed.
             try:
-                texts.append(_digitize_one(chunk, client, language))
+                texts.append(_digitize_one(chunk, client, language, key))
             except Exception as e:
+                # A dead-key error means EVERY chunk on this key will fail — bubble
+                # up so digitize_to_text rotates to the next key instead of
+                # burning all chunks. A non-key error (one bad page) is salvaged.
+                if _is_key_dead(e):
+                    raise
                 failed += 1
                 print(f"  [sarvam-vision] WARNING: chunk {i}/{len(chunks)} failed "
                       f"({type(e).__name__}: {e}); keeping the other chunks.",
@@ -280,3 +297,45 @@ def digitize_to_text(src: Path, language: str = "hi-IN") -> str:
               f"the output paper may be missing those pages' questions.",
               file=sys.stderr)
     return "\n".join(texts)
+
+
+def digitize_to_text(src: Path, language: str = "hi-IN") -> str:
+    """Public entry: any uploaded doc -> clean Unicode text via Sarvam Vision.
+
+    Converts .docx -> PDF, splits to <=10-page chunks, OCRs each, concatenates.
+    Tries each key in the POOL in turn: if a key is exhausted (out of credits /
+    auth / rate), rotate to the next; only when ALL keys are dead do we raise so
+    the caller can fall back to Claude Vision.
+    """
+    ext = src.suffix.lower()
+    if ext == ".docx":
+        pdf = _docx_to_pdf(src)
+    elif ext == ".pdf":
+        pdf = src
+    elif ext in (".png", ".jpg", ".jpeg"):
+        pdf = None  # single image, handled below
+    else:
+        raise ValueError(f"Sarvam Vision: unsupported input {src.name}")
+
+    chunks = [src] if pdf is None else _split_pdf(pdf)
+
+    keys = _keys()
+    last_err: Exception | None = None
+    for idx, key in enumerate(keys, 1):
+        try:
+            if len(keys) > 1:
+                print(f"  [sarvam-vision] trying key {idx}/{len(keys)} "
+                      f"(...{key[-4:]})", file=sys.stderr)
+            return _digitize_chunks(chunks, language, key)
+        except Exception as e:
+            last_err = e
+            if _is_key_dead(e) and idx < len(keys):
+                print(f"  [sarvam-vision] key {idx}/{len(keys)} exhausted "
+                      f"({type(e).__name__}: {str(e)[:120]}); rotating to next key",
+                      file=sys.stderr)
+                continue
+            # non-key error, or the last key — stop rotating.
+            raise
+    # exhausted every key
+    raise RuntimeError(f"Sarvam Vision: all {len(keys)} key(s) failed; "
+                       f"last error: {last_err}")
