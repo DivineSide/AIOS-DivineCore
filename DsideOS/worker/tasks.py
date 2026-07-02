@@ -88,12 +88,67 @@ def _extract_text_layer(file_path: Path) -> dict:
     raise ValueError(f"Unsupported input format: {ext}")
 
 
+_USE_CLAUDE_VISION_FALLBACK = os.environ.get("USE_CLAUDE_VISION_FALLBACK", "1") == "1"
+
+
+def _claude_vision_extract(file_path: Path) -> dict:
+    """Read the doc as page IMAGES via Claude Vision (extract_vision.py). Handles
+    docx (-> PDF first) and batches pages under Claude's per-request image cap so
+    a long paper doesn't blow the 20-image limit. Raises on failure so the caller
+    can drop to the text layer."""
+    import extract_vision
+
+    ext = file_path.suffix.lower()
+    # Claude Vision reads images/PDFs; a .docx must become a PDF first (same
+    # LibreOffice path Sarvam uses).
+    if ext == ".docx":
+        import extract_sarvam_vision
+        pdf = extract_sarvam_vision._docx_to_pdf(file_path)
+    else:
+        pdf = file_path
+
+    # Batch pages so each request stays within the image cap. extract_vision
+    # renders PDF pages internally; to batch, split the PDF into page ranges.
+    import fitz
+    doc = fitz.open(str(pdf))
+    n_pages = doc.page_count
+    doc.close()
+
+    cap = max(1, extract_vision.MAX_IMAGES - 2)  # headroom under the hard cap
+    all_questions: list[dict] = []
+    if n_pages <= cap:
+        data = extract_vision.extract([pdf])
+        all_questions = data.get("questions", [])
+    else:
+        for start in range(0, n_pages, cap):
+            end = min(start + cap, n_pages)
+            part = fitz.open()
+            src = fitz.open(str(pdf))
+            part.insert_pdf(src, from_page=start, to_page=end - 1)
+            src.close()
+            part_path = pdf.with_name(f"{pdf.stem}_cv_{start + 1}-{end}.pdf")
+            part.save(str(part_path))
+            part.close()
+            try:
+                data = extract_vision.extract([part_path])
+                all_questions.extend(data.get("questions", []))
+            except Exception as e:
+                print(f"  [claude-vision] batch pages {start + 1}-{end} failed "
+                      f"({type(e).__name__}: {e}); continuing", file=sys.stderr)
+    if not all_questions:
+        raise RuntimeError("Claude Vision returned no questions")
+    print(f"  [claude-vision] extracted {len(all_questions)} questions from "
+          f"{n_pages} page(s)", file=sys.stderr)
+    return {"questions": all_questions}
+
+
 def _extract_any(file_path: Path) -> dict:
     """Route ANY supported input file to questions dict.
 
     DEFAULT: Sarvam Vision OCR -> clean Unicode text -> shared question structuring.
-    FALLBACK: the legacy text-layer extractors (extract_docx/pdf/vision) if Sarvam
-    Vision is disabled, errors, or yields no questions.
+    FALLBACK 1: Claude Vision reads the doc as page IMAGES (clean Hindi, resilient
+    when Sarvam is out of credits / errors).
+    FALLBACK 2: the legacy text-layer extractors (only if both vision paths fail).
     """
     ext = file_path.suffix.lower()
     if ext == ".docx":
@@ -108,9 +163,21 @@ def _extract_any(file_path: Path) -> dict:
             if data.get("questions"):
                 return data
             print("  [extract] Sarvam Vision yielded no questions; "
-                  "falling back to text layer", file=sys.stderr)
+                  "trying Claude Vision", file=sys.stderr)
         except Exception as e:
             print(f"  [extract] Sarvam Vision failed ({type(e).__name__}: {e}); "
+                  f"trying Claude Vision", file=sys.stderr)
+
+    # FALLBACK 1: Claude Vision (reads the doc as images). Preferred over the
+    # text layer because it produces clean Unicode Hindi instead of Kruti-Dev
+    # gibberish — this is what runs when Sarvam is out of credits.
+    if _USE_CLAUDE_VISION_FALLBACK:
+        try:
+            data = _claude_vision_extract(file_path)
+            if data.get("questions"):
+                return data
+        except Exception as e:
+            print(f"  [extract] Claude Vision failed ({type(e).__name__}: {e}); "
                   f"falling back to text layer", file=sys.stderr)
 
     return _extract_text_layer(file_path)

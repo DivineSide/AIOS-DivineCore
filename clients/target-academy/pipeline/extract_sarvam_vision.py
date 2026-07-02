@@ -127,8 +127,18 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
                      headers={"x-ms-blob-type": "BlockBlob"})
     put.raise_for_status()
 
-    # 4. start
-    client.post(f"{BASE_URL}/{job_id}/start", headers=_headers()).raise_for_status()
+    # 4. start. Surface the response BODY on failure — a bare raise_for_status()
+    # hides Sarvam's actual reason (e.g. an invalid job param or unsupported
+    # output_format), which is exactly what we need to diagnose a 400.
+    st = client.post(f"{BASE_URL}/{job_id}/start", headers=_headers())
+    if st.status_code >= 400:
+        body = ""
+        try:
+            body = st.text[:500]
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"Sarvam /start failed ({st.status_code}) for job {job_id}: {body}")
 
     # 5. poll status — measure by WALL-CLOCK, not iteration count. Each loop does
     #    a network GET + a sleep, so counting iterations under-counts real elapsed
