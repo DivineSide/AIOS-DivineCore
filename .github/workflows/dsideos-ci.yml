@@ -161,6 +161,16 @@ jobs:
               print("::warning::DISCORD_WEBHOOK_URL secret is empty or not set — "
                     "add it in repo Settings > Secrets > Actions. Skipping ping.")
               sys.exit(0)
+          # SAFE fingerprint to diagnose a wrong/stale secret WITHOUT leaking the
+          # token: log the length + the webhook ID (the numeric path segment,
+          # which is not the secret — the secret is the token AFTER it). If this
+          # ID != 1520700531071389807 (the URL we verified works), the secret
+          # holds the wrong URL. Remove this block once confirmed.
+          import re as _re
+          _m = _re.search(r"/webhooks/(\d+)/", hook)
+          _wid = _m.group(1) if _m else "NO-ID-FOUND"
+          print(f"[notify-debug] webhook len={len(hook)} id={_wid} "
+                f"host={hook.split('/')[2] if '://' in hook else '?'}")
 
           ok = os.environ.get("DEPLOY_RESULT") == "success"
           payload = {
