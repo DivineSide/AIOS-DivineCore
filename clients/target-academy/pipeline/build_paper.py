@@ -253,7 +253,11 @@ def add_answer_key(doc, questions):
     add_mixed(p, "उत्तरमाला", size=16, bold=True)
     row = []
     for q in questions:
-        row.append(f"{q['n']}. ({q['answer']})")
+        # tolerate a missing/blank answer (unmarked question / no key) — render a
+        # clean dash instead of "5. ()" or KeyError-ing. Matches build_answer_key,
+        # build_deck, build_solution which all use .get("answer", "").
+        ans = str(q.get("answer", "")).strip()
+        row.append(f"{q.get('n', '')}. ({ans or '—'})")
         if len(row) == 5:
             add_latin(tight(doc.add_paragraph(), 4), "      ".join(row), size=12)
             row = []

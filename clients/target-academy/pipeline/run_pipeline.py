@@ -107,10 +107,17 @@ def validate(path: Path) -> dict:
         n_opts = len(opt_imgs) if opt_imgs else (len(opts) if isinstance(opts, list) else 0)
         if not opt_imgs and (not isinstance(opts, list) or len(opts) < 2):
             problems.append(f"Q{qid}: needs >= 2 options (text) or option_images (diagrams)")
-        elif "answer" in q and str(q["answer"]).lower() not in "abcdef"[:n_opts]:
-            problems.append(
-                f"Q{qid}: answer '{q['answer']}' out of range for {n_opts} options"
-            )
+        elif "answer" in q:
+            # A blank answer is allowed (unmarked / no key). A non-blank answer
+            # must be a SINGLE valid option letter. NOTE: the old test used
+            # `ans not in "abcdef"[:n_opts]` — a SUBSTRING test, so junk like
+            # "ab" passed ("ab" in "abcd" is True) then crashed the builder at
+            # "abcdef".index("ab"). Test membership in the letter LIST instead.
+            ans = str(q["answer"]).strip().lower()
+            if ans and ans not in list("abcdef"[:n_opts]):
+                problems.append(
+                    f"Q{qid}: answer '{q['answer']}' out of range for {n_opts} options"
+                )
         # any referenced crop MUST exist on disk — a missing diagram in class is fatal
         for ref in ([q["image"]] if q.get("image") else []) + (opt_imgs or []):
             rp = Path(ref)

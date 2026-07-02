@@ -123,6 +123,19 @@ def _mark_one(q: dict) -> bool:
 
     q["answer"] = ans
     q["solution"] = sol
+    # Provenance: record WHICH institute book(s) grounded this answer so the
+    # teacher solution doc shows a source line — a RAG-marked answer must be
+    # visibly distinguishable from one the source paper printed. Use the BOOK
+    # NAME only (build_solution renders sources via add_latin, which is for
+    # Latin filenames; the Hindi `topic` would render wrong there). Dedupe,
+    # keep the top few similarity-ordered passages.
+    srcs = []
+    for p in passages[:4]:
+        book = str(p.get("book") or p.get("source_file") or "").strip()
+        if book and book not in srcs:
+            srcs.append(book)
+    if srcs:
+        q["sources"] = srcs
     return True
 
 

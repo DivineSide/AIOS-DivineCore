@@ -130,10 +130,13 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
     # 4. start
     client.post(f"{BASE_URL}/{job_id}/start", headers=_headers()).raise_for_status()
 
-    # 5. poll status
-    deadline = POLL_TIMEOUT_S / POLL_INTERVAL_S
+    # 5. poll status — measure by WALL-CLOCK, not iteration count. Each loop does
+    #    a network GET + a sleep, so counting iterations under-counts real elapsed
+    #    time and can false-timeout a slow-but-valid OCR job (which then falls back
+    #    to the inferior garbled text layer). time.monotonic() is immune to that.
+    start_t = time.monotonic()
     state = "Accepted"
-    for _ in range(int(deadline) + 1):
+    while time.monotonic() - start_t < POLL_TIMEOUT_S:
         s = client.get(f"{BASE_URL}/{job_id}/status", headers=_headers())
         s.raise_for_status()
         state = s.json().get("job_state", "")
@@ -142,6 +145,14 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str) -> str:
         time.sleep(POLL_INTERVAL_S)
     if state in _TERMINAL_BAD or state not in _TERMINAL_OK:
         raise RuntimeError(f"Sarvam Vision job {job_id} ended in state {state!r}")
+    # PartiallyCompleted = OCR skipped some pages. We still USE what came back
+    # (it's clean Unicode, far better than the gibberish text-layer fallback for
+    # the WHOLE doc), but surface it LOUDLY — a silently short paper is the one
+    # failure mode we must never hide. tasks.py logs question counts alongside.
+    if state == "PartiallyCompleted":
+        print(f"  [sarvam-vision] WARNING: job {job_id} PartiallyCompleted — some "
+              f"pages may be missing from the OCR output. Question count may be low.",
+              file=sys.stderr)
 
     # 6. download links. download_urls is a dict {filename: {file_url, ...}} and
     #    the real output is a single ZIP ("document.zip") containing the OCR text
@@ -237,9 +248,25 @@ def digitize_to_text(src: Path, language: str = "hi-IN") -> str:
 
     chunks = _split_pdf(pdf)
     texts = []
+    failed = 0
     with _client() as client:
         for i, chunk in enumerate(chunks, 1):
             print(f"  [sarvam-vision] OCR chunk {i}/{len(chunks)} ({chunk.name})...",
                   file=sys.stderr)
-            texts.append(_digitize_one(chunk, client, language))
+            # SALVAGE: if one chunk's OCR fails, keep the pages that DID OCR
+            # instead of discarding the whole document to the garbled text path.
+            # Only give up entirely if EVERY chunk failed.
+            try:
+                texts.append(_digitize_one(chunk, client, language))
+            except Exception as e:
+                failed += 1
+                print(f"  [sarvam-vision] WARNING: chunk {i}/{len(chunks)} failed "
+                      f"({type(e).__name__}: {e}); keeping the other chunks.",
+                      file=sys.stderr)
+    if not texts:
+        raise RuntimeError("Sarvam Vision: all OCR chunks failed")
+    if failed:
+        print(f"  [sarvam-vision] WARNING: {failed}/{len(chunks)} chunk(s) failed — "
+              f"the output paper may be missing those pages' questions.",
+              file=sys.stderr)
     return "\n".join(texts)
