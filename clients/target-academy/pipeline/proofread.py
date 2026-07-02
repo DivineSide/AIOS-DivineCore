@@ -42,6 +42,17 @@ FIX aggressively:
   can tell from context. If a fragment is unrecoverable, leave it as-is.
 - A person/place name that is OCR-mangled -> its correct, conventional spelling
   (e.g. fix a clearly-broken rendering of a well-known name).
+- **NON-WORDS: a token that is NOT a real Hindi/loanword at all is ALMOST CERTAINLY
+  an OCR error — do NOT leave it. Work out the intended word from the sentence and
+  fix it.** Two real examples that MUST be fixed:
+    * "बाड़ाहाट का त्रिरूल लेख" -> "बाड़ाहाट का त्रिशूल लेख" ("त्रिरूल" is not a
+      word; the Barahat inscription is the त्रिशूल / trident inscription).
+    * "मेरी माँ के पासंनजम दामाद हैं" -> "मेरी माँ के इकलौते दामाद हैं"
+      ("पासंनजम" is not a Hindi word; the relationship-puzzle phrase is "इकलौते/
+      एकमात्र दामाद").
+  If you can read the sentence and the token is a non-word, replace it with the
+  word it was clearly meant to be. Only leave a non-word untouched if you truly
+  cannot infer the intended word even from full context.
 
 NEVER do:
 - NEVER change which fact/entity is meant. Correct the SPELLING of a name, never

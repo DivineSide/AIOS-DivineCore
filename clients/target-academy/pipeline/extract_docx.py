@@ -238,9 +238,19 @@ def read_docx_text(path: Path) -> str:
     return "\n".join(lines)
 
 
+# How much each chunk re-includes from the previous one. A question that
+# straddles a chunk boundary (stem in chunk N, options in chunk N+1) was being
+# dropped by BOTH chunks (each saw an incomplete question). Re-feeding the tail
+# of the previous chunk makes the straddling question appear WHOLE in the next
+# chunk; the dedup-by-`n` in extract_from_text ("later chunk wins") then keeps
+# the complete copy. ~1 large question's worth of chars.
+CHUNK_OVERLAP = 800
+
+
 def _chunk_body(body: str) -> list[str]:
     """Split body into ~CHUNK_CHARS chunks, breaking on newlines to avoid
-    cutting mid-question. Each chunk overlaps slightly at boundaries."""
+    cutting mid-question, with a small OVERLAP so a question straddling a
+    boundary still appears whole in one chunk (and isn't silently dropped)."""
     chunks, start = [], 0
     while start < len(body):
         end = min(start + CHUNK_CHARS, len(body))
@@ -250,7 +260,13 @@ def _chunk_body(body: str) -> list[str]:
             if nl > start:
                 end = nl
         chunks.append(body[start:end].strip())
-        start = end
+        if end >= len(body):
+            break
+        # advance, but back up by CHUNK_OVERLAP so the next chunk re-includes the
+        # tail (prefer starting at a newline for clean question boundaries).
+        nxt = max(start + 1, end - CHUNK_OVERLAP)
+        nl2 = body.rfind("\n", start, nxt)
+        start = nl2 + 1 if nl2 > start else nxt
     return [c for c in chunks if c]
 
 
@@ -401,8 +417,15 @@ def extract_from_text(body: str, label: str = "input") -> dict:
             lost_chunks += 1
         all_questions.extend(qs)
 
-    # deduplicate by question number (later chunk wins on overlap). Items missing
-    # a usable "n" still count — key them by running order so they aren't dropped.
+    # deduplicate by question number. With chunk OVERLAP a boundary question can
+    # appear twice — once TRUNCATED (the chunk that cut it) and once COMPLETE (the
+    # chunk that re-included it). Keep the MORE COMPLETE copy: prefer the one with
+    # more options, then the longer stem — NOT simply "later wins" (which could
+    # keep the truncated copy). Items missing a usable "n" key by running order.
+    def _completeness(q: dict) -> tuple:
+        opts = q.get("options") or []
+        return (len(opts) if isinstance(opts, list) else 0, len(str(q.get("stem", ""))))
+
     seen: dict = {}
     fallback_n = 10_000
     for q in all_questions:
@@ -410,7 +433,9 @@ def extract_from_text(body: str, label: str = "input") -> dict:
         if not isinstance(n, int):
             n = fallback_n
             fallback_n += 1
-        seen[n] = q
+        prev = seen.get(n)
+        if prev is None or _completeness(q) >= _completeness(prev):
+            seen[n] = q
     questions = [seen[n] for n in sorted(seen)]
 
     # Recover any text the model left in raw Kruti-Dev (it tends to give up on
