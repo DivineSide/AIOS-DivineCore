@@ -211,7 +211,11 @@ def add_question(doc, q, official: bool):
     elif srcs:
         sp = tight(doc.add_paragraph(), 2)
         add_mixed(sp, "✔ स्रोत: ", size=9, bold=True, color=GREEN)
-        add_latin(sp, " / ".join(srcs), size=9, color=GREY)
+        # add_mixed (not add_latin): a source book name can contain Devanagari
+        # (book_chunks.book_name is a filename, e.g. "KIRAN सामान्य हिन्दी.pdf"),
+        # and add_latin forces Times New Roman which has no Devanagari glyphs ->
+        # tofu boxes. add_mixed gives non-Latin runs a real Devanagari font.
+        add_mixed(sp, " / ".join(srcs), size=9, color=GREY)
     elif q.get("flag"):
         sp = tight(doc.add_paragraph(), 2)
         add_mixed(sp, "⚠ जाँच आवश्यक — ", size=10, bold=True, color=RED)

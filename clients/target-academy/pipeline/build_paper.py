@@ -255,8 +255,10 @@ def add_answer_key(doc, questions):
     for q in questions:
         # tolerate a missing/blank answer (unmarked question / no key) — render a
         # clean dash instead of "5. ()" or KeyError-ing. Matches build_answer_key,
-        # build_deck, build_solution which all use .get("answer", "").
-        ans = str(q.get("answer", "")).strip()
+        # build_deck, build_solution which all use .get("answer", ""). .lower() so
+        # an uppercase "A" prints "(a)" — consistent with the standalone answer
+        # key (build_answer_key lowercases too), not "(A)" vs "(a)".
+        ans = str(q.get("answer", "")).strip().lower()
         row.append(f"{q.get('n', '')}. ({ans or '—'})")
         if len(row) == 5:
             add_latin(tight(doc.add_paragraph(), 4), "      ".join(row), size=12)
