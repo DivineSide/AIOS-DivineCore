@@ -250,23 +250,38 @@ CHUNK_OVERLAP = 800
 def _chunk_body(body: str) -> list[str]:
     """Split body into ~CHUNK_CHARS chunks, breaking on newlines to avoid
     cutting mid-question, with a small OVERLAP so a question straddling a
-    boundary still appears whole in one chunk (and isn't silently dropped)."""
+    boundary still appears whole in one chunk (and isn't silently dropped).
+
+    CRITICAL: guarantee substantial forward progress each step. An earlier
+    version backed the next `start` up by CHUNK_OVERLAP from `end`; when `end`
+    was small (a short line followed by a long unbroken line), that backup went
+    before `start` and the loop advanced ~1 char at a time -> hundreds of tiny
+    chunks (826 in the wild) -> hundreds of slow LLM calls. Fix: the next start
+    is `end - overlap`, but NEVER less than `start + MIN_ADVANCE`, and the
+    overlap is capped so it can't exceed the chunk we just took.
+    """
     chunks, start = [], 0
-    while start < len(body):
-        end = min(start + CHUNK_CHARS, len(body))
-        if end < len(body):
-            # walk back to the last newline so we don't cut mid-question
+    n = len(body)
+    min_advance = max(1, CHUNK_CHARS // 2)  # always move forward at least half a chunk
+    while start < n:
+        end = min(start + CHUNK_CHARS, n)
+        if end < n:
             nl = body.rfind("\n", start, end)
             if nl > start:
                 end = nl
         chunks.append(body[start:end].strip())
-        if end >= len(body):
+        if end >= n:
             break
-        # advance, but back up by CHUNK_OVERLAP so the next chunk re-includes the
-        # tail (prefer starting at a newline for clean question boundaries).
-        nxt = max(start + 1, end - CHUNK_OVERLAP)
-        nl2 = body.rfind("\n", start, nxt)
-        start = nl2 + 1 if nl2 > start else nxt
+        # overlap the tail so a boundary-straddling question appears whole next
+        # time — but cap the overlap to at most (this chunk length - min_advance)
+        # so we can't stall, then floor the next start at start + min_advance.
+        this_len = end - start
+        overlap = min(CHUNK_OVERLAP, max(0, this_len - min_advance))
+        nxt = max(start + min_advance, end - overlap)
+        # snap to a newline at/after nxt for clean question boundaries (but never
+        # backward past nxt, so progress is preserved).
+        nl2 = body.find("\n", nxt)
+        start = (nl2 + 1) if (0 <= nl2 < end) else nxt
     return [c for c in chunks if c]
 
 
