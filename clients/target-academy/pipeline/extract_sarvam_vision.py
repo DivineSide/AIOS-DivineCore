@@ -40,7 +40,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 BASE_URL = "https://api.sarvam.ai/doc-digitization/job/v1"
 PAGES_PER_JOB = 10          # API hard limit
-POLL_INTERVAL_S = 3
+# 7s => ~8-9 status polls/min, under the documented 10 req/min limit (a 3s poll
+# was ~20/min and tripped 429s, which _is_key_dead wrongly treated as a dead key
+# and rotated away from a perfectly good key mid-OCR).
+POLL_INTERVAL_S = 7
 POLL_TIMEOUT_S = 300        # 5 min per batch; OCR of <=10 pages is fast
 _TERMINAL_OK = {"Completed", "PartiallyCompleted"}
 _TERMINAL_BAD = {"Failed"}
@@ -180,6 +183,12 @@ def _digitize_one(pdf: Path, client: httpx.Client, language: str, key: str) -> s
     state = "Accepted"
     while time.monotonic() - start_t < POLL_TIMEOUT_S:
         s = client.get(f"{BASE_URL}/{job_id}/status", headers=_headers(key))
+        # A 429 on the STATUS poll means "polling too fast", NOT "key is dead".
+        # Raising here would bubble up and make _is_key_dead rotate away from a
+        # good key mid-OCR. Back off and retry the poll on the SAME key instead.
+        if s.status_code == 429:
+            time.sleep(POLL_INTERVAL_S * 2)
+            continue
         s.raise_for_status()
         state = s.json().get("job_state", "")
         if state in _TERMINAL_OK or state in _TERMINAL_BAD:

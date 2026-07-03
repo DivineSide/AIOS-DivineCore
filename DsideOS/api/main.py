@@ -108,10 +108,13 @@ def _save_upload(job_id: str, file: UploadFile) -> None:
         chunks.append(chunk)
     data = b"".join(chunks)
 
-    input_dir = jobs.input_dir(job_id)
+    input_dir = jobs.input_dir(job_id).resolve()
     dest = (input_dir / f"upload{ext}").resolve()
-    # defence-in-depth: ensure the write stays inside the job's input dir
-    if not str(dest).startswith(str(input_dir.resolve())):
+    # defence-in-depth: ensure the write stays inside the job's input dir. Use a
+    # path-parent check, NOT str.startswith — "/data/jobs/ab/input" is a string
+    # prefix of the SIBLING "/data/jobs/ab/input_evil/x", so startswith would admit
+    # an escape. (Not exploitable today because ext is allowlisted, but correct.)
+    if input_dir != dest and input_dir not in dest.parents:
         raise HTTPException(400, "Invalid upload path.")
     dest.write_bytes(data)
 
@@ -222,21 +225,43 @@ def solutions(req: BuildRequest):
 
 # ── polling + download ────────────────────────────────────────────────────────
 
+# Map a raw internal exception string to a generic, stage-aware client message.
+# The raw error (which can contain absolute server paths, LibreOffice/soffice
+# stderr, or provider error bodies) stays in meta.json for server-side logs; the
+# client only gets a safe summary keyed by the stage it failed in.
+_STAGE_MESSAGE = {
+    "extract": "Could not read the paper. Try a clearer scan or a different file.",
+    "review": "Extraction failed while structuring the questions.",
+    "build": "Failed to build the output documents.",
+    "answer_key": "Failed to build the answer key.",
+    "solutions": "Failed to build the solutions.",
+    "generate_explanations": "Failed to generate explanations.",
+}
+
+
+def _client_error(meta: dict) -> str | None:
+    if meta.get("status") != "FAILED":
+        return None
+    return _STAGE_MESSAGE.get(meta.get("stage"), "The job failed. Please try again.")
+
+
 @app.get("/api/jobs/{job_id}", response_model=JobStatus, dependencies=[Depends(require_token)])
 def job_status(job_id: str):
     meta = jobs.read_meta(job_id)
     if not meta:
         raise HTTPException(404, "Unknown job_id.")
     known = {"job_id", "status", "stage", "n_questions", "outputs", "error", "created_at"}
+    # never surface the raw internal error string (paths / stderr / provider bodies)
+    # to the client — return only the safe stage-keyed summary.
     return JobStatus(
         job_id=job_id,
         status=meta.get("status", "UNKNOWN"),
         stage=meta.get("stage"),
         n_questions=meta.get("n_questions"),
         outputs=meta.get("outputs", []),
-        error=meta.get("error"),
+        error=_client_error(meta),
         created_at=meta.get("created_at"),
-        extra={k: v for k, v in meta.items() if k not in known},
+        extra={k: v for k, v in meta.items() if k not in known and k != "error"},
     )
 
 

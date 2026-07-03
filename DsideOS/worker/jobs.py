@@ -66,13 +66,42 @@ def read_meta(job_id: str) -> dict | None:
     p = _meta_path(job_id)
     if not p.exists():
         return None
-    return json.loads(p.read_text(encoding="utf-8"))
+    # The worker rewrites meta.json many times during a run while the API polls it.
+    # With atomic writes (write_meta) a torn read shouldn't happen, but tolerate a
+    # transient decode error (retry once) instead of 500ing the poll.
+    for attempt in range(2):
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, ValueError):
+            if attempt == 0:
+                import time
+                time.sleep(0.05)
+                continue
+            return None
 
 
 def write_meta(job_id: str, meta: dict) -> None:
-    _meta_path(job_id).write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    # Write atomically: a partial write must never be observed by a concurrent
+    # read_meta (the API polls meta.json continuously while the worker updates it).
+    # Write to a temp file in the same dir, then os.replace() onto meta.json — an
+    # atomic rename on the same filesystem.
+    import os
+    import tempfile
+    p = _meta_path(job_id)
+    data = json.dumps(meta, ensure_ascii=False, indent=2)
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), prefix=".meta.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, str(p))
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def update_meta(job_id: str, **changes) -> dict:
