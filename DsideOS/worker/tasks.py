@@ -195,6 +195,19 @@ def _safe_name(raw: str) -> str:
     return base[:120] or "Paper"
 
 
+def _safe_output_path(job_id: str, filename: str) -> Path:
+    """Build an output path and PROVE it stays inside the job's output dir.
+
+    Defense-in-depth on top of _safe_name: even if a filename slips through with a
+    traversal sequence, resolve it and confirm the job output dir is a parent —
+    the same containment check _save_upload uses for uploads. Raises on escape."""
+    out_dir = jobs.output_dir(job_id).resolve()
+    dest = (out_dir / filename).resolve()
+    if out_dir != dest and out_dir not in dest.parents:
+        raise ValueError(f"unsafe output path escapes job dir: {filename!r}")
+    return dest
+
+
 def _wrap_questions(questions: list[dict], meta: dict) -> dict:
     """Build the universal top-level JSON the pipeline/builders consume."""
     name = _safe_name(meta.get("paper_name", "Paper"))
@@ -286,8 +299,12 @@ def answer_key_task(self, job_id: str, questions: list[dict], meta: dict):
         data = _wrap_questions(questions, meta)
         qjson = jobs.input_dir(job_id) / "questions.json"
         qjson.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        name = meta.get("paper_name", "Paper")
-        out = jobs.output_dir(job_id) / f"{name} - Answer Key.pdf"
+        # SECURITY: paper_name is attacker-controlled; it MUST go through _safe_name
+        # before being spliced into an output path, or "../../.." escapes the job
+        # dir (arbitrary file write). _wrap_questions already sanitizes the name it
+        # embeds, but this output path was using the raw value — sanitize here too.
+        name = _safe_name(meta.get("paper_name", "Paper"))
+        out = _safe_output_path(job_id, f"{name} - Answer Key.pdf")
         build_answer_key.build(qjson, out, font=font)
         jobs.update_meta(job_id, status="DONE", outputs=jobs.list_outputs(job_id))
         return {"status": "DONE", "outputs": jobs.list_outputs(job_id)}
@@ -337,8 +354,10 @@ def solutions_task(self, job_id: str, questions: list[dict], meta: dict):
             qjson.write_text(json.dumps(gen_data, ensure_ascii=False, indent=2),
                              encoding="utf-8")
 
-        name = meta.get("paper_name", "Paper")
-        out = jobs.output_dir(job_id) / f"{name} - Solution (Teacher).docx"
+        # SECURITY: sanitize paper_name before it reaches the output path (see
+        # answer_key_task) — the raw value allows path traversal / arbitrary write.
+        name = _safe_name(meta.get("paper_name", "Paper"))
+        out = _safe_output_path(job_id, f"{name} - Solution (Teacher).docx")
         build_solution.build(qjson, out, font=font)
         jobs.update_meta(job_id, status="DONE", outputs=jobs.list_outputs(job_id))
         return {"status": "DONE", "outputs": jobs.list_outputs(job_id)}
