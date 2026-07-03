@@ -35,6 +35,16 @@ from llm import MODELS, client, message_text, parse_json  # noqa: E402
 
 MODEL = MODELS["anthropic"]["smart"]
 
+
+class VisionTruncated(Exception):
+    """Raised when a Vision extraction hit the output-token cap (the JSON was cut
+    off). Carries the complete questions we salvaged so the caller can re-batch the
+    remaining pages instead of losing the whole batch."""
+    def __init__(self, message: str, salvaged: list | None = None):
+        super().__init__(message)
+        self.salvaged = salvaged or []
+
+
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 DEFAULT_DPI = 150
 MAX_IMAGES = 20          # Anthropic per-request image cap territory; refuse beyond
@@ -126,10 +136,34 @@ def extract(paths: list[Path], dpi: int = DEFAULT_DPI) -> dict:
         system=SYSTEM,
         messages=[{"role": "user", "content": content}],
     )
-    data = parse_json(message_text(msg))
-    if isinstance(data, list):
-        data = {"questions": data}
-    if not data.get("questions"):
+    raw = message_text(msg)
+
+    # Truncation guard: if the output hit the token cap the JSON array is cut off
+    # mid-way, so parse_json would either raise or silently return a PARTIAL set —
+    # shipping fewer questions than the pages held, with no error. Salvage whatever
+    # complete objects we can, then RAISE so the caller (tasks._claude_vision_extract)
+    # re-batches with fewer pages rather than accepting a short paper.
+    truncated = getattr(msg, "stop_reason", None) == "max_tokens"
+    try:
+        data = parse_json(raw)
+        if isinstance(data, list):
+            data = {"questions": data}
+    except (ValueError, Exception):
+        data = {"questions": []}
+    if truncated or not data.get("questions"):
+        # recover complete objects from the (possibly truncated) array
+        try:
+            import extract_docx
+            salvaged = extract_docx._salvage_questions(extract_docx._clean_raw(raw))
+        except Exception:
+            salvaged = []
+        if truncated:
+            raise VisionTruncated(
+                f"Claude Vision output hit the {16_000}-token cap "
+                f"(recovered {len(salvaged)} complete question(s)); "
+                f"caller should re-batch with fewer pages.", salvaged)
+        if salvaged:
+            return {"questions": salvaged}
         raise ValueError("Claude returned no questions.")
     return data
 

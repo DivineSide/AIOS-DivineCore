@@ -115,31 +115,54 @@ def _claude_vision_extract(file_path: Path) -> dict:
     doc.close()
 
     cap = max(1, extract_vision.MAX_IMAGES - 2)  # headroom under the hard cap
+
+    def _extract_range(start: int, end: int) -> list[dict]:
+        """Extract pages [start, end) via Vision. On a TOKEN-CAP truncation, split
+        the range in half and recurse (keeping the questions already salvaged from
+        the truncated call) so a dense batch never silently loses its tail."""
+        part = fitz.open()
+        src = fitz.open(str(pdf))
+        part.insert_pdf(src, from_page=start, to_page=end - 1)
+        src.close()
+        part_path = pdf.with_name(f"{pdf.stem}_cv_{start + 1}-{end}.pdf")
+        part.save(str(part_path))
+        part.close()
+        try:
+            return extract_vision.extract([part_path]).get("questions", [])
+        except extract_vision.VisionTruncated as tr:
+            if end - start <= 1:
+                # a single page still overflowed the cap — keep what we salvaged
+                print(f"  [claude-vision] page {start + 1} truncated; kept "
+                      f"{len(tr.salvaged)} salvaged", file=sys.stderr)
+                return tr.salvaged
+            mid = (start + end) // 2
+            print(f"  [claude-vision] pages {start + 1}-{end} truncated; "
+                  f"re-splitting {start + 1}-{mid} / {mid + 1}-{end}", file=sys.stderr)
+            return _extract_range(start, mid) + _extract_range(mid, end)
+
     all_questions: list[dict] = []
-    if n_pages <= cap:
-        data = extract_vision.extract([pdf])
-        all_questions = data.get("questions", [])
-    else:
-        for start in range(0, n_pages, cap):
-            end = min(start + cap, n_pages)
-            part = fitz.open()
-            src = fitz.open(str(pdf))
-            part.insert_pdf(src, from_page=start, to_page=end - 1)
-            src.close()
-            part_path = pdf.with_name(f"{pdf.stem}_cv_{start + 1}-{end}.pdf")
-            part.save(str(part_path))
-            part.close()
-            try:
-                data = extract_vision.extract([part_path])
-                all_questions.extend(data.get("questions", []))
-            except Exception as e:
-                print(f"  [claude-vision] batch pages {start + 1}-{end} failed "
-                      f"({type(e).__name__}: {e}); continuing", file=sys.stderr)
+    failed_batches, total_batches = 0, 0
+    starts = [0] if n_pages <= cap else list(range(0, n_pages, cap))
+    for start in starts:
+        end = min(start + cap, n_pages)
+        total_batches += 1
+        try:
+            all_questions.extend(_extract_range(start, end))
+        except Exception as e:
+            failed_batches += 1
+            print(f"  [claude-vision] batch pages {start + 1}-{end} failed "
+                  f"({type(e).__name__}: {e}); continuing", file=sys.stderr)
     if not all_questions:
         raise RuntimeError("Claude Vision returned no questions")
+    # surface a MATERIAL partial failure rather than silently shipping a short paper
+    if failed_batches and total_batches and failed_batches / total_batches >= 0.25:
+        print(f"  [claude-vision] WARNING: {failed_batches}/{total_batches} page "
+              f"batches produced no questions — the paper may be short.",
+              file=sys.stderr)
     print(f"  [claude-vision] extracted {len(all_questions)} questions from "
           f"{n_pages} page(s)", file=sys.stderr)
-    return {"questions": all_questions}
+    return {"questions": all_questions, "_failed_batches": failed_batches,
+            "_total_batches": total_batches}
 
 
 def _extract_any(file_path: Path) -> dict:
@@ -195,6 +218,21 @@ def _safe_name(raw: str) -> str:
     return base[:120] or "Paper"
 
 
+def _safe_paper_name(raw: str) -> str:
+    """A _safe_name for the STUDENT PAPER filename specifically. The download
+    matcher (console isPaper) treats any file whose name contains "answer key" /
+    "solution" / "complete" as NOT the student paper, so a paper named e.g.
+    "Solution Practice" would be un-downloadable as the paper. Strip those reserved
+    matcher words (the console does this client-side; do it on the backend too so a
+    direct API call or an upload-derived name is always matcher-safe). The separate
+    key/solution files get their suffixes added AFTER this, so they still match."""
+    import re
+    base = _safe_name(raw)
+    base = re.sub(r"(?i)\b(answer\s*key|solution|complete)\b", "", base)
+    base = re.sub(r"\s{2,}", " ", base).strip(" -")
+    return base[:120] or "Paper"
+
+
 def _safe_output_path(job_id: str, filename: str) -> Path:
     """Build an output path and PROVE it stays inside the job's output dir.
 
@@ -210,7 +248,11 @@ def _safe_output_path(job_id: str, filename: str) -> Path:
 
 def _wrap_questions(questions: list[dict], meta: dict) -> dict:
     """Build the universal top-level JSON the pipeline/builders consume."""
-    name = _safe_name(meta.get("paper_name", "Paper"))
+    # _safe_paper_name strips reserved matcher words ("answer key"/"solution"/
+    # "complete") from the BASE name so the student paper filename ("<name>.docx")
+    # stays downloadable; the key/solution filenames re-add their own suffixes
+    # below, so those still match as answer-key/solution.
+    name = _safe_paper_name(meta.get("paper_name", "Paper"))
     return {
         "filename": f"{name}.docx",
         "ppt_filename": f"{name} (Class).pptx",
