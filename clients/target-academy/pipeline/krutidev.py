@@ -151,6 +151,11 @@ _U2K = (
     ("‘", "^"), ("’", "*"), ("“", "Þ"), ("”", "ß"), ("(", "¼"), (")", "½"),
     ("{", "¿"), ("}", "À"), ("=", "¾"), ("।", "A"), ("?", "\\"), ("-", "&"),
     ("µ", "&"), ("॰", "Œ"), (",", "]"), (".", "-"), ("् ", "~ "),
+    # A literal Unicode "/" must become the Kruti byte "@" (the reverse of the
+    # K2U ("@","/") rule): in Kruti Dev 010 the "/" byte is the glyph ध् (half-dha),
+    # so leaving "/" as-is corrupted the ubiquitous "कौन सा/से ... है/हैं" phrasing
+    # into a stray ध्. Placed AFTER "." so it doesn't disturb the ध्->/ direction.
+    ("/", "@"),
 
     ("०", "å"), ("१", "ƒ"), ("२", "„"), ("३", "…"), ("४", "†"),
     ("५", "‡"), ("६", "ˆ"), ("७", "‰"), ("८", "Š"), ("९", "‹"), ("x", "Û"),

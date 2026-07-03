@@ -60,8 +60,20 @@ _IMG_BASE = BASE  # set per build() so JSON image paths resolve beside the JSON
 
 
 def _img_path(rel):
+    """Resolve a question's image path, CONFINED to the job's image base.
+
+    image/option_images come from the API request body (free strings), so an
+    absolute path ("/etc/passwd") or a traversal ("../../../secret") would let a
+    caller embed an arbitrary server-side file into their output doc (exfiltration).
+    Reject absolute paths and any ref that resolves outside _IMG_BASE."""
+    base = Path(_IMG_BASE).resolve()
     p = Path(rel)
-    return p if p.is_absolute() else (_IMG_BASE / p)
+    if p.is_absolute():
+        raise ValueError(f"image path must be relative to the job dir: {rel!r}")
+    dest = (base / p).resolve()
+    if base != dest and base not in dest.parents:
+        raise ValueError(f"image path escapes the job dir: {rel!r}")
+    return dest
 
 
 def add_figure(doc, rel, max_w_cm=STEM_FIG_W_CM, max_h_cm=STEM_FIG_H_CM, para=None):

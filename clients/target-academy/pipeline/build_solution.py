@@ -56,8 +56,17 @@ _IMG_BASE = BASE
 
 
 def _img_path(rel):
+    """Resolve a question image path, CONFINED to _IMG_BASE (see build_paper._img_path:
+    image/option_images are attacker-controlled strings, so an absolute or ../
+    path would embed an arbitrary server file into the doc). Reject escapes."""
+    base = Path(_IMG_BASE).resolve()
     p = Path(rel)
-    return p if p.is_absolute() else (_IMG_BASE / p)
+    if p.is_absolute():
+        raise ValueError(f"image path must be relative to the job dir: {rel!r}")
+    dest = (base / p).resolve()
+    if base != dest and base not in dest.parents:
+        raise ValueError(f"image path escapes the job dir: {rel!r}")
+    return dest
 
 
 # ── shared helpers (same pattern as build_paper.py) ──────────────────────────
