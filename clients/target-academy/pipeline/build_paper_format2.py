@@ -218,13 +218,21 @@ def add_question_table(doc, q):
     ans = str(q.get("answer", "")).strip().lower()
     correct_idx = list("abcdef").index(ans) if ans in list("abcdef") else -1
 
-    # Rows 2–5: Option | <text> | correct/incorrect
+    # Rows 2–5: Option | <text> | correct/incorrect.
+    # When the question has NO marked answer (correct_idx == -1), leave the
+    # correct/incorrect column EMPTY for every option (Mayank's call) instead of
+    # writing "incorrect" on all four — an all-"incorrect" column wrongly implies
+    # the answer was checked and none is right. Empty = "not marked yet".
+    has_answer = correct_idx >= 0
     for i, opt in enumerate(q["options"][:4]):
         row = rows[2 + i]
         _fill_label(row.cells[0], "Option")
         _fill_runs(row.cells[1], _runs(opt), width=COL1_W, bold=False)
-        _fill_plain(row.cells[2], "correct" if i == correct_idx else "incorrect",
-                    width=COL2_W, bold=False)
+        if has_answer:
+            mark = "correct" if i == correct_idx else "incorrect"
+        else:
+            mark = ""  # no key -> leave blank, teacher fills it in
+        _fill_plain(row.cells[2], mark, width=COL2_W, bold=False)
 
     # Row 6: Solution | <solution text or blank, colspan 2>
     _fill_label(rows[6].cells[0], "Solution")
