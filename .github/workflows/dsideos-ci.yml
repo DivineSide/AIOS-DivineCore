@@ -156,15 +156,7 @@ jobs:
           cat > notify.py <<'PY'
           import json, os, sys, urllib.request
 
-          _raw = os.environ.get("DISCORD_WEBHOOK", "")
-          hook = _raw.strip()
-          # SAFE diagnostic — NO token bytes, NO external post, log-only. Just tells
-          # us empty-vs-present and whether a trailing whitespace/newline snuck in,
-          # so a failed ping is debuggable from the Actions log without exposing the
-          # secret. Remove once the ping is confirmed working.
-          print(f"[notify-debug] secret_present={bool(_raw)} raw_len={len(_raw)} "
-                f"strip_len={len(hook)} trailing_ws={_raw != hook} "
-                f"has_webhooks_path={'/webhooks/' in hook}")
+          hook = os.environ.get("DISCORD_WEBHOOK", "").strip()
           if not hook:
               print("::warning::DISCORD_WEBHOOK_URL secret is empty or not set — "
                     "add it in repo Settings > Secrets > Actions. Skipping ping.")
@@ -183,8 +175,13 @@ jobs:
               }]
           }
           data = json.dumps(payload).encode()
-          req = urllib.request.Request(hook, data=data,
-                headers={"Content-Type": "application/json"}, method="POST")
+          # A User-Agent is REQUIRED: Discord sits behind Cloudflare, which blocks
+          # requests with urllib's default agent ("Python-urllib/3.x") with a 403
+          # BEFORE the webhook is ever looked up. This is why every ping "succeeded"
+          # (continue-on-error) yet nothing arrived — it was a 403, not a bad secret.
+          req = urllib.request.Request(hook, data=data, method="POST",
+                headers={"Content-Type": "application/json",
+                         "User-Agent": "DsideOS-CI/1.0 (+github-actions)"})
           try:
               with urllib.request.urlopen(req, timeout=15) as r:
                   print(f"Discord responded {r.status}")
