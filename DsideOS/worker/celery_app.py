@@ -22,6 +22,14 @@ celery_app.conf.update(
     accept_content=["json"],
     result_expires=settings.JOB_TTL_HOURS * 3600,
     worker_prefetch_multiplier=1,     # long jobs — don't hoard the queue
+    # Bound how long any single job can occupy a worker. A full run legitimately
+    # takes several minutes (extract + proofread + parallel RAG marking + build),
+    # but must not run unbounded: a crafted many-page PDF whose OCR chunks never
+    # reach a terminal state could otherwise pin a worker for hours (per-chunk
+    # salvage no longer fails fast). Hard kill at 20 min; soft (raises inside the
+    # task) at 18 min so cleanup can run.
+    task_soft_time_limit=18 * 60,
+    task_time_limit=20 * 60,
     # Retry broker connection on startup and on stale-connection errors
     broker_connection_retry_on_startup=True,
     broker_connection_retry=True,

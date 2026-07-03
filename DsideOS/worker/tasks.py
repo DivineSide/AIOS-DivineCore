@@ -64,13 +64,16 @@ def _check_zip_bomb(path: Path) -> None:
         raise ValueError("Document is too large or suspiciously compressed.")
 
 
-def _extract_any(file_path: Path) -> dict:
-    """Route ANY supported input file to the right extractor -> questions dict.
+# Sarvam Vision (document OCR) is the DEFAULT extraction path: it reads the doc
+# as an image and returns clean Unicode, sidestepping the Kruti-Dev/English
+# ambiguity that garbles the legacy .docx text layer. Set USE_SARVAM_VISION=0 to
+# force the old text-layer path.
+_USE_SARVAM_VISION = os.environ.get("USE_SARVAM_VISION", "1") == "1"
 
-    .docx              -> extract_docx (text path, Unicode out)
-    .pdf               -> extract_pdf  (auto: digital text vs scanned vision)
-    .png/.jpg/.jpeg    -> extract_vision (Claude Vision)
-    """
+
+def _extract_text_layer(file_path: Path) -> dict:
+    """The original per-type extractors (text layer / Claude Vision). Used as the
+    fallback when Sarvam Vision is unavailable or fails."""
     ext = file_path.suffix.lower()
     if ext == ".docx":
         _check_zip_bomb(file_path)
@@ -83,6 +86,101 @@ def _extract_any(file_path: Path) -> dict:
         import extract_vision
         return extract_vision.extract([file_path])
     raise ValueError(f"Unsupported input format: {ext}")
+
+
+_USE_CLAUDE_VISION_FALLBACK = os.environ.get("USE_CLAUDE_VISION_FALLBACK", "1") == "1"
+
+
+def _claude_vision_extract(file_path: Path) -> dict:
+    """Read the doc as page IMAGES via Claude Vision (extract_vision.py). Handles
+    docx (-> PDF first) and batches pages under Claude's per-request image cap so
+    a long paper doesn't blow the 20-image limit. Raises on failure so the caller
+    can drop to the text layer."""
+    import extract_vision
+
+    ext = file_path.suffix.lower()
+    # Claude Vision reads images/PDFs; a .docx must become a PDF first (same
+    # LibreOffice path Sarvam uses).
+    if ext == ".docx":
+        import extract_sarvam_vision
+        pdf = extract_sarvam_vision._docx_to_pdf(file_path)
+    else:
+        pdf = file_path
+
+    # Batch pages so each request stays within the image cap. extract_vision
+    # renders PDF pages internally; to batch, split the PDF into page ranges.
+    import fitz
+    doc = fitz.open(str(pdf))
+    n_pages = doc.page_count
+    doc.close()
+
+    cap = max(1, extract_vision.MAX_IMAGES - 2)  # headroom under the hard cap
+    all_questions: list[dict] = []
+    if n_pages <= cap:
+        data = extract_vision.extract([pdf])
+        all_questions = data.get("questions", [])
+    else:
+        for start in range(0, n_pages, cap):
+            end = min(start + cap, n_pages)
+            part = fitz.open()
+            src = fitz.open(str(pdf))
+            part.insert_pdf(src, from_page=start, to_page=end - 1)
+            src.close()
+            part_path = pdf.with_name(f"{pdf.stem}_cv_{start + 1}-{end}.pdf")
+            part.save(str(part_path))
+            part.close()
+            try:
+                data = extract_vision.extract([part_path])
+                all_questions.extend(data.get("questions", []))
+            except Exception as e:
+                print(f"  [claude-vision] batch pages {start + 1}-{end} failed "
+                      f"({type(e).__name__}: {e}); continuing", file=sys.stderr)
+    if not all_questions:
+        raise RuntimeError("Claude Vision returned no questions")
+    print(f"  [claude-vision] extracted {len(all_questions)} questions from "
+          f"{n_pages} page(s)", file=sys.stderr)
+    return {"questions": all_questions}
+
+
+def _extract_any(file_path: Path) -> dict:
+    """Route ANY supported input file to questions dict.
+
+    DEFAULT: Sarvam Vision OCR -> clean Unicode text -> shared question structuring.
+    FALLBACK 1: Claude Vision reads the doc as page IMAGES (clean Hindi, resilient
+    when Sarvam is out of credits / errors).
+    FALLBACK 2: the legacy text-layer extractors (only if both vision paths fail).
+    """
+    ext = file_path.suffix.lower()
+    if ext == ".docx":
+        _check_zip_bomb(file_path)
+
+    if _USE_SARVAM_VISION:
+        try:
+            import extract_sarvam_vision
+            import extract_docx
+            text = extract_sarvam_vision.digitize_to_text(file_path)
+            data = extract_docx.extract_from_text(text, label=file_path.name)
+            if data.get("questions"):
+                return data
+            print("  [extract] Sarvam Vision yielded no questions; "
+                  "trying Claude Vision", file=sys.stderr)
+        except Exception as e:
+            print(f"  [extract] Sarvam Vision failed ({type(e).__name__}: {e}); "
+                  f"trying Claude Vision", file=sys.stderr)
+
+    # FALLBACK 1: Claude Vision (reads the doc as images). Preferred over the
+    # text layer because it produces clean Unicode Hindi instead of Kruti-Dev
+    # gibberish — this is what runs when Sarvam is out of credits.
+    if _USE_CLAUDE_VISION_FALLBACK:
+        try:
+            data = _claude_vision_extract(file_path)
+            if data.get("questions"):
+                return data
+        except Exception as e:
+            print(f"  [extract] Claude Vision failed ({type(e).__name__}: {e}); "
+                  f"falling back to text layer", file=sys.stderr)
+
+    return _extract_text_layer(file_path)
 
 
 def _safe_name(raw: str) -> str:
@@ -117,11 +215,12 @@ def _wrap_questions(questions: list[dict], meta: dict) -> dict:
 
 
 def _placeholder_answers(data: dict) -> None:
-    """When no answer key is provided, give every unanswered question a neutral
-    placeholder so the builders run, and flag it for review."""
+    """When a question has no answer in the source, DON'T fake one. Leave the
+    answer empty and flag it — the builders render a blank "—" with a clear
+    "answer key not provided" note instead of a misleading all-(a) key."""
     for q in data["questions"]:
         if not q.get("answer"):
-            q["answer"] = "a"
+            q["answer"] = ""          # blank, not a fake "a"
             q["flag"] = "उत्तर कुंजी उपलब्ध नहीं"
 
 
@@ -257,10 +356,24 @@ def full_task(self, job_id: str, meta: dict):
     try:
         src = next(jobs.input_dir(job_id).iterdir())
         extracted = _extract_any(src)
-        jobs.update_meta(job_id, stage="build",
+        jobs.update_meta(job_id, stage="review",
                          n_questions=len(extracted.get("questions", [])))
 
         data = _wrap_questions(extracted["questions"], meta)
+        # light OCR proofread (only obvious typos; proper nouns/facts untouched)
+        try:
+            import proofread
+            proofread.proofread(data)
+        except Exception as e:
+            print(f"[full_task] proofread skipped ({type(e).__name__}: {e})", flush=True)
+        # mark the correct option + solution from the institute DB, when confident;
+        # leave blank otherwise (never guess)
+        try:
+            import answer_from_rag
+            answer_from_rag.mark_answers(data)
+        except Exception as e:
+            print(f"[full_task] answer-marking skipped ({type(e).__name__}: {e})", flush=True)
+        jobs.update_meta(job_id, stage="build")
         _placeholder_answers(data)
         outputs = _run_builders(job_id, data, font)
         jobs.update_meta(job_id, status="DONE", outputs=outputs,

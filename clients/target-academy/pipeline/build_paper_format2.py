@@ -158,6 +158,32 @@ def _runs(text):
     return [(t, LATIN if is_latin else deva_font) for t, is_latin in runs]
 
 
+def _no_split_rows(tbl):
+    """Keep one question's whole table on a SINGLE page.
+
+    Two things are needed and w:cantSplit alone is NOT enough:
+      1. w:cantSplit on each row — stops a single row from breaking mid-row.
+      2. w:keepNext on every paragraph of every row EXCEPT the last — this is
+         what actually stops the TABLE from breaking BETWEEN rows across a page
+         (the bug where Question/Type land on page 1 and the Options on page 2).
+         keepNext chains each row to the next, so Word floats the entire table
+         to the next page when it doesn't fit, rather than splitting it.
+    """
+    rows = tbl.rows
+    last = len(rows) - 1
+    for i, row in enumerate(rows):
+        trPr = row._tr.get_or_add_trPr()
+        trPr.append(_el("w:cantSplit", **{"w:val": "true"}))
+        if i == last:
+            continue  # the last row has nothing after it to keep with
+        for cell in row.cells:
+            for para in cell.paragraphs:
+                pPr = para._p.get_or_add_pPr()
+                # avoid stacking duplicate keepNext if a cell is revisited
+                if pPr.find(qn("w:keepNext")) is None:
+                    pPr.append(_el("w:keepNext", **{"w:val": "true"}))
+
+
 def add_question_table(doc, q):
     tbl = doc.add_table(rows=8, cols=3)
     _apply_tblPr(tbl)
@@ -182,22 +208,57 @@ def add_question_table(doc, q):
     _fill_plain(rows[1].cells[1], "multiple_choice",
                 width=COL1_W + COL2_W, span=2, bold=False)
 
-    # Rows 2–5: Option | <text> | incorrect
+    # Which option (0-based) is the correct one, if the pipeline marked it from
+    # the institute DB. Blank/absent answer -> no option marked correct (all
+    # "incorrect" — the teacher fills it in).
+    # NOTE: must test LIST membership, not `ans in "abcdef"`. A blank answer ""
+    # is a SUBSTRING of "abcdef" (`"" in "abcdef"` is True), so the old check
+    # let a blank through and `"abcdef".index("")` returned 0 -> Option A was
+    # falsely marked "correct" on EVERY unanswered question (a fabricated key).
+    ans = str(q.get("answer", "")).strip().lower()
+    correct_idx = list("abcdef").index(ans) if ans in list("abcdef") else -1
+
+    # Rows 2–5: Option | <text> | correct/incorrect.
+    # When the question has NO marked answer (correct_idx == -1), leave the
+    # correct/incorrect column EMPTY for every option (Mayank's call) instead of
+    # writing "incorrect" on all four — an all-"incorrect" column wrongly implies
+    # the answer was checked and none is right. Empty = "not marked yet".
+    has_answer = correct_idx >= 0
     for i, opt in enumerate(q["options"][:4]):
         row = rows[2 + i]
         _fill_label(row.cells[0], "Option")
         _fill_runs(row.cells[1], _runs(opt), width=COL1_W, bold=False)
-        _fill_plain(row.cells[2], "incorrect", width=COL2_W, bold=False)
+        if has_answer:
+            mark = "correct" if i == correct_idx else "incorrect"
+        else:
+            mark = ""  # no key -> leave blank, teacher fills it in
+        _fill_plain(row.cells[2], mark, width=COL2_W, bold=False)
 
-    # Row 6: Solution | (blank, colspan 2)
+    # Row 6: Solution | <solution text or blank, colspan 2>
     _fill_label(rows[6].cells[0], "Solution")
-    _fill_plain(rows[6].cells[1], "",
-                width=COL1_W + COL2_W, span=2, bold=False)
+    solution = str(q.get("solution", "")).strip()
+    if solution:
+        _apply_tcPr(rows[6].cells[1]._tc, COL1_W + COL2_W, span=2)
+        tc2 = rows[6].cells[1]._tc.getnext()
+        if tc2 is not None:
+            tc2.getparent().remove(tc2)
+        para = rows[6].cells[1].paragraphs[0]
+        _fmt_para(para)
+        for text, font in _runs(solution):
+            _add_run(para, text, bold=False, font=font)
+    else:
+        _fill_plain(rows[6].cells[1], "",
+                    width=COL1_W + COL2_W, span=2, bold=False)
 
     # Row 7: Marks | 1 | 0.25
     _fill_label(rows[7].cells[0], "Marks")
     _fill_plain(rows[7].cells[1], "1",    width=COL1_W, bold=False)
     _fill_plain(rows[7].cells[2], "0.25", width=COL2_W, bold=False)
+
+    # Keep the whole question table on one page — MUST run AFTER all cells are
+    # filled, because the fill/colspan helpers replace paragraphs (which would
+    # drop a keepNext applied earlier).
+    _no_split_rows(tbl)
 
     # Blank separator paragraph
     sep = doc.add_paragraph()

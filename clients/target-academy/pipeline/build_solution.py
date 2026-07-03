@@ -129,8 +129,16 @@ def add_latin(para, text, size=BODY_PT, bold=False, color=None):
 
 # ── per-question renderer ─────────────────────────────────────────────────────
 
+def _label_up(i: int) -> str:
+    """Uppercase option label for any index (A, B, ... Z, then numbers)."""
+    return chr(ord("A") + i) if i < 26 else str(i + 1)
+
+
 def add_question(doc, q, official: bool):
-    ans_idx = LABELS.index(q["answer"].lower())
+    # Tolerate a missing/odd answer (imported papers often have no printed key).
+    # -1 means "no correct option to highlight" rather than a hard crash.
+    ans = str(q.get("answer", "")).strip().lower()
+    ans_idx = LABELS.index(ans) if ans in LABELS else -1
 
     # Q1. stem
     qp = tight(doc.add_paragraph(), after=2, before=8)
@@ -160,7 +168,7 @@ def add_question(doc, q, official: bool):
         for i, rel in enumerate(q["option_images"]):
             correct = i == ans_idx
             op = tight(doc.add_paragraph(), 1)
-            add_latin(op, f"   ({LABELS_UP[i]}) ",
+            add_latin(op, f"   ({_label_up(i)}) ",
                       bold=correct, color=GREEN if correct else None)
             if correct:
                 add_latin(op, "✓ ", bold=True, color=GREEN)
@@ -170,17 +178,21 @@ def add_question(doc, q, official: bool):
             correct = i == ans_idx
             op = tight(doc.add_paragraph(), 1)
             mark = " ✓" if correct else ""
-            add_mixed(op, f"   ({LABELS_UP[i]}) {opt}{mark}",
+            add_mixed(op, f"   ({_label_up(i)}) {opt}{mark}",
                       bold=correct, color=GREEN if correct else None)
 
     # उत्तर line
     ansp = tight(doc.add_paragraph(), after=1, before=2)
     add_mixed(ansp, "उत्तर: ", bold=True, color=GREEN)
     opts = q.get("options") or []
-    ans_txt = f"({LABELS_UP[ans_idx]})"
-    if ans_idx < len(opts):
-        ans_txt += f" {opts[ans_idx]}"
-    add_mixed(ansp, ans_txt, bold=True, color=GREEN)
+    if ans_idx < 0:
+        # no printed answer key in the source paper — say so rather than guess
+        add_mixed(ansp, "(not provided)", bold=True, color=GREEN)
+    else:
+        ans_txt = f"({_label_up(ans_idx)})"
+        if ans_idx < len(opts):
+            ans_txt += f" {opts[ans_idx]}"
+        add_mixed(ansp, ans_txt, bold=True, color=GREEN)
 
     # विस्तृत व्याख्या (solution) or संकेत (short reason)
     explanation = q.get("solution") or q.get("reason")
@@ -199,7 +211,11 @@ def add_question(doc, q, official: bool):
     elif srcs:
         sp = tight(doc.add_paragraph(), 2)
         add_mixed(sp, "✔ स्रोत: ", size=9, bold=True, color=GREEN)
-        add_latin(sp, " / ".join(srcs), size=9, color=GREY)
+        # add_mixed (not add_latin): a source book name can contain Devanagari
+        # (book_chunks.book_name is a filename, e.g. "KIRAN सामान्य हिन्दी.pdf"),
+        # and add_latin forces Times New Roman which has no Devanagari glyphs ->
+        # tofu boxes. add_mixed gives non-Latin runs a real Devanagari font.
+        add_mixed(sp, " / ".join(srcs), size=9, color=GREY)
     elif q.get("flag"):
         sp = tight(doc.add_paragraph(), 2)
         add_mixed(sp, "⚠ जाँच आवश्यक — ", size=10, bold=True, color=RED)

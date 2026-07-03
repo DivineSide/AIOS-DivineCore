@@ -156,7 +156,15 @@ jobs:
           cat > notify.py <<'PY'
           import json, os, sys, urllib.request
 
-          hook = os.environ.get("DISCORD_WEBHOOK", "").strip()
+          _raw = os.environ.get("DISCORD_WEBHOOK", "")
+          hook = _raw.strip()
+          # SAFE diagnostic — NO token bytes, NO external post, log-only. Just tells
+          # us empty-vs-present and whether a trailing whitespace/newline snuck in,
+          # so a failed ping is debuggable from the Actions log without exposing the
+          # secret. Remove once the ping is confirmed working.
+          print(f"[notify-debug] secret_present={bool(_raw)} raw_len={len(_raw)} "
+                f"strip_len={len(hook)} trailing_ws={_raw != hook} "
+                f"has_webhooks_path={'/webhooks/' in hook}")
           if not hook:
               print("::warning::DISCORD_WEBHOOK_URL secret is empty or not set — "
                     "add it in repo Settings > Secrets > Actions. Skipping ping.")

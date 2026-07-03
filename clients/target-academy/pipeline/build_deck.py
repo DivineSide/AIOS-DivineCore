@@ -176,7 +176,12 @@ def add_question_slide(prs, layout, banner, q):
         cursor = _place_image(slide, _img_path(q["image"]),
                               BOX_SIDE_INSET_CM, cursor, full_w, fig_max_h) + 0.4
 
-    labels = ["(a)", "(b)", "(c)", "(d)", "(e)"]
+    # Generate one label per option so we never index past the end. A salvaged or
+    # extracted question can legitimately have 2-6 (or more) options; the old fixed
+    # 5-element list raised IndexError on a 6-option question (build_deck.py:207).
+    n_opts = max(len(q.get("options") or []), len(q.get("option_images") or []))
+    labels = [f"({chr(ord('a') + i)})" if i < 26 else f"({i + 1})"
+              for i in range(max(n_opts, 5))]
 
     # option diagrams (Q60-type: each (a)-(d) is a cropped figure, laid in a row)
     if has_opt_imgs:
@@ -220,7 +225,8 @@ def add_answer_slide(prs, layout, banner, questions):
     add_mixed(para, "उत्तरमाला", 40, GOLD, bold=True)
     row = []
     for q in questions:
-        row.append(f"{q['n']}. ({q['answer']})")
+        ans = str(q.get("answer", "")).strip()
+        row.append(f"{q['n']}. ({ans or '—'})")
         if len(row) == 5:
             p = tf.add_paragraph()
             p.space_after = Pt(6)
