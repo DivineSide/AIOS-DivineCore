@@ -99,7 +99,12 @@ def validate(path: Path) -> dict:
         """Return a one-line reason this question is unusable, or None if it's OK.
         Per-question — a bad question is DROPPED, it does not fail the whole job."""
         qid = q.get("n", i)
-        for k in ("n", "stem", "answer"):
+        # 'answer' is intentionally NOT required-present: the extractor OMITS it
+        # when the source paper prints no key (the common practice-paper case), so
+        # requiring it dropped EVERY question of an unmarked paper -> GateError
+        # "every question was unusable". A missing answer == a blank/unmarked answer
+        # (handled below); only 'n' and 'stem' are structurally required.
+        for k in ("n", "stem"):
             if k not in q:
                 return f"Q{qid}: missing '{k}'"
         opts = q.get("options")

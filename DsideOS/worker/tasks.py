@@ -237,9 +237,14 @@ def _placeholder_answers(data: dict) -> None:
             q["flag"] = "उत्तर कुंजी उपलब्ध नहीं"
 
 
-def _run_builders(job_id: str, data: dict, font: str) -> list[dict]:
+def _run_builders(job_id: str, data: dict, font: str) -> tuple[list[dict], int]:
     """Write the questions JSON into the job's input dir, run run_pipeline.run()
-    pointed at the job's output dir, return the output manifest."""
+    pointed at the job's output dir, return (output manifest, built_count).
+
+    built_count is the number of questions ACTUALLY in the built paper — i.e. after
+    run_pipeline.validate() drops any malformed ones and writes the cleaned JSON
+    back to qjson. This is what the UI should report; the pre-validation extracted
+    count can be higher and misleads the user about what's in the PDF."""
     import run_pipeline
 
     qjson = jobs.input_dir(job_id) / "questions.json"
@@ -249,7 +254,14 @@ def _run_builders(job_id: str, data: dict, font: str) -> list[dict]:
     # client's review/output). We override the module-level OUTPUT_DIR.
     run_pipeline.OUTPUT_DIR = jobs.output_dir(job_id)
     run_pipeline.run(qjson, font=font)
-    return jobs.list_outputs(job_id)
+
+    # validate() rewrote qjson with only the questions that made it into the paper.
+    try:
+        built = json.loads(qjson.read_text(encoding="utf-8"))
+        built_count = len(built.get("questions", []))
+    except Exception:
+        built_count = len(data.get("questions", []))
+    return jobs.list_outputs(job_id), built_count
 
 
 # ── tasks ─────────────────────────────────────────────────────────────────────
@@ -280,9 +292,9 @@ def build_task(self, job_id: str, questions: list[dict], meta: dict):
     try:
         data = _wrap_questions(questions, meta)
         _placeholder_answers(data)
-        outputs = _run_builders(job_id, data, font)
-        jobs.update_meta(job_id, status="DONE", outputs=outputs)
-        return {"status": "DONE", "outputs": outputs}
+        outputs, built = _run_builders(job_id, data, font)
+        jobs.update_meta(job_id, status="DONE", outputs=outputs, n_questions=built)
+        return {"status": "DONE", "outputs": outputs, "n_questions": built}
     except Exception as e:
         jobs.update_meta(job_id, status="FAILED", error=f"{type(e).__name__}: {e}")
         raise
@@ -394,10 +406,20 @@ def full_task(self, job_id: str, meta: dict):
             print(f"[full_task] answer-marking skipped ({type(e).__name__}: {e})", flush=True)
         jobs.update_meta(job_id, stage="build")
         _placeholder_answers(data)
-        outputs = _run_builders(job_id, data, font)
+        outputs, built = _run_builders(job_id, data, font)
+        # Report the count ACTUALLY in the paper (post-validate), not the
+        # pre-validation extracted count. If a large fraction was dropped, flag it
+        # so a silently-short paper is visible rather than shipping as a clean DONE.
+        extracted_n = len(extracted.get("questions", []))
+        note = None
+        if extracted_n and built < extracted_n * 0.9:
+            note = (f"{extracted_n - built} of {extracted_n} extracted question(s) "
+                    f"were dropped as unusable; the paper has {built}.")
+            print(f"[full_task] {note}", flush=True)
         jobs.update_meta(job_id, status="DONE", outputs=outputs,
-                         n_questions=len(extracted.get("questions", [])))
-        return {"status": "DONE", "outputs": outputs}
+                         n_questions=built, extracted_questions=extracted_n,
+                         note=note)
+        return {"status": "DONE", "outputs": outputs, "n_questions": built}
     except Exception as e:
         jobs.update_meta(job_id, status="FAILED", error=f"{type(e).__name__}: {e}")
         raise
@@ -425,10 +447,9 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
         # phase 4: identical to the build path the other tools use
         data = _wrap_questions(questions, meta)
         _placeholder_answers(data)
-        outputs = _run_builders(job_id, data, font)
-        jobs.update_meta(job_id, status="DONE", outputs=outputs,
-                         n_questions=len(questions))
-        return {"status": "DONE", "outputs": outputs, "n_questions": len(questions)}
+        outputs, built = _run_builders(job_id, data, font)
+        jobs.update_meta(job_id, status="DONE", outputs=outputs, n_questions=built)
+        return {"status": "DONE", "outputs": outputs, "n_questions": built}
     except Exception as e:
         jobs.update_meta(job_id, status="FAILED", error=f"{type(e).__name__}: {e}")
         raise

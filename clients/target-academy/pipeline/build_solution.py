@@ -174,7 +174,11 @@ def add_question(doc, q, official: bool):
                 add_latin(op, "✓ ", bold=True, color=GREEN)
             op.add_run().add_picture(str(_img_path(rel)), width=Cm(FIG_W_CM - 2.0))
     else:
-        for i, opt in enumerate(q["options"]):
+        # q.get("options") or [] — a question with a missing/null options key
+        # (manual-import or a partial extract) must not crash the whole build;
+        # solutions_task/answer_key_task call this directly, bypassing the
+        # validate() drop-gate that the build/full pipeline runs.
+        for i, opt in enumerate(q.get("options") or []):
             correct = i == ans_idx
             op = tight(doc.add_paragraph(), 1)
             mark = " ✓" if correct else ""
