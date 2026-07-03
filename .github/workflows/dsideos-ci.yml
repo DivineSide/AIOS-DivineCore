@@ -3,7 +3,7 @@ name: DsideOS CI/CD
 # Test -> build+push images to GHCR -> SSH deploy to Hetzner. Runs on changes to
 # the backend or the pipeline it bundles. PRs run tests + build only (no push,
 # no deploy). Push to main does the full pipeline.
-# (no-op touch to trigger a deploy and verify the Discord webhook secret)
+# (no-op touch to trigger a deploy and verify the Discord webhook secret - retry)
 on:
   push:
     branches: [main]
