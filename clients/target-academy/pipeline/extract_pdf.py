@@ -75,7 +75,12 @@ def extract(path: Path, mode: str = "auto", dpi: int = extract_vision.DEFAULT_DP
             print("detect: no text after all, falling back to vision",
                   file=sys.stderr)
             return extract_vision.extract([path], dpi=dpi)
-        return extract_docx.extract_from_text(body, label=path.name)
+        # A digital PDF's text layer is Kruti-Dev-encoded (same as the .docx text
+        # layer) when the source used a Kruti-Dev font — flag it so the extractor
+        # transliterates rather than treating garbled ASCII as clean Unicode. (The
+        # clean path is Sarvam Vision / the scanned-PDF vision route below.)
+        return extract_docx.extract_from_text(body, label=path.name,
+                                              krutidev_input=True)
 
     if mode == "vision":
         return extract_vision.extract([path], dpi=dpi)

@@ -161,24 +161,32 @@ def _all_options_placeholder(opts) -> bool:
     return all(_is_placeholder_option(o) for o in opts)
 
 
-def _recover_or_drop(questions: list[dict]) -> list[dict]:
-    """Convert-then-drop (Mayank's call): deterministically fix any stem/option
-    the model left in raw Kruti-Dev; then drop a question that is STILL gibberish
-    (or is actually the cover page transcribed as a question) so the output never
-    shows garbage. Returns the cleaned list."""
+def _recover_or_drop(questions: list[dict], krutidev_input: bool = True) -> list[dict]:
+    """Clean up extracted questions and drop unusable ones.
+
+    `krutidev_input` gates the Kruti-Dev-specific steps: they run ONLY for the
+    legacy .docx text-layer path (garbled ASCII). On the CLEAN Unicode path
+    (Sarvam Vision) they must NOT run — feeding clean text through the Kruti-Dev
+    decoder corrupts English words, and _looks_like_krutidev wrongly flags a
+    mostly-English stem ("DNS protocol", "OSI model") as gibberish and DROPS a
+    real question. Cover-page and placeholder-option drops are input-agnostic and
+    always apply."""
     cleaned, dropped, covers, placeholders = [], 0, 0, 0
     for q in questions:
-        if q.get("stem"):
-            q["stem"] = _clean_krutidev(q["stem"])
-        if isinstance(q.get("options"), list):
-            q["options"] = [_clean_krutidev(o) if isinstance(o, str) else o
-                            for o in q["options"]]
-        # drop the cover page mis-read as a question
+        if krutidev_input:
+            # legacy path only: convert any raw Kruti-Dev the model left behind
+            if q.get("stem"):
+                q["stem"] = _clean_krutidev(q["stem"])
+            if isinstance(q.get("options"), list):
+                q["options"] = [_clean_krutidev(o) if isinstance(o, str) else o
+                                for o in q["options"]]
+        # drop the cover page mis-read as a question (both paths)
         if _looks_like_cover(q.get("stem", "")):
             covers += 1
             continue
-        # after recovery, is the stem still gibberish? if so, drop the question.
-        if q.get("stem") and _looks_like_krutidev(q["stem"]):
+        # legacy path only: after recovery, still gibberish? drop it. (Never on the
+        # clean path — a legit English-heavy stem is not gibberish.)
+        if krutidev_input and q.get("stem") and _looks_like_krutidev(q["stem"]):
             dropped += 1
             continue
         # drop a question whose options are ALL just label letters (अ/ब/स/द) —
@@ -199,32 +207,107 @@ def _recover_or_drop(questions: list[dict]) -> list[dict]:
               file=sys.stderr)
     return cleaned
 
-SYSTEM = """You extract MCQs from Indian exam paper text and return JSON.
+# The extractor input comes from two very different sources, so the prompt is
+# parameterised (see _system_for): the Sarvam Vision OCR path hands us CLEAN
+# Unicode already, while the legacy .docx text layer hands us Kruti-Dev-encoded
+# ASCII. Telling a clean-Unicode input it is "garbled Kruti-Dev" (the old fixed
+# prompt) invited the model to rewrite text that was already correct.
 
-The Hindi text uses Kruti Dev 010 — a legacy font where Devanagari is encoded as
-garbled ASCII. Convert it to proper Unicode Devanagari. English words stay English.
+# Shared rules for BOTH input kinds.
+_SYSTEM_BASE = """You extract multiple-choice questions (MCQs) from an Indian exam
+paper and return JSON. You are the ONLY thing deciding where each question begins
+and ends — read the text, understand the structure, and return every question.
 
 Return ONLY a JSON array, no prose, no markdown fences:
-[{"n":1,"stem":"Unicode Hindi stem","options":["opt1","opt2","opt3","opt4"]}]
+[{"n":1,"stem":"question text","options":["opt1","opt2","opt3","opt4"]}]
 
 Rules:
-- Convert ALL Kruti Dev garbled text to Unicode Devanagari Hindi.
-- "n": question number as integer.
-- "stem": full question on one line. Join sub-statements with space.
-- "options": 2-6 strings, marker stripped, each on one line.
-- "answer": only if paper prints a key (lowercase a/b/c/d). Else omit.
-- No newlines inside string values. No markdown. No prose."""
+- Extract EVERY question in the text, in the order they appear. Do not skip any,
+  do not merge two questions, do not split one question into two.
+- "n": the question's number as printed (integer). If unnumbered, count 1,2,3…
+- "stem": the FULL question text, VERBATIM. Do NOT paraphrase, translate,
+  summarise, "correct", or rewrite it. Join a multi-line stem with single spaces.
+- "options": the answer choices, VERBATIM, marker/label stripped (2–6 strings).
+- "answer": include ONLY if the paper itself prints an answer key for that
+  question (lowercase a/b/c/d matching the option order). Otherwise omit it — do
+  NOT guess or solve.
+- One line per string value (no literal newlines). No markdown. No prose."""
 
-USER_TMPL = """Extract every MCQ from this exam paper section.
+# Appended when the input is CLEAN Unicode (Sarvam Vision OCR).
+_SYSTEM_CLEAN = """
+The text is clean Unicode from OCR. It may carry light markdown/table markup
+(**bold**, #, |, -) — ignore that formatting, keep the actual question/option text
+exactly as written."""
+
+# Appended when the input is legacy Kruti-Dev (the .docx text layer).
+_SYSTEM_KRUTIDEV = """
+The Hindi text uses Kruti Dev 010 — a legacy font where Devanagari is encoded as
+garbled ASCII. Convert it to proper Unicode Devanagari. English words stay
+English. This transliteration is the ONLY change you make — do not otherwise
+reword the question."""
+
+
+def _system_for(krutidev_input: bool) -> str:
+    return _SYSTEM_BASE + (_SYSTEM_KRUTIDEV if krutidev_input else _SYSTEM_CLEAN)
+
+
+USER_TMPL = """Extract every MCQ from this exam paper text below.
 Return ONLY a JSON array. Each string value must be a single line (no \\n).
 
 --- PAPER TEXT START ---
 {body}
---- PAPER TEXT END ---
+--- PAPER TEXT END ---"""
 
-[{{"n":1,"stem":"full stem on one line","options":["opt1","opt2","opt3","opt4"]}}]"""
+# Page separators the OCR/flatteners emit between pages: a form-feed (\f), or the
+# explicit page markers Sarvam / markdown converters sometimes insert. Splitting
+# on these gives natural per-page units WITHOUT guessing question boundaries.
+_PAGE_SEP = re.compile(
+    r"\f"                                   # form feed
+    r"|^\s*-{3,}\s*$"                        # markdown horizontal rule / page break
+    r"|^\s*#+\s*(?:page|पृष्ठ|पेज)\b.*$"     # "# Page 3" style markers
+    r"|^\s*\[?(?:page|पृष्ठ|पेज)\s*\d+\]?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
-CHUNK_CHARS = 4_000   # ~10-15 questions per chunk; keeps output small for Haiku
+
+# How many times the recursive extractor may split a truncated body before it
+# gives up and keeps the partial result. pages -> paragraphs -> lines is 3 levels;
+# a 4th is headroom, and each level fans out into a few balanced groups.
+_MAX_SPLIT_DEPTH = 4
+
+
+def _split_pages(body: str) -> list[str]:
+    """Split OCR text into pages on form-feeds / page markers. If none are present
+    (many OCR outputs have no explicit page breaks), returns the whole body as one
+    element — the recursion then drops to paragraphs/lines (see _natural_units)."""
+    parts = [p.strip() for p in _PAGE_SEP.split(body) if p and p.strip()]
+    return parts if len(parts) > 1 else [body.strip()]
+
+
+def _natural_units(body: str, depth: int) -> list[str]:
+    """Break `body` into progressively finer NATURAL units as recursion deepens —
+    NEVER at a guessed question boundary:
+        depth 0 -> pages     (form-feeds / page markers)
+        depth 1 -> paragraphs (blank-line separated)
+        depth 2+ -> lines
+    Each is a real structural unit of the document, so a question is only ever
+    split if the document itself already split it across that unit (rare), and the
+    merge step recombines by content. Returns >1 unit only when a finer split
+    actually helps."""
+    if depth == 0:
+        pages = _split_pages(body)
+        if len(pages) > 1:
+            return pages
+        # no page separators -> fall straight to paragraphs
+        depth = 1
+    if depth == 1:
+        paras = [p.strip() for p in re.split(r"\n\s*\n", body) if p.strip()]
+        if len(paras) > 1:
+            return paras
+        depth = 2
+    # finest: individual non-empty lines
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    return lines
 
 
 def read_docx_text(path: Path) -> str:
@@ -261,113 +344,6 @@ def read_docx_text(path: Path) -> str:
     return "\n".join(lines)
 
 
-# A line that STARTS a new question. This MUST match the real production input,
-# which is Sarvam Vision OCR output in MARKDOWN (output_format="md") — question
-# numbers there arrive wrapped in markdown markup: "**1.**", "## प्रश्न 1",
-# "| 1. | ... |", "- 1. ...". The earlier version only matched bare "1." / a Latin
-# "Question" label, so on real Sarvam markdown it found ZERO boundaries and
-# _chunk_body silently fell back to the newline splitter — reintroducing the
-# fragment / short-count / missing-question symptoms the chunker was meant to fix.
-#
-# The shapes we now accept as a question start (at line start, re.MULTILINE):
-#   - optional leading markdown/list/table markup: >, #, |, *, -, and bold **
-#   - then ONE of:
-#       (1) / (१)                parenthesized number
-#       1. 1) 1- १।              number + delimiter, delimiter followed by space/EOL/*
-#       प्रश्न 1 / प्रश्न-1        Hindi "Question" label (+ optional number)
-#       प्र. 1                    Hindi abbreviation
-#       Question                 English label
-#       Q1 / Q.15                English Q-number
-# The number+delimiter form still requires whitespace/EOL/'*' AFTER the delimiter,
-# so a dotted decimal ("3.14") or IP ("142.250.190.46") inside a stem does NOT
-# match (a digit follows the dot). Verified against realistic Sarvam markdown:
-# a 39-question **n.** body now yields 39 boundaries (was 0).
-# A single, non-overlapping quantified class for the skippable leading markup
-# (whitespace + markdown/list/table/bold markers). This MUST be one class with one
-# quantifier: an earlier version stacked several overlapping groups
-# ([ \t]*[>#|*\-]*[ \t]*\**[ \t]*) whose alphabets overlapped (space in three
-# groups, '*' in two), letting the engine partition a leading run O(n) ways ->
-# catastrophic backtracking (ReDoS). A long run of spaces or '*' — a natural OCR
-# artifact like a ruled line or table border — hung the worker past its 20-min
-# hard limit, a cross-tenant DoS. One class = linear, no backtracking.
-_Q_LEAD = r"[ \t>#|*\-]*"
-_Q_NUM = r"[0-9०-९]{1,3}"
-_Q_BOUNDARY = re.compile(
-    r"^" + _Q_LEAD + r"(?:"
-    r"\(" + _Q_NUM + r"\)"                       # (1) / (१)
-    r"|" + _Q_NUM + r"[.)\-।:](?=[ \t*]|$)"      # 1. 1) 1- १।  (delim + space/EOL/*)
-    r"|प्रश्न[ \t\-.]*" + _Q_NUM + r"?"           # प्रश्न 1 / प्रश्न-1 / प्रश्न
-    r"|प्र\.[ \t]*" + _Q_NUM + r"?"               # प्र. 1
-    r"|Question\b"                                # Question
-    r"|Q\.?[ \t]*" + _Q_NUM + r"\b"              # Q1 / Q.15
-    r")",
-    re.MULTILINE,
-)
-
-
-def _question_starts(body: str) -> list[int]:
-    """Character offsets where a new question begins (see _Q_BOUNDARY)."""
-    return [m.start() for m in _Q_BOUNDARY.finditer(body)]
-
-
-def _chunk_body(body: str) -> list[str]:
-    """Split body into ~CHUNK_CHARS chunks, cutting ONLY at a question boundary so
-    a question is never split across two chunks. NO overlap.
-
-    Why structure-aware: the old version cut at the last NEWLINE before the cap,
-    which almost always lands mid-question — so the question straddling the
-    boundary lost its stem opening (rendered as a fragment) or its trailing
-    options (rendered with 3 choices), and sometimes vanished entirely. On SET-04
-    that produced a fragment Q1, a 3-option Q, and ~17 missing questions.
-
-    Fix: find every question-start offset (_question_starts) and pack whole
-    questions into each chunk greedily up to CHUNK_CHARS, breaking the chunk right
-    BEFORE the boundary that would overflow it. A single question larger than
-    CHUNK_CHARS (rare) still gets its own chunk — we never drop or truncate it, we
-    just let that one chunk run long. If the text has no detectable boundaries at
-    all (unknown format), fall back to the old newline split so we still make
-    progress. Overlap was tried before and made things WORSE (empty later chunks +
-    duplicates); this recovers the boundary questions WITHOUT re-feeding any text.
-    """
-    starts = _question_starts(body)
-    # No structure detected -> fall back to the newline split (never worse than before).
-    if len(starts) < 2:
-        return _chunk_body_by_newline(body)
-
-    # Treat the region before the first boundary (cover/header) as a leading block,
-    # and make the boundary list span the whole document.
-    bounds = starts + [len(body)]
-    if bounds[0] != 0:
-        bounds = [0] + bounds
-
-    chunks: list[str] = []
-    chunk_start = bounds[0]
-    for i in range(1, len(bounds)):
-        b = bounds[i]
-        # If extending the current chunk to this boundary would exceed the cap AND
-        # the current chunk already holds at least one question, close it here.
-        if b - chunk_start > CHUNK_CHARS and bounds[i - 1] > chunk_start:
-            chunks.append(body[chunk_start:bounds[i - 1]].strip())
-            chunk_start = bounds[i - 1]
-    # Trailing remainder (the last chunk).
-    if chunk_start < len(body):
-        chunks.append(body[chunk_start:].strip())
-    return [c for c in chunks if c]
-
-
-def _chunk_body_by_newline(body: str) -> list[str]:
-    """Fallback splitter: break on the last newline before the cap. Used only when
-    no question boundaries are detected (see _chunk_body)."""
-    chunks, start = [], 0
-    while start < len(body):
-        end = min(start + CHUNK_CHARS, len(body))
-        if end < len(body):
-            nl = body.rfind("\n", start, end)
-            if nl > start:
-                end = nl
-        chunks.append(body[start:end].strip())
-        start = end
-    return [c for c in chunks if c]
 
 
 def _clean_raw(raw: str) -> str:
@@ -469,76 +445,87 @@ def _parse_questions(raw: str) -> list[dict]:
     return _salvage_questions(raw)
 
 
-def _call_one(chunk: str, attempt: int = 1) -> list[dict]:
-    """Send one text chunk to the LLM (OpenAI primary, Claude fallback).
+# Output-token budget for one LLM extraction call. A JSON question with 4 options
+# is ~120-200 tokens; 16k tokens comfortably holds ~90-120 questions, i.e. a whole
+# typical paper in ONE call. This is the real (output) limit — and when it is hit,
+# the fix is to feed the LLM smaller NATURAL units of the SAME text (pages, then
+# paragraphs), never to chunk the input at a code-guessed question boundary.
+_EXTRACT_MAX_TOKENS = 16_000
 
-    On a chunk that yields zero parseable questions, retry once — the model is
-    non-deterministic and a second pass usually returns clean JSON. Never
-    silently drops a chunk: salvages partial JSON and logs the outcome.
-    """
-    raw = complete(SYSTEM, USER_TMPL.format(body=chunk), model="fast", max_tokens=8_000)
+
+def _looks_truncated(raw: str) -> bool:
+    """Did the model's JSON array get cut off by the output-token cap?
+
+    A last-char check ("ends with ]") is NOT enough: when the cap lands right
+    after an object's closing '}' (before the next ',' or the final ']'), the
+    array IS truncated but its last char is '}', so a naive check reports complete
+    and the page-split recovery never fires -> a silent short paper. Instead,
+    balance the brackets: strip fences, ignore brackets inside JSON strings, and
+    report truncated if the array/object nesting never returns to zero (i.e. a '['
+    or '{' was left open). Empty/no-JSON input is treated as truncated so the
+    caller escalates rather than shipping nothing."""
+    s = raw.strip()
+    s = re.sub(r"^```(?:json)?\s*", "", s)
+    s = re.sub(r"\s*```\s*$", "", s).strip()
+    if not s:
+        return True
+    start = s.find("[")
+    if start == -1:
+        start = s.find("{")
+    if start == -1:
+        return True                       # no JSON array/object at all
+    depth, in_str, esc = 0, False, False
+    for ch in s[start:]:
+        if esc:
+            esc = False
+            continue
+        if in_str:
+            if ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+    # depth>0 => an open bracket was never closed (cut off). in_str => cut inside a
+    # string. Either means the response did not finish.
+    return depth > 0 or in_str
+
+
+def _call_llm(body: str, system: str, max_tokens: int = _EXTRACT_MAX_TOKENS):
+    """One LLM extraction call over `body`. Returns (questions, truncated).
+
+    Never silently returns [] — salvages partial JSON. `truncated` is True when the
+    output looks cut off by the token cap, so the caller can split and retry the
+    pieces instead of shipping a short paper."""
+    raw = complete(system, USER_TMPL.format(body=body), model="fast",
+                   max_tokens=max_tokens)
+    truncated = _looks_truncated(raw)
     raw = _clean_raw(raw)
     questions = _parse_questions(raw)
-
-    if not questions and attempt < 2:
-        print(f"  [extract_docx] chunk parsed to 0 questions; retrying (attempt {attempt + 1})",
-              file=sys.stderr)
-        return _call_one(chunk, attempt + 1)
-
-    if not questions:
-        # genuinely couldn't recover anything from this chunk after a retry —
-        # make the loss LOUD instead of silently returning [] (the old bug).
-        print(f"  [extract_docx] WARNING: lost a chunk entirely after retry. "
-              f"raw tail: {raw[-300:]}", file=sys.stderr)
-    return questions
+    return questions, truncated
 
 
-def extract_from_text(body: str, label: str = "input") -> dict:
-    """Send paper text to Claude in chunks -> {"questions": [...]}.
+def _merge_ordered(all_questions: list[dict],
+                   krutidev_input: bool = True) -> list[dict]:
+    """Merge question lists (from one call, or several page-splits) into ONE
+    ordered, de-duplicated list — preserving document order, deduping on stem
+    content (not the LLM's per-piece numbering), and keeping the more-complete
+    copy of any duplicate at its first-seen position. Renumbers 1..N at the end.
 
-    Shared by the .docx and digital-PDF paths. Chunks at ~8k chars so the
-    output per call always fits within the model's output window.
-    """
-    if not body.strip():
-        raise ValueError(f"{label} has no extractable text.")
-    if len(body) > MAX_CHARS:
-        raise ValueError(f"{label} is {len(body)} chars (> {MAX_CHARS}). "
-                         f"Split the paper or raise MAX_CHARS.")
-
-    chunks = _chunk_body(body)
-    all_questions: list[dict] = []
-    lost_chunks = 0
-    for i, chunk in enumerate(chunks, 1):
-        print(f"  [extract_docx] chunk {i}/{len(chunks)} ({len(chunk)} chars)...",
-              file=sys.stderr)
-        qs = _call_one(chunk)
-        print(f"    -> {len(qs)} questions", file=sys.stderr)
-        if not qs:
-            lost_chunks += 1
-        all_questions.extend(qs)
-
-    # Merge chunk outputs into ONE ordered, de-duplicated list.
-    #
-    # Two bugs the old "dedup by q['n']" merge caused (Mayank saw both: questions
-    # shuffled AND repeated):
-    #   * SHUFFLE — each chunk is an INDEPENDENT LLM call that renumbers from n=1.
-    #     Sorting the merged list by n put chunk-2's n=1 BEFORE chunk-1's n=10, so
-    #     questions came out interleaved instead of in document order.
-    #   * REPEATS — a question can legitimately appear in the extractor output of
-    #     two chunks (or the LLM emits near-duplicates); keying identity on n let
-    #     genuinely-different questions with the same local n clobber each other,
-    #     while true duplicates with different n both survived.
-    #
-    # Fix: preserve DOCUMENT ORDER by arrival (chunks are already in order; within
-    # a chunk the LLM returns questions top-to-bottom), and dedup on the NORMALIZED
-    # STEM (content), not on n. Keep the MORE COMPLETE copy of a duplicate (more
-    # options, then longer stem) but hold its FIRST-seen position so order is stable.
+    (History: the old per-chunk pipeline deduped by q['n'] and sorted by it, which
+    both SHUFFLED — each piece renumbers from 1 — and dropped/duplicated questions.
+    Ordering by arrival + stem-content dedup fixes both.)"""
     def _completeness(q: dict) -> tuple:
         opts = q.get("options") or []
         return (len(opts) if isinstance(opts, list) else 0, len(str(q.get("stem", ""))))
 
-    order: list[str] = []          # stem-keys in first-seen (document) order
-    by_key: dict = {}              # stem-key -> best question dict
+    order: list[str] = []
+    by_key: dict = {}
     anon = 0
     for q in all_questions:
         key = _stem_key(q.get("stem", ""))
@@ -549,35 +536,117 @@ def extract_from_text(body: str, label: str = "input") -> dict:
             by_key[key] = q
             order.append(key)
         elif _completeness(q) > _completeness(by_key[key]):
-            by_key[key] = q       # better copy, same (first-seen) position
-    questions = [by_key[key] for key in order]  # document order, NOT renumbered yet
+            by_key[key] = q
+    questions = [by_key[key] for key in order]
 
-    # Recover any text the model left in raw Kruti-Dev (it tends to give up on
-    # the transliteration late in a long response); drop anything still gibberish
-    # (or the cover page mis-read as a question) so the paper never renders garbage.
-    questions = _recover_or_drop(questions)
+    # Recover Kruti-Dev the model left un-transliterated (legacy path only); drop
+    # cover pages / gibberish / placeholder-only questions so the paper never
+    # renders garbage. On the clean Unicode path this SKIPS Kruti-Dev processing
+    # so it can't corrupt English or drop a legit English-heavy stem.
+    questions = _recover_or_drop(questions, krutidev_input=krutidev_input)
 
-    # Renumber 1..N AFTER dropping. Doing it before _recover_or_drop left gaps
-    # (e.g. a dropped cover pseudo-question between 1 and 3 gave survivors
-    # n = [1, 3, 4]); builders print q["n"] verbatim, so a teacher saw the paper
-    # skip a number and read it as a MISSING question — one of the reported
-    # symptoms. Numbering last guarantees a clean 1..N in document order.
+    # Renumber 1..N AFTER dropping (a drop before numbering left gaps like
+    # n=[1,3,4], which builders print verbatim and a teacher reads as a MISSING
+    # question). Numbering last guarantees a clean contiguous 1..N.
     for i, q in enumerate(questions, 1):
         q["n"] = i
+    return questions
 
+
+def extract_from_text(body: str, label: str = "input",
+                      krutidev_input: bool = False) -> dict:
+    """Turn paper text into {"questions": [...]} by letting the LLM read it.
+
+    Design (per the product owner): Sarvam Vision / the docx text layer already
+    make the page selectable; the LLM — not hand-coded regex — decides where each
+    question starts and ends. So we send the WHOLE paper in one call and let the
+    model return every question in order. We only split when we must:
+
+      1. whole-paper call (primary) — one LLM call over the entire text.
+      2. if that output was truncated by the token cap, split by PAGE (a natural
+         boundary the OCR already provides via form-feed / page markers) and
+         extract each page-group, then merge.
+      3. if even the whole-paper call yields nothing (garbled/odd input), fall
+         re-extract each smaller unit with the LLM (never a code boundary split).
+
+    `krutidev_input`: True only for the legacy .docx text-layer path (garbled
+    Kruti-Dev ASCII); False for clean Unicode (Sarvam Vision) — this picks the
+    right system prompt so we never tell clean text it is "garbled"."""
+    if not body.strip():
+        raise ValueError(f"{label} has no extractable text.")
+    if len(body) > MAX_CHARS:
+        raise ValueError(f"{label} is {len(body)} chars (> {MAX_CHARS}). "
+                         f"Split the paper or raise MAX_CHARS.")
+
+    system = _system_for(krutidev_input)
+    questions = _extract_recursive(body, system, depth=0)
+    questions = _merge_ordered(questions, krutidev_input=krutidev_input)
     if not questions:
-        raise ValueError(f"{label}: extractor returned no questions across {len(chunks)} chunks.")
-    if lost_chunks:
-        # surface partial loss rather than quietly shipping a short paper
-        print(f"  [extract_docx] NOTE: {lost_chunks}/{len(chunks)} chunk(s) yielded "
-              f"nothing even after retry; extracted {len(questions)} questions total.",
-              file=sys.stderr)
+        raise ValueError(f"{label}: extractor returned no questions.")
+    print(f"  [extract] {len(questions)} questions total", file=sys.stderr)
     return {"questions": questions}
 
 
+def _extract_recursive(body: str, system: str, depth: int = 0) -> list[dict]:
+    """LLM-ONLY extraction (the product doctrine: OCR -> LLM makes the JSON ->
+    code only slots it into builders; code NEVER decides question boundaries).
+
+    Send `body` to the LLM. If the output is truncated by the token cap, split the
+    body into SMALLER NATURAL UNITS — pages, then paragraphs, then lines — and
+    recurse on each. There is no regex boundary logic and no character-chunker:
+    when the model can't fit the answer, it gets less INPUT text (whole natural
+    units), never text cut at a guessed question edge. The merge step dedups the
+    overlap at any truncation point.
+    """
+    indent = "  " * (depth + 1)
+    print(f"{indent}[extract] LLM call ({len(body)} chars, depth {depth})...",
+          file=sys.stderr)
+    questions, truncated = _call_llm(body, system)
+    print(f"{indent}  -> {len(questions)} questions"
+          f"{' (TRUNCATED)' if truncated else ''}", file=sys.stderr)
+    if not truncated:
+        return questions
+
+    # Truncated: split the SAME text into a FEW balanced groups of whole natural
+    # units and recurse on each. Splitting by unit COUNT (not char size) is what
+    # matters here: truncation is driven by how many QUESTIONS the output holds, and
+    # a dense paper of many short questions is small in chars but large in output —
+    # a char target would never trigger a split. Halving the units per level always
+    # reduces the questions-per-call, so we converge. Guard depth so a single
+    # indivisible unit can't loop forever.
+    units = _natural_units(body, depth)
+    if len(units) <= 1 or depth >= _MAX_SPLIT_DEPTH:
+        print(f"{indent}  [extract] WARNING: truncated output could not be split "
+              f"further (depth {depth}); keeping {len(questions)} partial questions",
+              file=sys.stderr)
+        return questions
+
+    groups = _balanced_groups(units, n=max(2, min(4, len(units))))
+    print(f"{indent}  [extract] truncated -> {len(groups)} group(s) of units",
+          file=sys.stderr)
+    out: list[dict] = list(questions)   # keep the partial first-pass questions too
+    for grp in groups:
+        out.extend(_extract_recursive(grp, system, depth + 1))
+    return out
+
+
+def _balanced_groups(units: list[str], n: int) -> list[str]:
+    """Split `units` into `n` contiguous, roughly-equal groups (by unit count),
+    each joined back into text. Preserves document order; never splits a unit."""
+    n = max(1, min(n, len(units)))
+    size = -(-len(units) // n)          # ceil division
+    groups = ["\n".join(units[i:i + size]) for i in range(0, len(units), size)]
+    return [g for g in groups if g.strip()]
+
+
 def extract(path: Path) -> dict:
-    """Read a .docx and return {"questions": [...]} via Claude."""
-    return extract_from_text(read_docx_text(path), label=path.name)
+    """Read a .docx and return {"questions": [...]} via Claude.
+
+    This is the LEGACY text-layer path: a .docx stores Devanagari as Kruti-Dev
+    encoded ASCII, so we flag the input as Kruti-Dev for the prompt. (The clean
+    path is Sarvam Vision -> extract_from_text(..., krutidev_input=False).)"""
+    return extract_from_text(read_docx_text(path), label=path.name,
+                             krutidev_input=True)
 
 
 def main():
