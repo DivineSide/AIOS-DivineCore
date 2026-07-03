@@ -261,20 +261,46 @@ def read_docx_text(path: Path) -> str:
     return "\n".join(lines)
 
 
-# A line that STARTS a new question. Two shapes cover both input paths:
-#   1. A numbered line: "1.", "2)", "12 -", "१." (digital-PDF / plain-text papers).
-#   2. A "Question" field label (the docx TABLE flattener emits each question as
-#      "Question\t<stem>", and Sarvam OCR of these table papers also transcribes a
-#      literal "Question" line). This is the anchor for Target Academy's format.
-# Matched at the start of a line only (re.MULTILINE), so a "1." inside a stem or
-# an inline "question" word never counts as a boundary.
-# The numbered form requires a SPACE/TAB (or line end) right after the delimiter,
-# so a question line "1. पहला प्रश्न" matches but a dotted-decimal inside a stem
-# ("142.250.190.46", where a digit follows the dot) does NOT — that false boundary
-# would otherwise split a question mid-stem.
+# A line that STARTS a new question. This MUST match the real production input,
+# which is Sarvam Vision OCR output in MARKDOWN (output_format="md") — question
+# numbers there arrive wrapped in markdown markup: "**1.**", "## प्रश्न 1",
+# "| 1. | ... |", "- 1. ...". The earlier version only matched bare "1." / a Latin
+# "Question" label, so on real Sarvam markdown it found ZERO boundaries and
+# _chunk_body silently fell back to the newline splitter — reintroducing the
+# fragment / short-count / missing-question symptoms the chunker was meant to fix.
+#
+# The shapes we now accept as a question start (at line start, re.MULTILINE):
+#   - optional leading markdown/list/table markup: >, #, |, *, -, and bold **
+#   - then ONE of:
+#       (1) / (१)                parenthesized number
+#       1. 1) 1- १।              number + delimiter, delimiter followed by space/EOL/*
+#       प्रश्न 1 / प्रश्न-1        Hindi "Question" label (+ optional number)
+#       प्र. 1                    Hindi abbreviation
+#       Question                 English label
+#       Q1 / Q.15                English Q-number
+# The number+delimiter form still requires whitespace/EOL/'*' AFTER the delimiter,
+# so a dotted decimal ("3.14") or IP ("142.250.190.46") inside a stem does NOT
+# match (a digit follows the dot). Verified against realistic Sarvam markdown:
+# a 39-question **n.** body now yields 39 boundaries (was 0).
+# A single, non-overlapping quantified class for the skippable leading markup
+# (whitespace + markdown/list/table/bold markers). This MUST be one class with one
+# quantifier: an earlier version stacked several overlapping groups
+# ([ \t]*[>#|*\-]*[ \t]*\**[ \t]*) whose alphabets overlapped (space in three
+# groups, '*' in two), letting the engine partition a leading run O(n) ways ->
+# catastrophic backtracking (ReDoS). A long run of spaces or '*' — a natural OCR
+# artifact like a ruled line or table border — hung the worker past its 20-min
+# hard limit, a cross-tenant DoS. One class = linear, no backtracking.
+_Q_LEAD = r"[ \t>#|*\-]*"
+_Q_NUM = r"[0-9०-९]{1,3}"
 _Q_BOUNDARY = re.compile(
-    r"^(?:\s*(?:[0-9०-९]{1,3}[.)\-।]|Q\.?\s*[0-9]{1,3}[.)]?)(?=[ \t]|$)|"
-    r"\s*Question\b)",
+    r"^" + _Q_LEAD + r"(?:"
+    r"\(" + _Q_NUM + r"\)"                       # (1) / (१)
+    r"|" + _Q_NUM + r"[.)\-।:](?=[ \t*]|$)"      # 1. 1) 1- १।  (delim + space/EOL/*)
+    r"|प्रश्न[ \t\-.]*" + _Q_NUM + r"?"           # प्रश्न 1 / प्रश्न-1 / प्रश्न
+    r"|प्र\.[ \t]*" + _Q_NUM + r"?"               # प्र. 1
+    r"|Question\b"                                # Question
+    r"|Q\.?[ \t]*" + _Q_NUM + r"\b"              # Q1 / Q.15
+    r")",
     re.MULTILINE,
 )
 
@@ -524,18 +550,20 @@ def extract_from_text(body: str, label: str = "input") -> dict:
             order.append(key)
         elif _completeness(q) > _completeness(by_key[key]):
             by_key[key] = q       # better copy, same (first-seen) position
-    # Renumber sequentially so downstream builders show 1..N in document order,
-    # regardless of the per-chunk numbers the LLM assigned.
-    questions = []
-    for i, key in enumerate(order, 1):
-        q = by_key[key]
-        q["n"] = i
-        questions.append(q)
+    questions = [by_key[key] for key in order]  # document order, NOT renumbered yet
 
     # Recover any text the model left in raw Kruti-Dev (it tends to give up on
     # the transliteration late in a long response); drop anything still gibberish
-    # so the paper never renders garbage.
+    # (or the cover page mis-read as a question) so the paper never renders garbage.
     questions = _recover_or_drop(questions)
+
+    # Renumber 1..N AFTER dropping. Doing it before _recover_or_drop left gaps
+    # (e.g. a dropped cover pseudo-question between 1 and 3 gave survivors
+    # n = [1, 3, 4]); builders print q["n"] verbatim, so a teacher saw the paper
+    # skip a number and read it as a MISSING question — one of the reported
+    # symptoms. Numbering last guarantees a clean 1..N in document order.
+    for i, q in enumerate(questions, 1):
+        q["n"] = i
 
     if not questions:
         raise ValueError(f"{label}: extractor returned no questions across {len(chunks)} chunks.")

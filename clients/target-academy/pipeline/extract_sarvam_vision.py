@@ -251,17 +251,48 @@ def _html_to_text(s: str) -> str:
     return s.strip()
 
 
+def _page_num(name: str) -> tuple:
+    """Natural-sort key for a page file: the last integer in the name, then the
+    name. Lexicographic sort put page10 before page2 (SHUFFLE — the whole paper
+    came out with pages/questions reordered); sort by the numeric page index so
+    page 2 precedes page 10."""
+    import re as _re
+    nums = _re.findall(r"\d+", name)
+    return (int(nums[-1]) if nums else 0, name.lower())
+
+
+# Format preference per page — request order was md, so prefer md; fall back
+# through txt, html, json. Exactly ONE format is emitted per page.
+_FMT_RANK = {".md": 0, ".txt": 1, ".html": 2, ".json": 3}
+
+
 def _text_from_zip(zip_bytes: bytes) -> list[str]:
-    """Pull text out of the Sarvam output ZIP, in page order, HTML stripped to
-    plain readable text (Devanagari is already clean Unicode here)."""
+    """Pull text out of the Sarvam output ZIP, in PAGE order, ONE format per page.
+
+    Two bugs this guards against (both caused the reported shuffle/duplicates):
+      * lexicographic name sort ordered page10 before page2 -> reorder the whole
+        paper. Fix: natural-sort by the page number in the filename.
+      * a page present in BOTH .md and .html was appended TWICE -> the same
+        questions duplicated. Fix: group files by page and keep exactly one format
+        per page (preferring .md, the format we requested).
+    HTML is stripped to plain text; md/txt/json pass through (Devanagari is already
+    clean Unicode)."""
+    import os
     import zipfile
-    parts = []
+    by_page: dict = {}   # page-stem -> (rank, name)
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        names = sorted(n for n in zf.namelist()
-                       if n.lower().endswith((".md", ".txt", ".html", ".json")))
-        # prefer md/txt/html over json if both exist; json is the structured dump
-        preferred = [n for n in names if not n.lower().endswith(".json")] or names
-        for n in preferred:
+        for n in zf.namelist():
+            ext = os.path.splitext(n)[1].lower()
+            if ext not in _FMT_RANK:
+                continue
+            stem = os.path.splitext(n)[0].lower()   # same page across formats shares a stem
+            rank = _FMT_RANK[ext]
+            prev = by_page.get(stem)
+            if prev is None or rank < prev[0]:
+                by_page[stem] = (rank, n)
+        chosen = sorted((name for _, name in by_page.values()), key=_page_num)
+        parts = []
+        for n in chosen:
             try:
                 raw = zf.read(n).decode("utf-8", "replace")
                 parts.append(_html_to_text(raw) if n.lower().endswith(".html") else raw)
