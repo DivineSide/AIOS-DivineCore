@@ -130,6 +130,29 @@ def _is_placeholder_option(opt: str) -> bool:
     return len(core) <= 1
 
 
+def _stem_key(stem: str) -> str:
+    """A normalized identity key for a question stem, used to dedup the same
+    question extracted by two chunks WITHOUT merging two genuinely different
+    questions.
+
+    Collapse all whitespace, drop punctuation/quotes/brackets that OCR wobbles on,
+    lowercase the Latin bits. Keep it CONTENT-based (not just a prefix) so two
+    different questions that happen to share an opening clause ("निम्नलिखित में
+    से...") don't collide. Empty/near-empty stems return "" (treated as anonymous
+    by the caller, never merged)."""
+    if not isinstance(stem, str):
+        return ""
+    s = stem.strip()
+    if not s:
+        return ""
+    # remove punctuation the OCR is inconsistent about; keep letters/digits/spaces
+    s = re.sub(r"[\s]+", " ", s)
+    s = re.sub(r"[।'\"'‘’“”()\[\]{}.,:;?!\-–—/\\]", "", s)
+    s = s.lower().strip()
+    # a stem shorter than a few chars can't reliably identify a question
+    return s if len(s) >= 6 else ""
+
+
 def _all_options_placeholder(opts) -> bool:
     """True if a question's options are ALL label placeholders (no real text),
     so the question carries no usable answer choices."""
@@ -468,26 +491,46 @@ def extract_from_text(body: str, label: str = "input") -> dict:
             lost_chunks += 1
         all_questions.extend(qs)
 
-    # deduplicate by question number. With chunk OVERLAP a boundary question can
-    # appear twice — once TRUNCATED (the chunk that cut it) and once COMPLETE (the
-    # chunk that re-included it). Keep the MORE COMPLETE copy: prefer the one with
-    # more options, then the longer stem — NOT simply "later wins" (which could
-    # keep the truncated copy). Items missing a usable "n" key by running order.
+    # Merge chunk outputs into ONE ordered, de-duplicated list.
+    #
+    # Two bugs the old "dedup by q['n']" merge caused (Mayank saw both: questions
+    # shuffled AND repeated):
+    #   * SHUFFLE — each chunk is an INDEPENDENT LLM call that renumbers from n=1.
+    #     Sorting the merged list by n put chunk-2's n=1 BEFORE chunk-1's n=10, so
+    #     questions came out interleaved instead of in document order.
+    #   * REPEATS — a question can legitimately appear in the extractor output of
+    #     two chunks (or the LLM emits near-duplicates); keying identity on n let
+    #     genuinely-different questions with the same local n clobber each other,
+    #     while true duplicates with different n both survived.
+    #
+    # Fix: preserve DOCUMENT ORDER by arrival (chunks are already in order; within
+    # a chunk the LLM returns questions top-to-bottom), and dedup on the NORMALIZED
+    # STEM (content), not on n. Keep the MORE COMPLETE copy of a duplicate (more
+    # options, then longer stem) but hold its FIRST-seen position so order is stable.
     def _completeness(q: dict) -> tuple:
         opts = q.get("options") or []
         return (len(opts) if isinstance(opts, list) else 0, len(str(q.get("stem", ""))))
 
-    seen: dict = {}
-    fallback_n = 10_000
+    order: list[str] = []          # stem-keys in first-seen (document) order
+    by_key: dict = {}              # stem-key -> best question dict
+    anon = 0
     for q in all_questions:
-        n = q.get("n")
-        if not isinstance(n, int):
-            n = fallback_n
-            fallback_n += 1
-        prev = seen.get(n)
-        if prev is None or _completeness(q) >= _completeness(prev):
-            seen[n] = q
-    questions = [seen[n] for n in sorted(seen)]
+        key = _stem_key(q.get("stem", ""))
+        if not key:                # no usable stem -> never merge these together
+            key = f"__anon{anon}__"
+            anon += 1
+        if key not in by_key:
+            by_key[key] = q
+            order.append(key)
+        elif _completeness(q) > _completeness(by_key[key]):
+            by_key[key] = q       # better copy, same (first-seen) position
+    # Renumber sequentially so downstream builders show 1..N in document order,
+    # regardless of the per-chunk numbers the LLM assigned.
+    questions = []
+    for i, key in enumerate(order, 1):
+        q = by_key[key]
+        q["n"] = i
+        questions.append(q)
 
     # Recover any text the model left in raw Kruti-Dev (it tends to give up on
     # the transliteration late in a long response); drop anything still gibberish
