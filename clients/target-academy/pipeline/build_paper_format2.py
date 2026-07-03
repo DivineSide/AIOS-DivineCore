@@ -184,12 +184,27 @@ def _no_split_rows(tbl):
                     pPr.append(_el("w:keepNext", **{"w:val": "true"}))
 
 
-def add_question_table(doc, q):
-    tbl = doc.add_table(rows=8, cols=3)
+def add_question_table(doc, q, student_safe: bool = True):
+    """Render one question as the format-2 table.
+
+    student_safe (default True): the paper is student-facing, so NO answers leak —
+    the correct/incorrect column is blank and the Solution row is empty regardless
+    of what the question JSON carries. The correct answer + worked solution live
+    ONLY on the separate answer-key / solution files. Set False only for an
+    explicit teacher/master copy.
+    """
+    opts = q.get("options") or []
+    n_opts = max(2, len(opts))          # at least the 2 label rows the layout needs
+    # 4 fixed rows historically (Question, Type, then 4 Option rows, Solution,
+    # Marks). Size the Option block to the ACTUAL option count so a 5th/6th option
+    # is never silently dropped and an 'e'/'f' answer still lands on a real row.
+    tbl = doc.add_table(rows=4 + n_opts, cols=3)
     _apply_tblPr(tbl)
     _apply_tblGrid(tbl)
 
     rows = tbl.rows
+    sol_row = 2 + n_opts                # Solution row index (after the option rows)
+    marks_row = sol_row + 1
 
     # Row 0: Question | <stem runs, colspan 2>
     _fill_label(rows[0].cells[0], "Question")
@@ -215,45 +230,53 @@ def add_question_table(doc, q):
     # is a SUBSTRING of "abcdef" (`"" in "abcdef"` is True), so the old check
     # let a blank through and `"abcdef".index("")` returned 0 -> Option A was
     # falsely marked "correct" on EVERY unanswered question (a fabricated key).
+    # Which option (0-based) is the correct one. correct_idx is computed over all
+    # SIX labels a..f so an 'e'/'f' key resolves — and because the option block is
+    # now sized to len(options), that index always maps to a real rendered row.
+    # NOTE: must test LIST membership, not `ans in "abcdef"`. A blank answer ""
+    # is a SUBSTRING of "abcdef", so the old check let a blank through and
+    # `.index("")` returned 0 -> Option A falsely "correct" on every blank.
     ans = str(q.get("answer", "")).strip().lower()
     correct_idx = list("abcdef").index(ans) if ans in list("abcdef") else -1
 
-    # Rows 2–5: Option | <text> | correct/incorrect.
-    # When the question has NO marked answer (correct_idx == -1), leave the
-    # correct/incorrect column EMPTY for every option (Mayank's call) instead of
-    # writing "incorrect" on all four — an all-"incorrect" column wrongly implies
-    # the answer was checked and none is right. Empty = "not marked yet".
+    # Option rows. On the STUDENT-SAFE paper the correct/incorrect column is ALWAYS
+    # blank (no answer leaks); the answer + solution live only on the separate
+    # answer-key / solution files. Only a teacher/master copy (student_safe=False)
+    # prints the marking.
     has_answer = correct_idx >= 0
-    for i, opt in enumerate(q["options"][:4]):
+    for i, opt in enumerate(opts):
         row = rows[2 + i]
         _fill_label(row.cells[0], "Option")
         _fill_runs(row.cells[1], _runs(opt), width=COL1_W, bold=False)
-        if has_answer:
+        if student_safe:
+            mark = ""
+        elif has_answer:
             mark = "correct" if i == correct_idx else "incorrect"
         else:
-            mark = ""  # no key -> leave blank, teacher fills it in
+            mark = ""  # no key -> blank, teacher fills it in
         _fill_plain(row.cells[2], mark, width=COL2_W, bold=False)
 
-    # Row 6: Solution | <solution text or blank, colspan 2>
-    _fill_label(rows[6].cells[0], "Solution")
-    solution = str(q.get("solution", "")).strip()
+    # Solution row — colspan 2. Blank on the student-safe paper (the worked solution
+    # is a separate teacher file); only a teacher copy embeds it.
+    _fill_label(rows[sol_row].cells[0], "Solution")
+    solution = "" if student_safe else str(q.get("solution", "")).strip()
     if solution:
-        _apply_tcPr(rows[6].cells[1]._tc, COL1_W + COL2_W, span=2)
-        tc2 = rows[6].cells[1]._tc.getnext()
+        _apply_tcPr(rows[sol_row].cells[1]._tc, COL1_W + COL2_W, span=2)
+        tc2 = rows[sol_row].cells[1]._tc.getnext()
         if tc2 is not None:
             tc2.getparent().remove(tc2)
-        para = rows[6].cells[1].paragraphs[0]
+        para = rows[sol_row].cells[1].paragraphs[0]
         _fmt_para(para)
         for text, font in _runs(solution):
             _add_run(para, text, bold=False, font=font)
     else:
-        _fill_plain(rows[6].cells[1], "",
+        _fill_plain(rows[sol_row].cells[1], "",
                     width=COL1_W + COL2_W, span=2, bold=False)
 
-    # Row 7: Marks | 1 | 0.25
-    _fill_label(rows[7].cells[0], "Marks")
-    _fill_plain(rows[7].cells[1], "1",    width=COL1_W, bold=False)
-    _fill_plain(rows[7].cells[2], "0.25", width=COL2_W, bold=False)
+    # Marks row
+    _fill_label(rows[marks_row].cells[0], "Marks")
+    _fill_plain(rows[marks_row].cells[1], "1",    width=COL1_W, bold=False)
+    _fill_plain(rows[marks_row].cells[2], "0.25", width=COL2_W, bold=False)
 
     # Keep the whole question table on one page — MUST run AFTER all cells are
     # filled, because the fill/colspan helpers replace paragraphs (which would
@@ -266,8 +289,14 @@ def add_question_table(doc, q):
     sep.paragraph_format.space_before = Pt(0)
 
 
-def build(src: Path, out_path: Path, font: str = DEFAULT_FONT):
-    """Pipeline builder: universal questions JSON -> format-2 table .docx."""
+def build(src: Path, out_path: Path, font: str = DEFAULT_FONT,
+          student_safe: bool = True):
+    """Pipeline builder: universal questions JSON -> format-2 table .docx.
+
+    student_safe (default True): produce a STUDENT paper with no answers/solutions
+    embedded (the format-2 table would otherwise carry the correct-answer marking
+    and worked solution in its own cells, and the file is named like a plain paper
+    so a student could download it). The key + solutions ship as separate files."""
     global _FONT
     _FONT = font  # _runs() reads this via render_runs()
     data = json.loads(Path(src).read_text(encoding="utf-8"))
@@ -279,7 +308,12 @@ def build(src: Path, out_path: Path, font: str = DEFAULT_FONT):
         p._element.getparent().remove(p._element)
 
     for q in questions:
-        add_question_table(doc, q)
+        # skip a malformed question rather than crash the whole paper build
+        if not str(q.get("stem", "")).strip() or not (q.get("options") or []):
+            print(f"  [format2] skipping question with no stem/options: "
+                  f"n={q.get('n')}", file=sys.stderr)
+            continue
+        add_question_table(doc, q, student_safe=student_safe)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out_path))
