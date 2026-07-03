@@ -62,14 +62,23 @@ SUPPORTED_UPLOAD_EXTS = {".docx", ".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
 
 def require_token(authorization: str = Header(default="")) -> None:
-    """Defence-in-depth API auth. If DSIDEOS_API_TOKEN is configured, every
-    protected route requires `Authorization: Bearer <token>` (constant-time
-    compared). If the token is blank the check is a no-op — the API is then
-    expected to be reachable only via the authenticated console proxy on
-    localhost (the public nginx /api route was removed)."""
+    """API auth. Every protected route requires `Authorization: Bearer <token>`
+    (constant-time compared) matching DSIDEOS_API_TOKEN. The console proxy already
+    sends this header using the same env var, so they just need the same value.
+
+    FAIL CLOSED: if DSIDEOS_API_TOKEN is blank, the route is REFUSED (503) unless
+    DSIDEOS_ALLOW_OPEN_API=1 is explicitly set for local dev. Previously a blank
+    token made this a no-op, which — combined with the public Caddy /api route —
+    left every endpoint (generate/full/extract/jobs/files) reachable with no auth
+    (cost bomb + cross-tenant data access). Refusing loudly surfaces the missing
+    token instead of silently serving an open API in production."""
     expected = settings.DSIDEOS_API_TOKEN
     if not expected:
-        return
+        if settings.DSIDEOS_ALLOW_OPEN_API:
+            return  # explicit local-dev opt-in only
+        raise HTTPException(
+            503, "API auth not configured: set DSIDEOS_API_TOKEN (or "
+                 "DSIDEOS_ALLOW_OPEN_API=1 for local dev).")
     prefix = "Bearer "
     supplied = authorization[len(prefix):] if authorization.startswith(prefix) else ""
     if not supplied or not secrets.compare_digest(supplied, expected):

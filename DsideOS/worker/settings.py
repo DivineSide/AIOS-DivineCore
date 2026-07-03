@@ -33,10 +33,18 @@ class Settings(BaseSettings):
     # Max upload size (MB) — guards against giant files.
     MAX_UPLOAD_MB: int = 50
 
-    # Optional shared bearer token. When set, every /api route requires
-    # `Authorization: Bearer <token>`. Leave blank to keep the API open (e.g.
-    # when it's only reachable via the authenticated console proxy on localhost).
+    # Shared bearer token. Every protected /api route requires
+    # `Authorization: Bearer <token>`. The console proxy already sends this header
+    # (ds-ai/console .../api/proxy uses the same DSIDEOS_API_TOKEN env var), so the
+    # two just need the SAME value. If this is blank, the API refuses to serve
+    # protected routes UNLESS DSIDEOS_ALLOW_OPEN_API=1 is explicitly set (local dev
+    # only) — a blank token in production used to silently disable all auth.
     DSIDEOS_API_TOKEN: str = ""
+
+    # Dev-only escape hatch: allow running with NO API token (open API). Must be
+    # explicitly enabled; production never sets it, so a missing token there is a
+    # hard failure instead of a silent wide-open API.
+    DSIDEOS_ALLOW_OPEN_API: bool = False
 
 
 settings = Settings()
