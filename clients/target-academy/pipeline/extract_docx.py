@@ -238,19 +238,77 @@ def read_docx_text(path: Path) -> str:
     return "\n".join(lines)
 
 
-def _chunk_body(body: str) -> list[str]:
-    """Split body into ~CHUNK_CHARS chunks, breaking on the last newline before
-    the cap so a question is never split mid-way. NO overlap.
+# A line that STARTS a new question. Two shapes cover both input paths:
+#   1. A numbered line: "1.", "2)", "12 -", "१." (digital-PDF / plain-text papers).
+#   2. A "Question" field label (the docx TABLE flattener emits each question as
+#      "Question\t<stem>", and Sarvam OCR of these table papers also transcribes a
+#      literal "Question" line). This is the anchor for Target Academy's format.
+# Matched at the start of a line only (re.MULTILINE), so a "1." inside a stem or
+# an inline "question" word never counts as a boundary.
+# The numbered form requires a SPACE/TAB (or line end) right after the delimiter,
+# so a question line "1. पहला प्रश्न" matches but a dotted-decimal inside a stem
+# ("142.250.190.46", where a digit follows the dot) does NOT — that false boundary
+# would otherwise split a question mid-stem.
+_Q_BOUNDARY = re.compile(
+    r"^(?:\s*(?:[0-9०-९]{1,3}[.)\-।]|Q\.?\s*[0-9]{1,3}[.)]?)(?=[ \t]|$)|"
+    r"\s*Question\b)",
+    re.MULTILINE,
+)
 
-    History: an overlap was added to recover a question straddling a boundary,
-    but it backfired badly on real OCR text — re-feeding the tail made the LLM
-    return an empty [] for the heavily-overlapped later chunks (losing a whole
-    middle block of questions) AND duplicated boundary questions. Net result was
-    WORSE (74 questions with dupes vs 97 clean without overlap). Reverted to the
-    simple non-overlapping split; the rare boundary-straddle loss is far smaller
-    than the damage the overlap caused. The real fix for boundary questions is
-    structure-aware splitting (cut only at a question-number line), TODO later.
+
+def _question_starts(body: str) -> list[int]:
+    """Character offsets where a new question begins (see _Q_BOUNDARY)."""
+    return [m.start() for m in _Q_BOUNDARY.finditer(body)]
+
+
+def _chunk_body(body: str) -> list[str]:
+    """Split body into ~CHUNK_CHARS chunks, cutting ONLY at a question boundary so
+    a question is never split across two chunks. NO overlap.
+
+    Why structure-aware: the old version cut at the last NEWLINE before the cap,
+    which almost always lands mid-question — so the question straddling the
+    boundary lost its stem opening (rendered as a fragment) or its trailing
+    options (rendered with 3 choices), and sometimes vanished entirely. On SET-04
+    that produced a fragment Q1, a 3-option Q, and ~17 missing questions.
+
+    Fix: find every question-start offset (_question_starts) and pack whole
+    questions into each chunk greedily up to CHUNK_CHARS, breaking the chunk right
+    BEFORE the boundary that would overflow it. A single question larger than
+    CHUNK_CHARS (rare) still gets its own chunk — we never drop or truncate it, we
+    just let that one chunk run long. If the text has no detectable boundaries at
+    all (unknown format), fall back to the old newline split so we still make
+    progress. Overlap was tried before and made things WORSE (empty later chunks +
+    duplicates); this recovers the boundary questions WITHOUT re-feeding any text.
     """
+    starts = _question_starts(body)
+    # No structure detected -> fall back to the newline split (never worse than before).
+    if len(starts) < 2:
+        return _chunk_body_by_newline(body)
+
+    # Treat the region before the first boundary (cover/header) as a leading block,
+    # and make the boundary list span the whole document.
+    bounds = starts + [len(body)]
+    if bounds[0] != 0:
+        bounds = [0] + bounds
+
+    chunks: list[str] = []
+    chunk_start = bounds[0]
+    for i in range(1, len(bounds)):
+        b = bounds[i]
+        # If extending the current chunk to this boundary would exceed the cap AND
+        # the current chunk already holds at least one question, close it here.
+        if b - chunk_start > CHUNK_CHARS and bounds[i - 1] > chunk_start:
+            chunks.append(body[chunk_start:bounds[i - 1]].strip())
+            chunk_start = bounds[i - 1]
+    # Trailing remainder (the last chunk).
+    if chunk_start < len(body):
+        chunks.append(body[chunk_start:].strip())
+    return [c for c in chunks if c]
+
+
+def _chunk_body_by_newline(body: str) -> list[str]:
+    """Fallback splitter: break on the last newline before the cap. Used only when
+    no question boundaries are detected (see _chunk_body)."""
     chunks, start = [], 0
     while start < len(body):
         end = min(start + CHUNK_CHARS, len(body))
