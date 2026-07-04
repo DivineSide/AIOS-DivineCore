@@ -138,3 +138,34 @@ def cleanup_expired(ttl_hours: int) -> int:
             shutil.rmtree(d, ignore_errors=True)
             removed += 1
     return removed
+
+
+def reap_stuck(max_running_seconds: int) -> int:
+    """Flip jobs stuck in RUNNING past max_running_seconds to FAILED.
+
+    A worker that is hard-killed (Celery hard time limit, OOM, a LibreOffice /
+    PyMuPDF segfault) can't run its own except block, so meta.json stays RUNNING
+    forever and the UI spins indefinitely. We use meta.json's last-modified time
+    as the 'last activity' signal — a live job rewrites meta on every stage
+    transition, so a RUNNING job whose meta hasn't been touched in longer than the
+    hard time limit is genuinely dead. Returns the number reaped."""
+    if not JOBS_DIR.exists():
+        return 0
+    cutoff = time.time() - max_running_seconds
+    reaped = 0
+    for d in JOBS_DIR.iterdir():
+        if not d.is_dir():
+            continue
+        meta = read_meta(d.name)
+        if not meta or meta.get("status") != "RUNNING":
+            continue
+        mp = _meta_path(d.name)
+        try:
+            last_activity = mp.stat().st_mtime
+        except OSError:
+            continue
+        if last_activity < cutoff:
+            update_meta(d.name, status="FAILED",
+                        error="Worker did not finish (timed out or crashed).")
+            reaped += 1
+    return reaped

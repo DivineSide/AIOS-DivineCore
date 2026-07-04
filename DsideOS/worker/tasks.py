@@ -501,3 +501,19 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
 def cleanup_jobs():
     """Beat task: purge job folders past their TTL."""
     return jobs.cleanup_expired(settings.JOB_TTL_HOURS)
+
+
+# A RUNNING job whose meta.json hasn't been touched in this long is dead — past
+# the 20-min hard time limit plus a safety buffer, so we never reap a job that is
+# merely slow. A live job rewrites meta on each stage transition.
+_STUCK_JOB_SECONDS = 25 * 60
+
+
+@shared_task(name="worker.tasks.reap_stuck_jobs")
+def reap_stuck_jobs():
+    """Beat task: flip jobs stuck in RUNNING past the hard time limit to FAILED so
+    the UI stops spinning forever on a crashed/killed worker."""
+    n = jobs.reap_stuck(_STUCK_JOB_SECONDS)
+    if n:
+        print(f"[reap_stuck_jobs] marked {n} stuck job(s) FAILED", flush=True)
+    return n

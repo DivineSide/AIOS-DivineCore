@@ -40,5 +40,13 @@ celery_app.conf.update(
             "task": "worker.tasks.cleanup_jobs",
             "schedule": 3600.0,        # hourly
         },
+        # Flip jobs stuck in RUNNING past the hard time limit to FAILED. A worker
+        # that is SIGKILLed (hard time limit, OOM, LibreOffice/PyMuPDF segfault)
+        # can't run its own except block, so meta.json stays RUNNING forever and
+        # the UI spins indefinitely. This reaper is the safety net.
+        "reap-stuck-jobs": {
+            "task": "worker.tasks.reap_stuck_jobs",
+            "schedule": 300.0,         # every 5 min
+        },
     },
 )
