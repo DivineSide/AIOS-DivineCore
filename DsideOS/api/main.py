@@ -131,10 +131,10 @@ def _save_upload(job_id: str, file: UploadFile) -> None:
 # ── upload-driven endpoints ─────────────────────────────────────────────────
 
 @app.post("/api/extract", response_model=JobAccepted, dependencies=[Depends(require_token)])
-def extract(file: UploadFile = File(...)):
+def extract(file: UploadFile = File(...), x_institute_id: str = Header(default="")):
     """Any input file -> universal questions JSON. (Step 1 of the pipeline.)"""
     job_id = jobs.new_id()
-    jobs.create(job_id, workflow="extract")
+    jobs.create(job_id, workflow="extract", institute_id=x_institute_id or None)
     _save_upload(job_id, file)              # file on disk BEFORE dispatch
     _dispatch(extract_task, job_id, task_id=job_id)
     return JobAccepted(job_id=job_id)
@@ -148,6 +148,7 @@ def full(
     font: str = Form("krutidev"),
     title_hindi: str = Form(""),
     subtitle_hindi: str = Form(""),
+    x_institute_id: str = Header(default=""),
 ):
     """One-shot: upload a paper -> all deliverables in the chosen format + font."""
     meta = {
@@ -158,7 +159,7 @@ def full(
         "subtitle_hindi": subtitle_hindi,
     }
     job_id = jobs.new_id()
-    jobs.create(job_id, workflow="full", **meta)
+    jobs.create(job_id, workflow="full", institute_id=x_institute_id or None, **meta)
     _save_upload(job_id, file)
     _dispatch(full_task, job_id, meta, task_id=job_id)
     return JobAccepted(job_id=job_id)
@@ -181,6 +182,7 @@ def generate(
     font: str = Form("krutidev"),
     title_hindi: str = Form(""),
     subtitle_hindi: str = Form(""),
+    x_institute_id: str = Header(default=""),
 ):
     """AI Generative: pick a subject + question count -> generate questions from
     the embedded book corpus -> same deliverables as /api/full (no file upload)."""
@@ -198,38 +200,40 @@ def generate(
         "subtitle_hindi": subtitle_hindi,
     }
     job_id = jobs.new_id()
-    jobs.create(job_id, workflow="generate", subject=subject, **meta)
+    jobs.create(job_id, workflow="generate", subject=subject,
+                institute_id=x_institute_id or None, **meta)
     _dispatch(generate_task, job_id, subject, count, meta, task_id=job_id)
     return JobAccepted(job_id=job_id)
 
 
 # ── JSON-driven endpoints (the 3 workflows) ──────────────────────────────────
 
-def _dispatch_questions_task(task, req: BuildRequest, workflow: str) -> JobAccepted:
+def _dispatch_questions_task(task, req: BuildRequest, workflow: str,
+                             institute_id: str = "") -> JobAccepted:
     questions = [q.model_dump(exclude_none=True) for q in req.questions]
     meta = req.meta.model_dump()
     job_id = jobs.new_id()
-    jobs.create(job_id, workflow=workflow, **meta)
+    jobs.create(job_id, workflow=workflow, institute_id=institute_id or None, **meta)
     _dispatch(task, job_id, questions, meta, task_id=job_id)
     return JobAccepted(job_id=job_id)
 
 
 @app.post("/api/build", response_model=JobAccepted, dependencies=[Depends(require_token)])
-def build(req: BuildRequest):
+def build(req: BuildRequest, x_institute_id: str = Header(default="")):
     """W1: questions JSON -> branded paper + class deck + answer key."""
-    return _dispatch_questions_task(build_task, req, "build")
+    return _dispatch_questions_task(build_task, req, "build", x_institute_id)
 
 
 @app.post("/api/answer-key", response_model=JobAccepted, dependencies=[Depends(require_token)])
-def answer_key(req: BuildRequest):
+def answer_key(req: BuildRequest, x_institute_id: str = Header(default="")):
     """W3: questions JSON -> standalone answer-key PDF."""
-    return _dispatch_questions_task(answer_key_task, req, "answer_key")
+    return _dispatch_questions_task(answer_key_task, req, "answer_key", x_institute_id)
 
 
 @app.post("/api/solutions", response_model=JobAccepted, dependencies=[Depends(require_token)])
-def solutions(req: BuildRequest):
+def solutions(req: BuildRequest, x_institute_id: str = Header(default="")):
     """W2: questions JSON -> teacher solution doc (question/options/answer/explanation)."""
-    return _dispatch_questions_task(solutions_task, req, "solutions")
+    return _dispatch_questions_task(solutions_task, req, "solutions", x_institute_id)
 
 
 # ── polling + download ────────────────────────────────────────────────────────
@@ -254,11 +258,27 @@ def _client_error(meta: dict) -> str | None:
     return _STAGE_MESSAGE.get(meta.get("stage"), "The job failed. Please try again.")
 
 
+def _check_owner(meta: dict, x_institute_id: str) -> None:
+    """Per-tenant scoping: a job may only be read by the institute that created it.
+
+    The console proxy sends X-Institute-Id derived from the caller's verified
+    session (not user input); only the console holds the API token, so a browser
+    can't forge it. If a job carries an institute_id, a mismatched caller gets 404
+    (not 403 — don't confirm the job exists to a non-owner). Jobs created before
+    this change have no institute_id and stay readable (back-compat); once every
+    create stamps it, absence only happens for legacy jobs.
+    """
+    owner = meta.get("institute_id")
+    if owner and x_institute_id and owner != x_institute_id:
+        raise HTTPException(404, "Unknown job_id.")
+
+
 @app.get("/api/jobs/{job_id}", response_model=JobStatus, dependencies=[Depends(require_token)])
-def job_status(job_id: str):
+def job_status(job_id: str, x_institute_id: str = Header(default="")):
     meta = jobs.read_meta(job_id)
     if not meta:
         raise HTTPException(404, "Unknown job_id.")
+    _check_owner(meta, x_institute_id)
     known = {"job_id", "status", "stage", "n_questions", "outputs", "error", "created_at"}
     # never surface the raw internal error string (paths / stderr / provider bodies)
     # to the client — return only the safe stage-keyed summary.
@@ -275,9 +295,13 @@ def job_status(job_id: str):
 
 
 @app.get("/api/files/{job_id}/{name}", dependencies=[Depends(require_token)])
-def download(job_id: str, name: str):
+def download(job_id: str, name: str, x_institute_id: str = Header(default="")):
     if "/" in name or "\\" in name or ".." in name:
         raise HTTPException(400, "Invalid filename.")
+    # per-tenant scoping: only the owning institute may download a job's files
+    meta = jobs.read_meta(job_id)
+    if meta:
+        _check_owner(meta, x_institute_id)
     path = jobs.output_dir(job_id) / name
     if not path.is_file():
         raise HTTPException(404, "File not found.")
