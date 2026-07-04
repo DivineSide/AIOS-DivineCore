@@ -293,9 +293,10 @@ def _run_builders(job_id: str, data: dict, font: str) -> tuple[list[dict], int]:
     qjson.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # Point the pipeline's output at THIS job's folder (it defaults to the
-    # client's review/output). We override the module-level OUTPUT_DIR.
-    run_pipeline.OUTPUT_DIR = jobs.output_dir(job_id)
-    run_pipeline.run(qjson, font=font)
+    # client's review/output). Pass it EXPLICITLY — mutating the module-global
+    # run_pipeline.OUTPUT_DIR was a latent cross-job leak (two jobs in one process
+    # would clobber each other's output dir if the pool were ever non-prefork).
+    run_pipeline.run(qjson, font=font, output_dir=jobs.output_dir(job_id))
 
     # validate() rewrote qjson with only the questions that made it into the paper.
     try:

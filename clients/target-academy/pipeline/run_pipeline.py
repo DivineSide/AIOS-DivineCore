@@ -184,29 +184,37 @@ def review_summary(data: dict) -> tuple[int, int, list[str]]:
     return len(data["questions"]), len(flagged), flagged
 
 
-def run(input_path: Path | None = None, font: str | None = None) -> dict:
+def run(input_path: Path | None = None, font: str | None = None,
+        output_dir: Path | None = None) -> dict:
     """Validate -> generate all three -> return a result dict for the caller.
 
     `font` ("krutidev" | "unicode") selects the Devanagari rendering for every
     builder. Defaults to the JSON's top-level "font" key, else the shipping
     default ("krutidev"). This is the frontend's per-build font choice.
+
+    `output_dir` is where the built files land. PASS IT EXPLICITLY per job — the
+    worker used to MUTATE the module-global OUTPUT_DIR before each call, which is a
+    latent cross-job output leak the moment the worker pool is not prefork (two
+    jobs in one process would clobber each other's OUTPUT_DIR). Defaults to the
+    module OUTPUT_DIR for the CLI / standalone use.
     """
     src = input_path or find_input()
+    out_dir = output_dir or OUTPUT_DIR
     data = validate(src)
     # validate() may have DROPPED unusable questions from `data`. The builders
     # below read from the FILE `src`, not from `data`, so persist the cleaned
     # question set back to disk — otherwise a dropped question (e.g. Q83 with <2
     # options) would still reach the builders and crash/mis-render.
     src.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     font = (font or data.get("font") or "krutidev").lower()
 
     deck_name, sol_name, paper_name, akey_name = output_names(data)
-    deck_out = OUTPUT_DIR / deck_name
-    sol_out = OUTPUT_DIR / sol_name
-    paper_out = OUTPUT_DIR / paper_name
-    akey_out = OUTPUT_DIR / akey_name
+    deck_out = out_dir / deck_name
+    sol_out = out_dir / sol_name
+    paper_out = out_dir / paper_name
+    akey_out = out_dir / akey_name
 
     # 1. in-class deck — verbatim MCQs, NO answers shown live
     build_deck.build(src, deck_out, answer_key=False, font=font)
