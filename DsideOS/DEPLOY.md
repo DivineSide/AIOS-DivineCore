@@ -1,6 +1,6 @@
 # DsideOS — Deployment Runbook (Hetzner CX23)
 
-Server: `divinesideai` · `204.168.198.139` · 2 vCPU / 4 GB / 40 GB.
+Server: `divinesideai` · `<SERVER_IP>` · 2 vCPU / 4 GB / 40 GB.
 Public URL (after DNS + first deploy): `https://dsideos.divinesideai.com`.
 
 The flow: **push to `main` → GitHub Actions tests → builds api/worker images →
@@ -15,7 +15,7 @@ ping.** Caddy terminates TLS and path-splits `/api/*` (backend) vs `/*` (fronten
 In Hetzner DNS (or wherever divinesideai.com is managed), add an **A record**:
 
 ```
-Type: A   Name: dsideos   Value: 204.168.198.139   TTL: auto
+Type: A   Name: dsideos   Value: <SERVER_IP>   TTL: auto
 ```
 
 `dsideos.divinesideai.com` now resolves to the server. (AAAA to the IPv6
@@ -27,7 +27,7 @@ Caddy needs 80 + 443 reachable to issue the cert.
 
 ### 3. Server prep (SSH in once)
 ```bash
-ssh root@204.168.198.139
+ssh root@<SERVER_IP>
 
 # Docker + compose plugin
 curl -fsSL https://get.docker.com | sh
@@ -60,7 +60,7 @@ rate / auth error the same call retries on Claude automatically (see
 
 | Secret | What it is |
 |--------|-----------|
-| `HETZNER_HOST` | `204.168.198.139` |
+| `HETZNER_HOST` | `<SERVER_IP>` |
 | `HETZNER_USER` | `root` |
 | `HETZNER_SSH_KEY` | private key whose public half is in the server's `~/.ssh/authorized_keys` |
 | `GHCR_PULL_TOKEN` | a GitHub PAT with `read:packages` (server uses it to pull images) |
@@ -81,8 +81,8 @@ The builders need the client's branded files at runtime. They're client IP
 
 scp them up from your machine:
 ```bash
-scp -r clients/target-academy/resources root@204.168.198.139:/root/DsideOS/assets/
-scp -r clients/target-academy/templates root@204.168.198.139:/root/DsideOS/assets/
+scp -r clients/target-academy/resources root@<SERVER_IP>:/root/DsideOS/assets/
+scp -r clients/target-academy/templates root@<SERVER_IP>:/root/DsideOS/assets/
 ```
 The worker mounts these read-only (see `docker-compose.prod.yml`). Without them,
 builds fail at the first template open.

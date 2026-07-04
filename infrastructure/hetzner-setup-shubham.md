@@ -23,7 +23,7 @@ Hey Shubham. This is your task list for setting up the new DivineSide server. Yo
 Open Terminal on your laptop (Mac: search Terminal, Windows: use Git Bash) and run:
 
 ```
-ssh root@204.168.198.139
+ssh root@<SERVER_IP>
 ```
 
 Enter the root password Mayank gave you. You are now inside the server.
@@ -40,7 +40,7 @@ Inside the server, run `claude` to open Claude Code. Paste this task:
 > 2. Show me the command to add my laptop's public key to this server's authorized_keys
 > 3. Test that passwordless login works
 >
-> Server IP: 204.168.198.139. I am currently logged in as root with a password.
+> Server IP: <SERVER_IP>. I am currently logged in as root with a password.
 
 ---
 
@@ -76,7 +76,7 @@ SSH in, run `claude`, paste:
 > - Configure Nginx to reverse-proxy n8n.divinesideai.com to localhost:5678 with WebSocket support (n8n requires it)
 > - Run Certbot to get the SSL certificate for n8n.divinesideai.com
 >
-> DNS for n8n.divinesideai.com already points to this server (204.168.198.139). Verify the full setup end to end.
+> DNS for n8n.divinesideai.com already points to this server (<SERVER_IP>). Verify the full setup end to end.
 
 ---
 
@@ -142,7 +142,7 @@ SSH in, run `claude`, paste:
 > **Task:** Configure Nginx for app.divinesideai.com pointing to localhost:3001.
 >
 > The app isn't running yet — just set up the Nginx config and get the SSL certificate via Certbot.
-> DNS for app.divinesideai.com already points to 204.168.198.139.
+> DNS for app.divinesideai.com already points to <SERVER_IP>.
 > Make sure nginx -t passes cleanly.
 
 ---
@@ -167,7 +167,7 @@ SSH in, run `claude`, paste:
 
 Get back into the server:
 ```
-ssh root@204.168.198.139
+ssh root@<SERVER_IP>
 ```
 
 Open Claude Code once inside:

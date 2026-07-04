@@ -140,13 +140,13 @@ DivineCore channels:
 | Database (vector) | Supabase + pgvector | Semantic search for working examples |
 | Embeddings | OpenAI text-embedding-3-small | For Supabase vector store |
 | Middleware | Node.js (discord.js) | Discord → n8n webhook bridge |
-| VPS | Hetzner | divinesideai / IP: 204.168.198.139 (CX23, Helsinki) |
+| VPS | Hetzner | divinesideai / IP: <SERVER_IP> (CX23, Helsinki) |
 | Process Manager | PM2 | Keeps middleware alive, survives reboots |
 | Reverse Proxy | Nginx | HTTPS routing on VPS |
 | Future Interface | Proprietary app (TBD) | Replaces Discord when DivineSide launches publicly |
 
 **n8n Instance**  
-Hosted on Hetzner VPS (204.168.198.139). All workflows live here.
+Hosted on Hetzner VPS (<SERVER_IP>). All workflows live here.
 
 **Discord Middleware**  
 Location on VPS: /root/discord-middleware/index.js  
