@@ -653,21 +653,57 @@ def _extract_recursive(body: str, system: str, depth: int = 0) -> list[dict]:
               file=sys.stderr)
         return questions
 
-    groups = _balanced_groups(units, n=max(2, min(4, len(units))))
-    print(f"{indent}  [extract] truncated -> {len(groups)} group(s) of units",
-          file=sys.stderr)
-    out: list[dict] = list(questions)   # keep the partial first-pass questions too
+    # Pick the group count from CHARACTER volume so each sub-call is small
+    # enough to answer completely (~35k chars ≈ ~25 questions ≈ well under the
+    # output cap). Unit-count alone produced one 120k-char group that repeated
+    # the whole-paper failure.
+    target = max(2, min(6, -(-len(body) // _GROUP_TARGET_CHARS)))
+    groups = _balanced_groups(units, n=min(target, len(units)))
+    print(f"{indent}  [extract] truncated -> {len(groups)} group(s) of units "
+          f"({', '.join(str(len(g)) for g in groups)} chars)", file=sys.stderr)
+    # Do NOT merge the partial first-pass questions: the splits re-extract the
+    # same questions with slightly different verbatim text, so partials slip
+    # past the stem-content dedup and DUPLICATE the paper (seen live: 100-Q
+    # paper -> 153 after merging a 55-question partial with the split results).
+    # The split results alone cover the whole body; boundary overlaps between
+    # groups share identical OCR text, which the dedup catches.
+    out: list[dict] = []
     for grp in groups:
         out.extend(_extract_recursive(grp, system, depth + 1))
     return out
 
 
+# Aim each split group at roughly this many characters — small enough that the
+# model returns every question without hitting its output ceiling.
+_GROUP_TARGET_CHARS = 35_000
+
+
 def _balanced_groups(units: list[str], n: int) -> list[str]:
-    """Split `units` into `n` contiguous, roughly-equal groups (by unit count),
-    each joined back into text. Preserves document order; never splits a unit."""
+    """Split `units` into `n` contiguous groups balanced by CHARACTER SIZE,
+    each joined back into text. Preserves document order; never splits a unit.
+    (Unit-count balancing made one group carry a 120k-char page while the other
+    two got 10k each — the giant group then failed the same way as the whole.)"""
     n = max(1, min(n, len(units)))
-    size = -(-len(units) // n)          # ceil division
-    groups = ["\n".join(units[i:i + size]) for i in range(0, len(units), size)]
+    groups: list[str] = []
+    cur: list[str] = []
+    cur_len = 0
+    remaining_groups = n
+    rem = sum(len(u) for u in units)     # chars not yet placed (incl. current)
+    for u in units:
+        if cur and remaining_groups > 1:
+            share = (cur_len + rem) / remaining_groups
+            # close the current group once it has its share, or BEFORE adding a
+            # unit that would blow far past it (a giant last page must not drag
+            # the small pages in with it — n is a maximum, not a promise)
+            if cur_len >= share or cur_len + len(u) > share * 1.5:
+                groups.append("\n".join(cur))
+                cur, cur_len = [], 0
+                remaining_groups -= 1
+        cur.append(u)
+        cur_len += len(u)
+        rem -= len(u)
+    if cur:
+        groups.append("\n".join(cur))
     return [g for g in groups if g.strip()]
 
 
