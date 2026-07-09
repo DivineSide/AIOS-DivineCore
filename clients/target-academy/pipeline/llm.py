@@ -58,11 +58,11 @@ _PRICES = {
     "claude-haiku-4-5-20251001":  (1.00, 5.00),
     "claude-sonnet-4-6":          (3.00, 15.00),
 }
-# Sarvam OCR / document-digitization price, USD per page. Sarvam is currently on
-# the FREE tier, so this is 0.0 by design (not a missing value) — the per-run spend
-# is entirely the Claude/OpenAI cost above. If Sarvam ever moves to a paid per-page
-# plan, set the real rate here and Sarvam pages start contributing to the total.
-_SARVAM_PER_PAGE = 0.0
+# Sarvam Vision OCR price per page. REAL rate from the Sarvam usage dashboard
+# (2026-07-09): Rs 95.50 for 191 pages = Rs 0.50/page ~= $0.0058 at Rs 86/$.
+# This is the DOMINANT cost of a run (98% of Sarvam spend was OCR pages; their
+# LLM tokens were negligible). Update if Sarvam's pricing or the FX rate moves.
+_SARVAM_PER_PAGE = 0.0058
 
 # Per-run accumulator. Reset at job start; read at job end.
 _USAGE = {"calls": [], "sarvam_pages": 0}
