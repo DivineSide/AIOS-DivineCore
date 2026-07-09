@@ -24,7 +24,6 @@ Usage:
 """
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -54,43 +53,13 @@ def pdf_text(path: Path) -> tuple[str, int]:
     return "\n".join(parts), n
 
 
-# A Hindi paper whose text layer is Kruti-Dev shows up as lots of Latin-range
-# "gibberish" with almost no real Devanagari. Those bytes are NOT reliable text:
-# the reverse-Kruti decoder can't cleanly separate genuine English (Option, MS-
-# Excel, TCP) from Kruti-Dev words (dsoy, dFku) — they're the same letter shapes —
-# so it mangles English into garbage Devanagari. The RENDERED page, however, shows
-# correct Hindi AND correct English, so vision reads it accurately. Route these to
-# vision even though a "text layer" technically exists.
-_DEVANAGARI = re.compile(r"[ऀ-ॿ]")
-_LATIN = re.compile(r"[A-Za-z]")
-# Below this fraction of letters being Devanagari, a Hindi-language paper's text
-# layer is almost certainly Kruti-Dev (or otherwise non-Unicode) garbage.
-DEVANAGARI_RATIO_MIN = 0.30
-
-
-def _devanagari_ratio(s: str) -> float:
-    deva = len(_DEVANAGARI.findall(s))
-    latin = len(_LATIN.findall(s))
-    total = deva + latin
-    return deva / total if total else 1.0
-
-
 def detect_mode(path: Path) -> tuple[str, str]:
     """Decide 'text' vs 'vision'. Returns (mode, reason)."""
     text, n_pages = pdf_text(path)
     per_page = len(text) / max(n_pages, 1)
-    if per_page < TEXT_CHARS_PER_PAGE_MIN:
-        return "vision", f"{int(per_page)} chars/page — looks scanned/image, using vision"
-    # There IS a text layer — but if it's mostly Latin gibberish with almost no
-    # Devanagari, it's Kruti-Dev (unreliable). Read the rendered page with vision
-    # instead of decoding garbage.
-    ratio = _devanagari_ratio(text)
-    if ratio < DEVANAGARI_RATIO_MIN and len(_LATIN.findall(text)) >= 200:
-        return "vision", (
-            f"{int(per_page)} chars/page but only {ratio:.0%} Devanagari — "
-            f"text layer is Kruti-Dev/non-Unicode, reading the rendered page with vision"
-        )
-    return "text", f"{int(per_page)} chars/page, {ratio:.0%} Devanagari — digital PDF, text layer usable"
+    if per_page >= TEXT_CHARS_PER_PAGE_MIN:
+        return "text", f"{int(per_page)} chars/page — digital PDF, text layer present"
+    return "vision", f"{int(per_page)} chars/page — looks scanned/image, using vision"
 
 
 def extract(path: Path, mode: str = "auto", dpi: int = extract_vision.DEFAULT_DPI) -> dict:
