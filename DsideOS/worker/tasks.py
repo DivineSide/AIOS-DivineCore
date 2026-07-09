@@ -427,6 +427,10 @@ def full_task(self, job_id: str, meta: dict):
     font = (meta.get("font") or "krutidev").lower()
     jobs.update_meta(job_id, status="RUNNING", stage="extract", font=font,
                      format=meta.get("format", "format-1"))
+    # Track REAL API spend for this run (Mayank wants actuals, not estimates).
+    # reset here; every LLM call self-records; we read + log the total at the end.
+    import llm
+    llm.reset_usage()
     try:
         src = next(jobs.input_dir(job_id).iterdir())
         extracted = _extract_any(src)
@@ -459,10 +463,19 @@ def full_task(self, job_id: str, meta: dict):
             note = (f"{extracted_n - built} of {extracted_n} extracted question(s) "
                     f"were dropped as unusable; the paper has {built}.")
             print(f"[full_task] {note}", flush=True)
+        # Real spend for this run: log it and attach to the job meta so the console
+        # can surface it. This is ACTUAL usage from each API response, not an estimate.
+        usage = llm.usage_summary()
+        print(f"[full_task] SPEND job={job_id} total=${usage['total_usd']} "
+              f"(llm ${usage['llm_usd']} + sarvam ${usage['sarvam_usd']}) "
+              f"tokens in/out={usage['input_tokens']}/{usage['output_tokens']} "
+              f"calls={usage['n_llm_calls']} sarvam_pages={usage['sarvam_pages']}",
+              flush=True)
         jobs.update_meta(job_id, status="DONE", outputs=outputs,
                          n_questions=built, extracted_questions=extracted_n,
-                         note=note)
-        return {"status": "DONE", "outputs": outputs, "n_questions": built}
+                         note=note, usage=usage)
+        return {"status": "DONE", "outputs": outputs, "n_questions": built,
+                "usage": usage}
     except Exception as e:
         jobs.update_meta(job_id, status="FAILED", error=f"{type(e).__name__}: {e}")
         raise

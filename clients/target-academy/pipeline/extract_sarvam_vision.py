@@ -359,6 +359,19 @@ def digitize_to_text(src: Path, language: str = "hi-IN") -> str:
 
     chunks = [src] if pdf is None else _split_pdf(pdf)
 
+    # Record pages processed for real per-run spend tracking (Sarvam bills per page).
+    try:
+        import llm
+        if pdf is None:
+            llm.record_sarvam(1)  # a single image
+        else:
+            import fitz
+            _d = fitz.open(str(pdf))
+            llm.record_sarvam(_d.page_count)
+            _d.close()
+    except Exception:
+        pass  # tracking must never break extraction
+
     keys = _keys()
     last_err: Exception | None = None
     for idx, key in enumerate(keys, 1):

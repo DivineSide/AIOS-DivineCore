@@ -43,6 +43,93 @@ MODEL_FAST  = "fast"
 MODEL_SMART = "smart"
 MODEL = MODEL_FAST
 
+# ── usage / cost tracking ────────────────────────────────────────────────────
+# Mayank wants REAL per-run spend, not estimates. Every LLM call reports exact
+# token usage in its response; we accumulate it here and turn it into $ using the
+# published per-1M-token prices below. Sarvam OCR (page-based) records separately
+# via record_sarvam(). Call reset_usage() at the start of a job and usage_summary()
+# at the end to log/attach the real spend.
+#
+# Prices are USD per 1,000,000 tokens (input, output). Update if the model list or
+# vendor pricing changes — keep this the single source of truth.
+_PRICES = {
+    "gpt-4o-mini":                (0.15, 0.60),
+    "gpt-4o":                     (2.50, 10.00),
+    "claude-haiku-4-5-20251001":  (1.00, 5.00),
+    "claude-sonnet-4-6":          (3.00, 15.00),
+}
+# Sarvam OCR / document-digitization price, USD per page (update to the real rate).
+_SARVAM_PER_PAGE = 0.0
+
+# Per-run accumulator. Reset at job start; read at job end.
+_USAGE = {"calls": [], "sarvam_pages": 0}
+
+
+def reset_usage() -> None:
+    """Clear the per-run usage accumulator. Call at the start of each job."""
+    _USAGE["calls"] = []
+    _USAGE["sarvam_pages"] = 0
+
+
+def _price_for(model: str) -> tuple[float, float]:
+    """(input, output) USD per 1M tokens for a model; (0,0) if unknown."""
+    return _PRICES.get(model, (0.0, 0.0))
+
+
+def record_usage(provider: str, model: str, input_tokens: int,
+                 output_tokens: int, kind: str = "text") -> None:
+    """Record one LLM call's real token usage into the per-run accumulator."""
+    in_price, out_price = _price_for(model)
+    cost = (input_tokens / 1e6) * in_price + (output_tokens / 1e6) * out_price
+    _USAGE["calls"].append({
+        "provider": provider, "model": model, "kind": kind,
+        "input_tokens": int(input_tokens or 0),
+        "output_tokens": int(output_tokens or 0),
+        "cost_usd": round(cost, 6),
+    })
+
+
+def record_sarvam(pages: int) -> None:
+    """Record Sarvam OCR pages processed this run (billed per page)."""
+    _USAGE["sarvam_pages"] += int(pages or 0)
+
+
+def _extract_usage(resp, provider: str) -> tuple[int, int]:
+    """Pull (input_tokens, output_tokens) from an OpenAI or Anthropic response,
+    tolerating SDK shape differences. Returns (0, 0) if usage isn't present."""
+    u = getattr(resp, "usage", None)
+    if u is None:
+        return 0, 0
+    if provider == "openai":
+        # OpenAI: prompt_tokens / completion_tokens
+        return (getattr(u, "prompt_tokens", 0) or 0,
+                getattr(u, "completion_tokens", 0) or 0)
+    # Anthropic: input_tokens / output_tokens
+    return (getattr(u, "input_tokens", 0) or 0,
+            getattr(u, "output_tokens", 0) or 0)
+
+
+def usage_summary() -> dict:
+    """Return the real spend for the current run: total $, token counts, and a
+    per-call breakdown. Safe to call any time; reflects everything recorded since
+    the last reset_usage()."""
+    calls = _USAGE["calls"]
+    in_tok = sum(c["input_tokens"] for c in calls)
+    out_tok = sum(c["output_tokens"] for c in calls)
+    llm_cost = sum(c["cost_usd"] for c in calls)
+    sarvam_pages = _USAGE["sarvam_pages"]
+    sarvam_cost = sarvam_pages * _SARVAM_PER_PAGE
+    return {
+        "total_usd": round(llm_cost + sarvam_cost, 4),
+        "llm_usd": round(llm_cost, 4),
+        "sarvam_usd": round(sarvam_cost, 4),
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "n_llm_calls": len(calls),
+        "sarvam_pages": sarvam_pages,
+        "calls": calls,
+    }
+
 
 def _primary() -> str:
     p = (os.environ.get("LLM_PRIMARY") or "openai").lower()
@@ -153,12 +240,16 @@ def _complete_one(provider: str, system: str, user: str, model: str,
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}],
         )
+        it, ot = _extract_usage(resp, "openai")
+        record_usage("openai", model, it, ot, kind="text")
         return resp.choices[0].message.content or ""
     # anthropic
     msg = _anthropic_client().messages.create(
         model=model, max_tokens=max_tokens, system=system,
         messages=[{"role": "user", "content": user}],
     )
+    it, ot = _extract_usage(msg, "anthropic")
+    record_usage("anthropic", model, it, ot, kind="text")
     return message_text(msg)
 
 
@@ -199,6 +290,8 @@ def _vision_one(provider, system, user_text, images, model, max_tokens) -> str:
             model=model, max_tokens=max_tokens, system=system,
             messages=[{"role": "user", "content": content}],
         )
+        it, ot = _extract_usage(msg, "anthropic")
+        record_usage("anthropic", model, it, ot, kind="vision")
         return message_text(msg)
     # openai
     content = [{"type": "image_url", "image_url": {
@@ -210,6 +303,8 @@ def _vision_one(provider, system, user_text, images, model, max_tokens) -> str:
         messages=[{"role": "system", "content": system},
                   {"role": "user", "content": content}],
     )
+    it, ot = _extract_usage(resp, "openai")
+    record_usage("openai", model, it, ot, kind="vision")
     return resp.choices[0].message.content or ""
 
 
