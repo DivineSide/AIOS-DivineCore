@@ -587,6 +587,22 @@ def extract_from_text(body: str, label: str = "input",
     return {"questions": questions}
 
 
+def _estimate_question_count(body: str) -> int:
+    """Cheap deterministic estimate of how many questions the text holds, from
+    the paper's OWN printed numbering ("1." ... "100." at line starts, tolerating
+    the OCR markdown's pipe/bold/blockquote prefixes). Distinct numbers only, so
+    repeats don't inflate it.
+
+    Used ONLY as a completeness guard (see _extract_recursive): the LLM still
+    decides every question boundary — this never chunks or parses questions."""
+    nums = set()
+    for m in re.finditer(r"(?m)^[\s>|*#-]{0,6}(\d{1,3})[.)]\s", body):
+        n = int(m.group(1))
+        if 1 <= n <= 300:
+            nums.add(n)
+    return len(nums)
+
+
 def _extract_recursive(body: str, system: str, depth: int = 0) -> list[dict]:
     """LLM-ONLY extraction (the product doctrine: OCR -> LLM makes the JSON ->
     code only slots it into builders; code NEVER decides question boundaries).
@@ -604,6 +620,22 @@ def _extract_recursive(body: str, system: str, depth: int = 0) -> list[dict]:
     questions, truncated = _call_llm(body, system)
     print(f"{indent}  -> {len(questions)} questions"
           f"{' (TRUNCATED)' if truncated else ''}", file=sys.stderr)
+
+    # SHORTFALL GUARD: a model can stop early and close the JSON cleanly — a
+    # well-formed but INCOMPLETE answer that _looks_truncated cannot catch (seen
+    # live: a 100-question paper came back as a tidy 56-question array, shipped
+    # silently). Compare against the paper's own printed numbering: if we got
+    # far fewer questions than the text visibly numbers, treat it exactly like a
+    # truncation so the page-split recovery below kicks in.
+    if not truncated and questions:
+        est = _estimate_question_count(body)
+        if est >= 10 and len(questions) < est * 0.9:
+            print(f"{indent}  [extract] SHORTFALL: model returned "
+                  f"{len(questions)} questions but the text numbers ~{est} — "
+                  f"splitting and retrying so none are silently lost",
+                  file=sys.stderr)
+            truncated = True
+
     if not truncated:
         return questions
 
