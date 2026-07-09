@@ -58,7 +58,10 @@ _PRICES = {
     "claude-haiku-4-5-20251001":  (1.00, 5.00),
     "claude-sonnet-4-6":          (3.00, 15.00),
 }
-# Sarvam OCR / document-digitization price, USD per page (update to the real rate).
+# Sarvam OCR / document-digitization price, USD per page. Sarvam is currently on
+# the FREE tier, so this is 0.0 by design (not a missing value) — the per-run spend
+# is entirely the Claude/OpenAI cost above. If Sarvam ever moves to a paid per-page
+# plan, set the real rate here and Sarvam pages start contributing to the total.
 _SARVAM_PER_PAGE = 0.0
 
 # Per-run accumulator. Reset at job start; read at job end.
