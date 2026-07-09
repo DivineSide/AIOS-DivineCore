@@ -310,16 +310,58 @@ def _text_from_zip(zip_bytes: bytes) -> list[str]:
     return parts
 
 
+def _is_transient(exc: Exception) -> bool:
+    """True for a momentary failure worth RETRYING on the same key: a Sarvam
+    server error (5xx) or a network/timeout blip. NOT key problems (rotate) and
+    NOT 4xx document problems (retrying the same bad doc won't help).
+
+    Why this matters: a single transient 500 from Sarvam used to abandon the
+    whole Sarvam path and fall back to Claude Vision — costlier, and observed
+    to drop the paper's first question + misread श on Kruti-Dev sources. A
+    short retry keeps runs on the accurate, cheap path."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    if isinstance(exc, httpx.TransportError):  # timeouts, connect/read errors
+        return True
+    return False
+
+
+# Attempts per chunk for TRANSIENT errors only (initial try + retries), with a
+# short pause between tries so a momentary server blip can pass.
+_TRANSIENT_ATTEMPTS = 3
+_TRANSIENT_BACKOFF_S = (8, 20)  # pause before retry 2, retry 3
+
+
+def _digitize_one_with_retry(chunk: Path, client: httpx.Client,
+                             language: str, key: str) -> str:
+    """_digitize_one, retried on transient (5xx/network) errors only."""
+    last: Exception | None = None
+    for attempt in range(1, _TRANSIENT_ATTEMPTS + 1):
+        try:
+            return _digitize_one(chunk, client, language, key)
+        except Exception as e:
+            last = e
+            if _is_key_dead(e) or not _is_transient(e) or attempt == _TRANSIENT_ATTEMPTS:
+                raise
+            wait = _TRANSIENT_BACKOFF_S[min(attempt - 1, len(_TRANSIENT_BACKOFF_S) - 1)]
+            print(f"  [sarvam-vision] transient error on {chunk.name} "
+                  f"(attempt {attempt}/{_TRANSIENT_ATTEMPTS}: {type(e).__name__}: "
+                  f"{str(e)[:100]}); retrying in {wait}s...", file=sys.stderr)
+            time.sleep(wait)
+    raise last or RuntimeError("unreachable")
+
+
 def _digitize_chunks(chunks: list[Path], language: str, key: str) -> str:
     """OCR every chunk on ONE key. Raises if the key is dead (credits/auth) so
-    the pool can rotate; salvages per-chunk on non-key errors (bad page)."""
+    the pool can rotate; salvages per-chunk on non-key errors (bad page).
+    Transient Sarvam server errors are retried before giving up on a chunk."""
     texts, failed = [], 0
     with _client() as client:
         for i, chunk in enumerate(chunks, 1):
             print(f"  [sarvam-vision] OCR chunk {i}/{len(chunks)} ({chunk.name})...",
                   file=sys.stderr)
             try:
-                texts.append(_digitize_one(chunk, client, language, key))
+                texts.append(_digitize_one_with_retry(chunk, client, language, key))
             except Exception as e:
                 # A dead-key error means EVERY chunk on this key will fail — bubble
                 # up so digitize_to_text rotates to the next key instead of

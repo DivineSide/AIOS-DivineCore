@@ -58,8 +58,17 @@ translate or transliterate. Keep English words in English.
 
 Identify each numbered question, its stem, and its options. Option markers vary \
 — (a)/(A)/1)/i. etc. Strip the marker; keep the option body verbatim. Ignore \
-section headers, instructions, page numbers, and watermarks. If a question is \
-cut off at a page edge, include what is visible and add "flag":"partial".
+section headers, instructions, page numbers, and watermarks — BUT the first \
+question (Q1) often sits immediately BELOW the title/header block on page 1: it \
+is still a question. Any numbered item followed by answer options is a question \
+and must be extracted, even when it shares a page with the cover or header. If \
+a question is cut off at a page edge, include what is visible and add \
+"flag":"partial".
+
+Devanagari accuracy: several letters look alike in print — श vs भ, ष vs य, \
+त vs न, ब vs व, and matras ै vs े, ौ vs ो. Read these carefully from the glyph \
+shape; a proper noun like शेखर must not become भोखर. When a letter is genuinely \
+ambiguous, prefer the reading that forms a real Hindi word or a plausible name.
 
 Return ONLY a JSON object, no prose:
 {"questions":[
