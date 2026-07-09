@@ -70,6 +70,11 @@ def _check_zip_bomb(path: Path) -> None:
 # force the old text-layer path.
 _USE_SARVAM_VISION = os.environ.get("USE_SARVAM_VISION", "1") == "1"
 
+# A native .docx (typed in Word) has an unambiguous text layer that beats image
+# OCR on look-alike Devanagari glyphs — prefer it for .docx inputs that carry a
+# usable text layer. Set PREFER_DOCX_TEXT_LAYER=0 to force everything through OCR.
+_PREFER_DOCX_TEXT_LAYER = os.environ.get("PREFER_DOCX_TEXT_LAYER", "1") == "1"
+
 
 def _extract_text_layer(file_path: Path) -> dict:
     """The original per-type extractors (text layer / Claude Vision). Used as the
@@ -176,6 +181,30 @@ def _extract_any(file_path: Path) -> dict:
     ext = file_path.suffix.lower()
     if ext == ".docx":
         _check_zip_bomb(file_path)
+
+    # NATIVE .docx SHORT-CIRCUIT: a Word-typed paper carries a real text layer
+    # whose characters are unambiguous. Image OCR (Sarvam) reads the rendered
+    # glyphs and confuses look-alike Devanagari print shapes (श↔भ: शेखर->भोखर),
+    # AND can skip the first question tucked under the cover header. The native
+    # text layer has neither problem, so for a .docx WITH a usable text layer it
+    # is the source of truth — use it before OCR. Scanned-image .docx wrappers
+    # have no usable text layer -> this returns False -> OCR path (correct).
+    if ext == ".docx" and _PREFER_DOCX_TEXT_LAYER:
+        try:
+            import extract_docx
+            if extract_docx.has_usable_text_layer(file_path):
+                print("  [extract] native .docx with a clean text layer -> "
+                      "using it directly (deterministic, no OCR glyph guessing)",
+                      file=sys.stderr)
+                data = extract_docx.extract(file_path)
+                if data.get("questions"):
+                    return data
+                print("  [extract] text-layer extract yielded no questions; "
+                      "falling through to Sarvam Vision", file=sys.stderr)
+        except Exception as e:
+            print(f"  [extract] docx text-layer path failed "
+                  f"({type(e).__name__}: {e}); trying Sarvam Vision",
+                  file=sys.stderr)
 
     if _USE_SARVAM_VISION:
         try:

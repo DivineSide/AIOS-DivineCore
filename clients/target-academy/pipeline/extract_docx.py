@@ -707,6 +707,84 @@ def _balanced_groups(units: list[str], n: int) -> list[str]:
     return [g for g in groups if g.strip()]
 
 
+# Common English words. Real English prose is dense with these; Kruti-Dev
+# (Latin bytes that only LOOK like letters) essentially never forms them. This
+# is what tells "genuine Kruti-Dev Hindi" apart from "real English text" — both
+# are Latin-heavy, but only English contains actual English words.
+_ENGLISH_STOPWORDS = frozenset(
+    "the a an is are was of to in on and or for with which what who how "
+    "why when where following from by as it that this these those be".split()
+)
+
+
+def _is_krutidev_text(text: str) -> bool:
+    """True if Latin-heavy `text` is genuine Kruti-Dev (legacy-font Hindi), NOT
+    real English. Both are Latin-heavy, so the discriminator is English WORDS:
+    real English prose is full of stopwords ("the/of/which/is"); Kruti-Dev's
+    Latin bytes almost never spell them. Low English-word density => Kruti-Dev.
+
+    This guards has_usable_text_layer: without it, an English text layer would
+    be run through the Kruti-Dev converter, producing garbage Devanagari that
+    scores ~1.0 on the ratio check and wrongly passes."""
+    words = re.findall(r"[A-Za-z]{2,}", text.lower())
+    if len(words) < 20:
+        # too little Latin to be an English document; if it has Kruti-Dev's
+        # signature bracket/danda bytes, treat as Kruti-Dev
+        return bool(re.search(r"[¼½¾]", text))
+    hits = sum(1 for w in words if w in _ENGLISH_STOPWORDS)
+    # English prose runs ~20-40% stopwords; Kruti-Dev runs near 0%.
+    return (hits / len(words)) < 0.05
+
+
+def has_usable_text_layer(path: Path) -> bool:
+    """True if a .docx carries a real, machine-readable text layer we can trust
+    OVER image OCR — i.e. it is a NATIVE document (typed in Word), not a scan
+    wrapped in a docx.
+
+    Why this matters: image OCR (Sarvam Vision) reads the RENDERED glyphs and
+    genuinely confuses look-alike Devanagari print shapes — श↔भ, ष↔य — so a
+    name like शेखर becomes भोखर. The native text layer has NO such ambiguity: श
+    and भ are distinct code points (or distinct Kruti-Dev glyph codes), so
+    converting the text layer is deterministically correct on exactly the
+    characters OCR gets wrong. For a native .docx the text layer is the SOURCE
+    OF TRUTH; prefer it.
+
+    "Usable" = enough text, AND it is either clean Unicode Devanagari OR legacy
+    Kruti-Dev (which our converter turns into correct Devanagari). A docx that is
+    just a wrapper around scanned page images has an empty/negligible text layer
+    -> False -> fall through to OCR, which is correct for scans.
+    """
+    try:
+        text = read_docx_text(path)
+    except Exception:
+        return False
+    # need real content: a few numbered questions' worth of characters
+    if len(text.strip()) < 400:
+        return False
+
+    # The raw text layer may be Kruti-Dev ASCII ("1- rqcsjk...") — so BOTH the
+    # Devanagari check and the "1." numbering check must run on the CONVERTED
+    # text, never the raw. (Kruti-Dev renders "1." as "1-" and Hindi as Latin,
+    # so raw always scores 0 on both — that was the first-cut bug.)
+    ratio_raw = _devanagari_ratio(text)
+    if ratio_raw >= 0.5:
+        readable = text                  # already clean Unicode Hindi
+    elif _is_krutidev_text(text):
+        readable = _clean_krutidev(text)  # genuine Kruti-Dev -> convert
+    else:
+        # Latin-heavy but NOT Kruti-Dev: real English, or a garbage/scanned text
+        # layer. _clean_krutidev would turn English into junk Devanagari that
+        # scores ~1.0 and falsely pass this gate — so refuse and let OCR handle
+        # it. (English is easier for OCR anyway.)
+        return False
+    # a real question paper exposes many "1." "2." ... markers once readable;
+    # a scan-wrapper docx (images only) has a negligible text layer -> few/none
+    if _estimate_question_count(readable) < 5:
+        return False
+    # final sanity: the readable text must genuinely be Hindi
+    return _devanagari_ratio(readable) >= 0.5
+
+
 def extract(path: Path) -> dict:
     """Read a .docx and return {"questions": [...]} via Claude.
 
