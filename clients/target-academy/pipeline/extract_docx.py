@@ -153,6 +153,31 @@ def _stem_key(stem: str) -> str:
     return s if len(s) >= 6 else ""
 
 
+def _dedup_key(q: dict) -> str:
+    """Identity key for merging the SAME question seen in two overlapping chunks,
+    WITHOUT collapsing two different questions that share a boilerplate stem.
+
+    Keying on the stem alone is not enough: template questions repeat a fixed
+    stem verbatim and put the real content in the OPTIONS — SET 03 has two
+    assertion-reason questions (Q19, Q36) whose stem is identically
+    "निम्नलिखित कथन और कारण का चयन करें" and two match-the-list questions with the
+    same "सूची-1 को सूची-2 से सुमेलित कीजिए" stem. Stem-only dedup merged each pair
+    into one and silently dropped questions. So fold the first option's content
+    into the key: an exact chunk-overlap duplicate matches on both, while two
+    template questions differ in their options and stay separate."""
+    stem = _stem_key(q.get("stem", ""))
+    if not stem:
+        return ""
+    opts = q.get("options") or []
+    first_opt = ""
+    for o in opts:
+        if isinstance(o, str):
+            first_opt = _stem_key(o)      # same normalization as the stem
+            if first_opt:
+                break
+    return f"{stem}||{first_opt}"
+
+
 def _all_options_placeholder(opts) -> bool:
     """True if a question's options are ALL label placeholders (no real text),
     so the question carries no usable answer choices."""
@@ -616,8 +641,8 @@ def _merge_ordered(all_questions: list[dict],
     by_key: dict = {}
     anon = 0
     for q in all_questions:
-        key = _stem_key(q.get("stem", ""))
-        if not key:                # no usable stem -> never merge these together
+        key = _dedup_key(q)
+        if not key:                # no usable identity -> never merge these
             key = f"__anon{anon}__"
             anon += 1
         if key not in by_key:
