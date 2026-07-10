@@ -666,6 +666,34 @@ def _merge_ordered(all_questions: list[dict],
     return questions
 
 
+def _normalize_option_markers(body: str) -> str:
+    """Rewrite the paper's option markers to a clean, uniform "(a) (b) (c) (d)"
+    so the LLM never has to guess whether an odd glyph is an option label.
+
+    Papers use several marker encodings, sometimes MIXED within one paper:
+      raw Kruti-Dev:  ¼a½ ¼b½ ¼c½ ¼d½   and the bracket-letter  A½ B½ C½ D½
+      converted glyph: (ं)/(इ)/(ब)/(क)   and  ।)  ठ)  ब्)  क्)
+    The letter/position is unambiguous in every form, so map by that. Only the
+    MARKER is rewritten — option content is untouched. Order matters: rewrite the
+    multi-char conjunct markers (ब्) क्)) before the single-char ones."""
+    # NOTE: normalize the RAW markers the model actually sees on this path — do
+    # NOT touch letters that the Kruti-Dev converter needs (rewriting "A½" is
+    # safe because it is only ever an option label; rewriting bare vowels would
+    # corrupt the transliteration). Keep the label letter by position.
+    subs = [
+        # bracket-letter labels: A½ B½ C½ D½  (½ is Kruti-Dev ')'). Anchor to a
+        # word boundary so we never eat a mid-word A/B/C/D.
+        (r"(?<![A-Za-z0-9])A½", "(a) "), (r"(?<![A-Za-z0-9])B½", "(b) "),
+        (r"(?<![A-Za-z0-9])C½", "(c) "), (r"(?<![A-Za-z0-9])D½", "(d) "),
+        # parenthesized Kruti-Dev labels: ¼a½ .. ¼d½ (and uppercase)
+        (r"¼\s*[aA]\s*½", "(a) "), (r"¼\s*[bB]\s*½", "(b) "),
+        (r"¼\s*[cC]\s*½", "(c) "), (r"¼\s*[dD]\s*½", "(d) "),
+    ]
+    for pat, rep in subs:
+        body = re.sub(pat, rep, body)
+    return body
+
+
 def extract_from_text(body: str, label: str = "input",
                       krutidev_input: bool = False) -> dict:
     """Turn paper text into {"questions": [...]} by letting the LLM read it.
@@ -692,6 +720,15 @@ def extract_from_text(body: str, label: str = "input",
                          f"Split the paper or raise MAX_CHARS.")
 
     system = _system_for(krutidev_input)
+
+    # Normalize the paper's option markers to clean (a)/(b)/(c)/(d) BEFORE the LLM
+    # sees the text. SET 03 mixes two Kruti-Dev marker styles — "¼a½ ¼b½..." and
+    # the bracket-letter "A½ B½..." — that convert to odd glyphs ("।) ठ) ब्) क्)")
+    # the model doesn't reliably read as option markers, so it mangles or drops
+    # the options on tightly-packed one-line option rows (SET 03 Q90/Q91/Q98 lost
+    # their options this way). Deterministic marker cleanup makes every option row
+    # unambiguous without touching the option CONTENT.
+    body = _normalize_option_markers(body)
 
     # PRE-SPLIT BY THE PAPER'S OWN NUMBERING (native-docx / clean-text path):
     # when the text carries reliable sequential question numbering, don't gamble
