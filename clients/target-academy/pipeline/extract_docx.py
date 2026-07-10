@@ -692,6 +692,12 @@ def _estimate_question_count(body: str) -> int:
     decides every question boundary — this never chunks or parses questions."""
     if _looks_like_krutidev(body):
         body = _clean_krutidev(body)
+    # Strip ZERO-WIDTH / invisible chars that some papers put right before the
+    # number ("​23." starts with U+200B). Python's \s does NOT match U+200B/FEFF,
+    # so without this the anchored "^<num>." misses every such question — SET 03
+    # hid Q23-Q33 and Q59-Q60 this way, making the estimate 88 when the paper
+    # actually numbers ~100 and letting a 19-question shortfall ship.
+    body = re.sub(r"[​‌‍﻿ ]", "", body)
     nums = set()
     # accept "1." "1)" and the Kruti-Dev danda "1-" at a line start
     for m in re.finditer(r"(?m)^[\s>|*#-]{0,6}(\d{1,3})[.)\-]\s", body):
