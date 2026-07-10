@@ -681,10 +681,20 @@ def _estimate_question_count(body: str) -> int:
     the OCR markdown's pipe/bold/blockquote prefixes). Distinct numbers only, so
     repeats don't inflate it.
 
+    Kruti-Dev raw text prints the question number's dot as a DANDA rendered "-"
+    ("1- rqcsjk...", not "1."), so the "." / ")" pattern below finds NOTHING and
+    the estimate is 0 — silently disabling the shortfall guard on the .docx
+    text-layer path (this shipped SET 03 as 81 of ~88). So: if the body looks
+    like Kruti-Dev, estimate against its CONVERTED (Devanagari) form, where the
+    numbering reads "1." normally.
+
     Used ONLY as a completeness guard (see _extract_recursive): the LLM still
     decides every question boundary — this never chunks or parses questions."""
+    if _looks_like_krutidev(body):
+        body = _clean_krutidev(body)
     nums = set()
-    for m in re.finditer(r"(?m)^[\s>|*#-]{0,6}(\d{1,3})[.)]\s", body):
+    # accept "1." "1)" and the Kruti-Dev danda "1-" at a line start
+    for m in re.finditer(r"(?m)^[\s>|*#-]{0,6}(\d{1,3})[.)\-]\s", body):
         n = int(m.group(1))
         if 1 <= n <= 300:
             nums.add(n)
@@ -711,17 +721,26 @@ def _extract_recursive(body: str, system: str, depth: int = 0) -> list[dict]:
 
     # SHORTFALL GUARD: a model can stop early and close the JSON cleanly — a
     # well-formed but INCOMPLETE answer that _looks_truncated cannot catch (seen
-    # live: a 100-question paper came back as a tidy 56-question array, shipped
-    # silently). Compare against the paper's own printed numbering: if we got
-    # far fewer questions than the text visibly numbers, treat it exactly like a
-    # truncation so the page-split recovery below kicks in.
+    # live: a 100-question paper came back as a tidy 56-question array, and later
+    # SET 03 came back 81 of ~88 — both shipped silently). Compare against the
+    # paper's own printed numbering: if we got fewer questions than the text
+    # visibly numbers, treat it exactly like a truncation so the split recovery
+    # below kicks in.
+    #
+    # Threshold: allow a SMALL slack (the model may legitimately merge a two-part
+    # question or the numbering estimate may over-count a stray "1." in an
+    # option), but demand near-total coverage — a 7-question gap on an 88-question
+    # paper is a real miss, not slack. `est - max(2, 3% )` catches that while
+    # tolerating tiny estimator noise. Only re-split ONCE per level (depth guard
+    # in the split below prevents runaway).
     if not truncated and questions:
         est = _estimate_question_count(body)
-        if est >= 10 and len(questions) < est * 0.9:
+        slack = max(2, round(est * 0.03))
+        if est >= 10 and len(questions) < est - slack:
             print(f"{indent}  [extract] SHORTFALL: model returned "
-                  f"{len(questions)} questions but the text numbers ~{est} — "
-                  f"splitting and retrying so none are silently lost",
-                  file=sys.stderr)
+                  f"{len(questions)} questions but the text numbers ~{est} "
+                  f"(slack {slack}) — splitting and retrying so none are "
+                  f"silently lost", file=sys.stderr)
             truncated = True
 
     if not truncated:
