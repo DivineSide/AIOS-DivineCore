@@ -385,6 +385,50 @@ def _clean_raw(raw: str) -> str:
     return "".join(result)
 
 
+def _repair_inner_quotes(frag: str) -> str:
+    """Escape stray un-escaped double-quotes INSIDE a question object's string
+    values, so a stem/option that quotes a word verbatim still parses.
+
+    The model copies a source's quoted term literally — 'रेखांकित शब्द "यह"' —
+    and emits it WITHOUT escaping: ...,"stem":"... शब्द "यह" ...","options":...
+    That is invalid JSON and costs us the whole question (SET 03 Q71). We know
+    the object's SHAPE ("n"/"stem"/"options"/"answer"/"flag" keys, options is a
+    string array), so we can tell a STRUCTURAL quote (the one right before a key,
+    a ':' , a ',' , a '[' ']' '{' '}') from a CONTENT quote and backslash-escape
+    the content ones. Conservative: only rewrites quotes that are clearly inside
+    a value; if the result still doesn't parse, the caller just skips this one.
+    """
+    # A structural closing quote is followed (after optional spaces) by one of
+    # : , ] } or by another key-name pattern. Any other '"' sits inside a value.
+    out = []
+    n = len(frag)
+    in_str = False
+    esc = False
+    i = 0
+    while i < n:
+        ch = frag[i]
+        if esc:
+            out.append(ch); esc = False; i += 1; continue
+        if ch == "\\":
+            out.append(ch); esc = True; i += 1; continue
+        if ch == '"':
+            if not in_str:
+                in_str = True
+                out.append(ch); i += 1; continue
+            # we're inside a string and hit a '"': is it the real close?
+            j = i + 1
+            while j < n and frag[j] in " \t\r\n":
+                j += 1
+            nxt = frag[j] if j < n else ""
+            if nxt in ":,]}":            # structural -> real close
+                in_str = False
+                out.append(ch); i += 1; continue
+            # content quote inside the value -> escape it
+            out.append('\\"'); i += 1; continue
+        out.append(ch); i += 1
+    return "".join(out)
+
+
 def _salvage_questions(raw: str) -> list[dict]:
     """Recover whatever valid question objects we can from a malformed response.
 
@@ -394,8 +438,26 @@ def _salvage_questions(raw: str) -> list[dict]:
     chunk (which silently loses ~15 questions), scan the text for individual
     {"n":..,"stem":..,"options":[..]} objects and json.loads each one on its own.
     One bad object loses one question, not the whole chunk.
+
+    Object boundaries are found by BRACE depth while tracking strings, but an
+    unescaped inner quote desyncs that string tracking — so we also try a
+    quote-repaired copy of each fragment before giving up on it.
     """
     salvaged: list[dict] = []
+
+    def _try(frag: str) -> bool:
+        try:
+            obj = json.loads(frag)
+        except (ValueError, json.JSONDecodeError):
+            try:
+                obj = json.loads(_repair_inner_quotes(frag))
+            except (ValueError, json.JSONDecodeError):
+                return False
+        if isinstance(obj, dict) and "n" in obj and obj.get("options"):
+            salvaged.append(obj)
+            return True
+        return False
+
     # find each top-level object that starts with an "n" key (a question item)
     for m in re.finditer(r'\{\s*"n"\s*:', raw):
         start = m.start()
@@ -418,13 +480,7 @@ def _salvage_questions(raw: str) -> list[dict]:
             elif ch == "}":
                 depth -= 1
                 if depth == 0:
-                    frag = raw[start:i + 1]
-                    try:
-                        obj = json.loads(frag)
-                        if isinstance(obj, dict) and "n" in obj and obj.get("options"):
-                            salvaged.append(obj)
-                    except (ValueError, json.JSONDecodeError):
-                        pass  # this one object is unrecoverable; skip just it
+                    _try(raw[start:i + 1])
                     break
     return salvaged
 
@@ -432,16 +488,34 @@ def _salvage_questions(raw: str) -> list[dict]:
 def _parse_questions(raw: str) -> list[dict]:
     """Parse a model response into a list of question dicts, tolerantly.
 
-    First try the clean whole-document parse; if that fails, salvage individual
-    objects so a single malformed item never costs us the whole chunk."""
-    try:
-        data = parse_json(raw)
+    Order of attempts:
+      1. clean whole-document parse;
+      2. parse after repairing unescaped inner quotes across the WHOLE array
+         (must happen before per-object salvage: an unescaped quote desyncs the
+         brace-boundary scan, so salvage can't even isolate the broken object —
+         SET 03 Q71 was lost this way);
+      3. per-object salvage as a last resort (recovers what survives)."""
+    def _as_list(data):
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
             return data.get("questions", [])
+        return None
+
+    try:
+        got = _as_list(parse_json(raw))
+        if got is not None:
+            return got
     except (ValueError, json.JSONDecodeError):
         pass
+
+    try:
+        got = _as_list(parse_json(_repair_inner_quotes(raw)))
+        if got:
+            return got
+    except (ValueError, json.JSONDecodeError):
+        pass
+
     return _salvage_questions(raw)
 
 
@@ -456,44 +530,58 @@ _EXTRACT_MAX_TOKENS = 16_000
 def _looks_truncated(raw: str) -> bool:
     """Did the model's JSON array get cut off by the output-token cap?
 
-    A last-char check ("ends with ]") is NOT enough: when the cap lands right
-    after an object's closing '}' (before the next ',' or the final ']'), the
-    array IS truncated but its last char is '}', so a naive check reports complete
-    and the page-split recovery never fires -> a silent short paper. Instead,
-    balance the brackets: strip fences, ignore brackets inside JSON strings, and
-    report truncated if the array/object nesting never returns to zero (i.e. a '['
-    or '{' was left open). Empty/no-JSON input is treated as truncated so the
-    caller escalates rather than shipping nothing."""
+    A real token-cap cutoff leaves the LAST question object incomplete (an open
+    '{' or a string cut mid-value). We must NOT confuse that with a response
+    that is COMPLETE but malformed — e.g. an unescaped '"' inside a stem (common
+    when the model copies a source's quoted grammar question verbatim: '"यह"
+    शब्द'). A naive bracket-balancer desyncs on that stray quote and screams
+    "truncated", triggering a pointless recursive split that FRAGMENTS the paper
+    and loses a question at the boundary (this bit us on SET 03's Q71).
+
+    So: truncation is decided by the TAIL, not by whole-string bracket balance.
+      1. If the whole thing parses as JSON -> complete (not truncated).
+      2. Else salvage the complete {"n":..} objects. If we recovered some AND the
+         text AFTER the last complete object is just the array close (whitespace
+         / ',' / ']'), the response finished — an inner defect, not a cutoff.
+      3. Only if the tail after the last complete object still contains an
+         unterminated object (or we salvaged nothing from non-empty text) is it a
+         real truncation the caller should split-and-retry.
+    Empty / no-JSON input is treated as truncated so the caller escalates."""
     s = raw.strip()
     s = re.sub(r"^```(?:json)?\s*", "", s)
     s = re.sub(r"\s*```\s*$", "", s).strip()
     if not s:
         return True
-    start = s.find("[")
-    if start == -1:
-        start = s.find("{")
-    if start == -1:
+    if "[" not in s and "{" not in s:
         return True                       # no JSON array/object at all
-    depth, in_str, esc = 0, False, False
-    for ch in s[start:]:
-        if esc:
-            esc = False
-            continue
-        if in_str:
-            if ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = False
-            continue
-        if ch == '"':
-            in_str = True
-        elif ch in "[{":
-            depth += 1
-        elif ch in "]}":
-            depth -= 1
-    # depth>0 => an open bracket was never closed (cut off). in_str => cut inside a
-    # string. Either means the response did not finish.
-    return depth > 0 or in_str
+
+    # 1. clean parse -> definitely complete
+    try:
+        parse_json(s)
+        return False
+    except (ValueError, json.JSONDecodeError):
+        pass
+
+    # 2. salvage complete objects. If we recovered some, decide truncation from
+    #    the very END of the response, not from whole-string bracket balance:
+    #    a token-cap cutoff ends MID-TOKEN (inside a string or right after a
+    #    key/comma) so the last non-space char is NOT an array/object close.
+    #    A complete-but-malformed response (unescaped inner quote) still ENDS
+    #    with its ']' — the defect is interior, and _salvage_questions recovers
+    #    the objects, so it must not be treated as truncated.
+    salvaged = _salvage_questions(s)
+    if salvaged:
+        last = s.rstrip()[-1:]
+        # finished if it closes the array/object (']' or '}'); if the model
+        # appended trailing prose after the array, the last char won't be a
+        # close-bracket but the content is still complete — so also accept when
+        # a ']' appears in the final few chars.
+        if last in "]}":
+            return False
+        return "]" not in s[-4:]
+
+    # 3. non-empty text but nothing salvageable -> treat as cut off / unusable
+    return True
 
 
 def _call_llm(body: str, system: str, max_tokens: int = _EXTRACT_MAX_TOKENS):
