@@ -179,11 +179,30 @@ def _dedup_key(q: dict) -> str:
 
 
 def _all_options_placeholder(opts) -> bool:
-    """True if a question's options are ALL label placeholders (no real text),
-    so the question carries no usable answer choices."""
+    """True only if the options are the LABEL SEQUENCE echoed as content (अ/ब/स/द
+    or a/b/c/d), i.e. the OCR captured the markers instead of the real choices —
+    an unusable question.
+
+    Do NOT fire on a set of DISTINCT single-character answers: a phonetics or
+    grammar question legitimately has one-letter options (e.g. "which is a
+    dental-labial sound?" -> ब / फ / व / म). Those are real, different answers,
+    not placeholders. The old "every option is <=1 char" rule dropped exactly
+    those (SET 03 Q90). So require that the single-char options be the label
+    letters AND non-distinct-as-answers: if the options are all short but are all
+    DIFFERENT from each other and aren't the a/b/c/d label run, keep them."""
     if not isinstance(opts, list) or len(opts) < 2:
         return False
-    return all(_is_placeholder_option(o) for o in opts)
+    strs = [o for o in opts if isinstance(o, str)]
+    if len(strs) < 2 or not all(_is_placeholder_option(o) for o in strs):
+        return False
+    # all options are single-char. Distinct single-char answers are REAL (ब/फ/व/म)
+    cores = [o.strip().strip("().[]। :-").strip() for o in strs]
+    if len(set(cores)) == len(cores):
+        # all different -> genuine one-letter answer set, NOT placeholders
+        # UNLESS they are exactly the label run (अ,ब,स,द / a,b,c,d) echoed
+        label_runs = [list("अबसद"), list("abcd"), list("ABCD"), list("कखगघ")]
+        return any(cores == run[:len(cores)] for run in label_runs)
+    return True   # short AND repeating -> markers, not answers
 
 
 def _recover_or_drop(questions: list[dict], krutidev_input: bool = True) -> list[dict]:
