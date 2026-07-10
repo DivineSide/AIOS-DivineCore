@@ -667,12 +667,114 @@ def extract_from_text(body: str, label: str = "input",
                          f"Split the paper or raise MAX_CHARS.")
 
     system = _system_for(krutidev_input)
-    questions = _extract_recursive(body, system, depth=0)
+
+    # PRE-SPLIT BY THE PAPER'S OWN NUMBERING (native-docx / clean-text path):
+    # when the text carries reliable sequential question numbering, don't gamble
+    # on the model returning all ~100 in one call (it silently drops a handful,
+    # and the after-the-fact split recovery leaves a few in the boundary cracks).
+    # Instead cut the text AT the numbered question starts into bounded chunks,
+    # extract each, and merge. Splitting AT a number-start (never mid-question)
+    # means no question can fall in a crack; a small overlap is deduped by stem.
+    chunks = _split_by_numbering(body)
+    if chunks is not None:
+        print(f"  [extract] numbering is reliable -> pre-split into "
+              f"{len(chunks)} bounded chunk(s); extracting each in full",
+              file=sys.stderr)
+        questions = []
+        for idx, chunk in enumerate(chunks):
+            questions.extend(_extract_recursive(chunk, system, depth=0))
+    else:
+        questions = _extract_recursive(body, system, depth=0)
+
     questions = _merge_ordered(questions, krutidev_input=krutidev_input)
     if not questions:
         raise ValueError(f"{label}: extractor returned no questions.")
     print(f"  [extract] {len(questions)} questions total", file=sys.stderr)
     return {"questions": questions}
+
+
+# Target questions-per-chunk when pre-splitting by the paper's own numbering.
+# ~20 keeps each LLM call far under the output cap so it returns every question,
+# while overlapping one question into the next chunk so a boundary question is
+# never lost (the merge dedups the overlap by stem content).
+_CHUNK_QUESTIONS = 20
+_CHUNK_OVERLAP = 1
+
+
+def _split_by_numbering(body: str):
+    """If `body` has reliable, mostly-sequential question numbering, return it cut
+    into bounded, slightly-overlapping chunks AT the number boundaries. Else None.
+
+    "Reliable" = we can find a long run of ascending numbers starting at/near 1
+    with few gaps — i.e. this really is a numbered question paper, not prose that
+    happens to contain digits. We split only at a line that STARTS a numbered
+    question, so a chunk boundary never lands inside a question.
+    """
+    # locate every line that starts a numbered question (tolerate zero-width /
+    # markdown prefixes and the Kruti-Dev danda, same as the estimator).
+    probe = body
+    if _looks_like_krutidev(probe):
+        probe = _clean_krutidev(probe)
+    probe = re.sub(r"[​‌‍﻿\xa0]", "", probe)
+
+    starts = []   # (char_offset_in_body_LINES, question_number)
+    lines = body.splitlines(keepends=True)
+    conv_lines = probe.splitlines()
+    # align: read_docx_text and _clean_krutidev are 1:1 on line count (conversion
+    # is per-run, never adds/removes lines), so index i matches between them.
+    if len(conv_lines) != len(lines):
+        conv_lines = [(_clean_krutidev(ln) if _looks_like_krutidev(ln) else ln)
+                      for ln in [l.rstrip("\n") for l in lines]]
+    offset = 0
+    line_offsets = []
+    for l in lines:
+        line_offsets.append(offset)
+        offset += len(l)
+    for i, cl in enumerate(conv_lines):
+        m = re.match(r"^[\s>|*#\-​‌‍﻿\xa0]{0,6}(\d{1,3})[.)\-]\s", cl)
+        if m:
+            n = int(m.group(1))
+            if 1 <= n <= 300:
+                starts.append((line_offsets[i], n))
+
+    if len(starts) < 12:
+        return None                       # too few numbered items to trust
+
+    # is the numbering a real ascending run? require it to start low and mostly
+    # ascend (a stray "1." inside an option won't form a long ascending series).
+    numbers = [n for _, n in starts]
+    if numbers[0] > 3:
+        return None
+    ascending = sum(1 for a, b in zip(numbers, numbers[1:]) if b > a)
+    if ascending < 0.8 * (len(numbers) - 1):
+        return None
+
+    # keep only the FIRST occurrence of each number, in order — dedupes a number
+    # that appears both as a question start and inside a later option.
+    seen = set()
+    anchors = []
+    for off, n in starts:
+        if n not in seen:
+            seen.add(n)
+            anchors.append(off)
+    anchors.sort()
+
+    if len(anchors) <= _CHUNK_QUESTIONS:
+        return None                       # small enough for one call; no split
+
+    # cut at every _CHUNK_QUESTIONS-th anchor, overlapping _CHUNK_OVERLAP back
+    chunks = []
+    step = _CHUNK_QUESTIONS
+    i = 0
+    while i < len(anchors):
+        start_off = anchors[max(0, i - _CHUNK_OVERLAP)] if i > 0 else 0
+        end_idx = i + step
+        end_off = anchors[end_idx] if end_idx < len(anchors) else len(body)
+        seg = body[start_off:end_off].strip()
+        if seg:
+            chunks.append(seg)
+        i += step
+    return chunks if len(chunks) > 1 else None
 
 
 def _estimate_question_count(body: str) -> int:
