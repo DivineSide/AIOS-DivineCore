@@ -77,7 +77,12 @@ def _sarvam():
 
 
 def _is_credit_error(exc: Exception) -> bool:
-    return "insufficient credits" in str(exc).lower()
+    # Sarvam signals credit exhaustion in (at least) two shapes:
+    #   400 "Insufficient credits for N pages"  (mid-account)
+    #   429 "No credits available." / insufficient_quota_error  (fully dry)
+    s = str(exc).lower()
+    return ("insufficient credits" in s or "no credits available" in s
+            or "insufficient_quota" in s)
 
 
 def _is_transient_error(exc: Exception) -> bool:
