@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS pyq_chunks (
 -- Fast subject filtering (used in pyq_lookup random fetch)
 CREATE INDEX IF NOT EXISTS pyq_chunks_subject_idx ON pyq_chunks (subject);
 
--- ANN index for future semantic search on PYQs
-CREATE INDEX IF NOT EXISTS pyq_chunks_embedding_idx
-    ON pyq_chunks USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 50);
+-- NO ANN index on embedding — deliberately (dropped 2026-07-12).
+-- The original ivfflat (lists=50) with pgvector's default probes=1 searched only
+-- ~26 of 1,302 rows (~2% of the space): real 0.42-similarity matches never
+-- surfaced and generation received ZERO style examples on every call. At this
+-- row count an exact scan is <10ms with perfect recall; an approximate index is
+-- pure accuracy loss with no speed win. Do not recreate below ~10k rows.

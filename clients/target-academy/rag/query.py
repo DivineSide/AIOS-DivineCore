@@ -129,31 +129,40 @@ async def rag_lookup(
 
 
 def _pyq_search(embedding: list[float], subject: str, top_k: int,
-                threshold: float) -> list[dict]:
+                threshold: float, format: str | None = None) -> list[dict]:
     """Semantic search on pyq_chunks — same cosine similarity as book_chunks
     but hits the PYQ table. Returns questions whose meaning is close to the
-    query embedding, preserving framing + distractor style."""
+    query embedding, preserving framing + distractor style. Optional `format`
+    filter ("match", "assertion", ...) returns only that question format —
+    used to hand the generator real examples of the exact format it must write."""
     conn = _db()
     vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
-    sql = """
+    fmt_where = "AND format = %s" if format else ""
+    sql = f"""
         SELECT
             chunk_text,
             source_file,
+            answer,
+            format,
             1 - (embedding <=> %s::vector) AS similarity
         FROM pyq_chunks
-        WHERE subject = %s
+        WHERE subject = %s {fmt_where}
         ORDER BY embedding <=> %s::vector
         LIMIT %s
     """
+    params = ([vec_str, subject, format, vec_str, top_k * 2] if format
+              else [vec_str, subject, vec_str, top_k * 2])
     with conn.cursor() as cur:
-        cur.execute(sql, (vec_str, subject, vec_str, top_k * 2))
+        cur.execute(sql, params)
         rows = cur.fetchall()
     results = []
-    for chunk_text, source_file, similarity in rows:
+    for chunk_text, source_file, answer, fmt, similarity in rows:
         if similarity >= threshold:
             results.append({
                 "text":        chunk_text,
                 "source_file": source_file,
+                "answer":      answer,
+                "format":      fmt,
                 "similarity":  round(float(similarity), 4),
             })
         if len(results) >= top_k:
@@ -166,12 +175,71 @@ async def pyq_rag_lookup(
     subject: str,
     top_k: int = 5,
     threshold: float = 0.20,
+    format: str | None = None,
 ) -> list[dict]:
     """Semantic search on pyq_chunks for past questions relevant to a topic.
     Returns [] on any error (table may not exist yet — fail soft)."""
     try:
         embedding = await asyncio.to_thread(_embed, topic)
-        return await asyncio.to_thread(_pyq_search, embedding, subject, top_k, threshold)
+        return await asyncio.to_thread(_pyq_search, embedding, subject, top_k,
+                                       threshold, format)
+    except Exception:
+        return []
+
+
+def _passage_search(embedding: list[float], top_k: int, threshold: float,
+                    subject: str | None = None) -> list[dict]:
+    """Cosine search on book_passages — the merged, generation-grade view of the
+    corpus (multi-fact passages instead of one-line fragments). Same embedding
+    space as book_chunks; exact scan, no index (small table, perfect recall)."""
+    conn = _db()
+    vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
+    where = "WHERE subject = %s" if subject else ""
+    sql = f"""
+        SELECT
+            book_name,
+            subject,
+            topic,
+            passage_text,
+            1 - (embedding <=> %s::vector) AS similarity
+        FROM book_passages
+        {where}
+        ORDER BY embedding <=> %s::vector
+        LIMIT %s
+    """
+    params = ([vec_str, subject, vec_str, top_k * 2] if subject
+              else [vec_str, vec_str, top_k * 2])
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    results = []
+    for book_name, subj, topic, text, similarity in rows:
+        if similarity >= threshold:
+            results.append({
+                "book":       book_name,
+                "subject":    subj or "",
+                "topic":      topic or "",
+                "text":       text,
+                "similarity": round(float(similarity), 4),
+            })
+        if len(results) >= top_k:
+            break
+    return results
+
+
+async def passage_lookup(
+    topic: str,
+    subject: str | None = None,
+    top_k: int = 4,
+    threshold: float = 0.25,
+) -> list[dict]:
+    """Generation-side retrieval: multi-fact passages from book_passages.
+    Same result shape as rag_lookup, so it's a drop-in for generate.py.
+    Returns [] on any error (fail soft — e.g. table not built yet)."""
+    try:
+        embedding = await asyncio.to_thread(_embed, topic)
+        return await asyncio.to_thread(_passage_search, embedding, top_k,
+                                       threshold, subject)
     except Exception:
         return []
 
