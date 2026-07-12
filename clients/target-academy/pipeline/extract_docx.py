@@ -68,6 +68,42 @@ def _looks_like_krutidev(s: str) -> bool:
 _KD_RUN = re.compile(r"[A-Za-z][A-Za-z0-9 \]\[{}%:;,.'\"&+/=#-]{3,}")
 
 
+# Roman-numeral LABELS (कथन I / निष्कर्ष II / statement III) collide with the
+# Kruti-Dev table: 'I' is the glyph code for प्, so "निष्कर्ष I" converts to
+# "निष्कर्ष प्" and "II" -> "प्प्" — corrupting assertion-reason and syllogism
+# questions on every paper. But 'I' INSIDE a word (Ik, kI, qI...) is legitimate
+# Kruti-Dev that must convert. So protect ONLY a STANDALONE I/II/III token
+# (word-boundary both sides) — swap it for a sentinel the converter passes
+# through untouched, then restore it after conversion. V/IV are NOT protected:
+# 'V' is a common Kruti-Dev letter inside real words (राष्ट्र, ट्रेल), so
+# touching it would break Hindi.
+_ROMAN_LABEL = re.compile(r"(?<![A-Za-z0-9])(III|II|I)(?![A-Za-z0-9])")
+# Distinct Unicode Private-Use-Area sentinels (U+E000..E002) - never appear in
+# real exam text and have no Kruti-Dev mapping, so the converter passes them
+# through byte-for-byte. One codepoint per numeral so restore is unambiguous.
+_ROMAN_MAP = {"I": chr(0xE000), "II": chr(0xE001), "III": chr(0xE002)}
+_ROMAN_UNMAP = {v: k for k, v in _ROMAN_MAP.items()}
+
+
+def _protect_roman(s: str) -> str:
+    """Replace standalone Roman-numeral labels with PUA sentinels so the
+    Kruti-Dev converter leaves them alone ('I' would otherwise become the
+    Kruti-Dev letter it maps to)."""
+    if not s:
+        return s
+    return _ROMAN_LABEL.sub(lambda m: _ROMAN_MAP[m.group(1)], s)
+
+
+def _restore_roman(s: str) -> str:
+    """Turn the PUA sentinels back into I / II / III after conversion."""
+    if not s:
+        return s
+    for sentinel, roman in _ROMAN_UNMAP.items():
+        if sentinel in s:
+            s = s.replace(sentinel, roman)
+    return s
+
+
 def _clean_krutidev(s: str) -> str:
     """Deterministically repair Kruti-Dev that the model failed to transliterate.
 
@@ -80,11 +116,15 @@ def _clean_krutidev(s: str) -> str:
     if not s:
         return s
 
+    # protect standalone Roman-numeral labels from the I->प् collision (restored
+    # at the end); does nothing to text without such labels.
+    s = _protect_roman(s)
+
     # whole-string case: clearly all Kruti-Dev -> convert the whole thing
     if _looks_like_krutidev(s):
         converted = krutidev_to_unicode(s)
         if _devanagari_ratio(converted) > _devanagari_ratio(s):
-            return converted
+            return _restore_roman(converted)
 
     # mixed case: convert only the Latin-gibberish runs embedded in the Hindi
     def _sub(m):
@@ -93,7 +133,7 @@ def _clean_krutidev(s: str) -> str:
         # only swap in the conversion if it actually became Devanagari
         return conv if _DEVANAGARI.search(conv) else run
 
-    return _KD_RUN.sub(_sub, s)
+    return _restore_roman(_KD_RUN.sub(_sub, s))
 
 
 # The OCR sometimes transcribes the paper's COVER PAGE (logo, "Target Academy",
