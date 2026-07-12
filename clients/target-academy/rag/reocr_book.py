@@ -51,23 +51,71 @@ def _load_env():
 _load_env()
 
 
+def _keys() -> list[str]:
+    """Key pool: SARVAM_API_KEY plus SARVAM_API_KEY_2, _3, ... — fresh free
+    accounts are ₹100 each, so a big book spans several. Rotation is automatic
+    on credit exhaustion; order = env-var order."""
+    keys = []
+    base = os.environ.get("SARVAM_API_KEY", "")
+    if base:
+        keys.append(base)
+    n = 2
+    while (k := os.environ.get(f"SARVAM_API_KEY_{n}", "")):
+        keys.append(k)
+        n += 1
+    if not keys:
+        raise RuntimeError("No SARVAM_API_KEY[_N] set in .env")
+    return keys
+
+
+_key_idx = 0
+
+
 def _sarvam():
     from sarvamai import SarvamAI
-    key = os.environ.get("SARVAM_API_KEY", "")
-    if not key:
-        raise RuntimeError("SARVAM_API_KEY not set in .env")
-    return SarvamAI(api_subscription_key=key)
+    return SarvamAI(api_subscription_key=_keys()[_key_idx])
+
+
+def _is_credit_error(exc: Exception) -> bool:
+    return "insufficient credits" in str(exc).lower()
+
+
+def _is_transient_error(exc: Exception) -> bool:
+    s = str(exc).lower()
+    return any(m in s for m in ("disconnected", "timeout", "timed out", "connection",
+                                "502", "503", "429", "internal server"))
 
 
 def _digitize_pdf_file(pdf_path: Path) -> str:
-    """One <=10-page PDF -> markdown via a Sarvam doc-digitization job."""
-    client = _sarvam()
-    job = client.document_intelligence.create_job(language="hi-IN", output_format="md")
-    job.upload_file(str(pdf_path))
-    job.start()
-    status = job.wait_until_complete(poll_interval=4.0, timeout=420)
-    if status.job_state != "Completed":
-        raise RuntimeError(f"Sarvam job {job.job_id}: {status.job_state}: {status.error_message}")
+    """One <=10-page PDF -> markdown via a Sarvam doc-digitization job.
+    Rotates to the next key in the pool when the current account runs dry;
+    retries transient server errors (disconnects/timeouts) with backoff."""
+    global _key_idx
+    import time
+    transient_left = 3
+    while True:
+        try:
+            client = _sarvam()
+            job = client.document_intelligence.create_job(language="hi-IN", output_format="md")
+            job.upload_file(str(pdf_path))
+            job.start()
+            status = job.wait_until_complete(poll_interval=4.0, timeout=420)
+            if status.job_state != "Completed":
+                raise RuntimeError(f"Sarvam job {job.job_id}: {status.job_state}: {status.error_message}")
+            break
+        except Exception as exc:
+            if _is_credit_error(exc) and _key_idx + 1 < len(_keys()):
+                _key_idx += 1
+                print(f"  [key pool] credit exhausted — rotating to key #{_key_idx + 1}", flush=True)
+                continue
+            if _is_transient_error(exc) and transient_left > 0:
+                transient_left -= 1
+                wait = 15 * (3 - transient_left)
+                print(f"  [transient] {exc} — retrying in {wait}s "
+                      f"({transient_left} retries left)", flush=True)
+                time.sleep(wait)
+                continue
+            raise
     tmp_zip = pdf_path.with_suffix(".zip")
     try:
         job.download_output(str(tmp_zip))
@@ -121,9 +169,16 @@ def reocr(book_rel: str, status_only: bool = False):
         (out_dir / name).write_text(md, encoding="utf-8")
         print(f"  pages {s}-{e}: OK ({len(md)} chars)", flush=True)
 
-    # all pieces present -> assemble
+    # all pieces present -> assemble. Sarvam inlines photo plates as base64
+    # images (single 500KB "![Image](data:...)" lines) — pure bloat for a text
+    # corpus, stripped here so full.md holds only text.
     pieces = sorted(p for p in out_dir.glob("*.md") if re.match(r"\d{3}-\d{3}\.md$", p.name))
-    full = "\n\n".join(p.read_text(encoding="utf-8") for p in pieces)
+    parts = []
+    for p in pieces:
+        t = p.read_text(encoding="utf-8")
+        t = re.sub(r"!\[[^\]]*\]\(data:[^)]*\)", "", t)
+        parts.append(t)
+    full = "\n\n".join(parts)
     full_path = REOCR_DIR / f"{src.stem}.full.md"
     full_path.write_text(full, encoding="utf-8")
     print(f"\nDONE: {full_path} ({len(full):,} chars from {len(pieces)} pieces)")
