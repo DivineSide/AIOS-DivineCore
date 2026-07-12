@@ -211,7 +211,23 @@ def _extract_any(file_path: Path) -> dict:
             import extract_sarvam_vision
             import extract_docx
             text = extract_sarvam_vision.digitize_to_text(file_path)
-            data = extract_docx.extract_from_text(text, label=file_path.name)
+            # PRIMARY: two-pass harness (model finds boundaries -> code slices ->
+            # validate -> informed retry). Enforces exactly-4-options mechanically,
+            # so a question can never silently ship short (the Q118 bug). Falls
+            # back to the battle-tested single-call extractor if it errors or the
+            # cross-check flags a big shortfall.
+            data = None
+            try:
+                import extract_two_pass
+                data = extract_two_pass.extract_two_pass(text)
+                # low_confidence: unrecoverable questions -> job meta -> dashboard
+                # (NOT the deliverable). Stashed on the dict; full_task reads it.
+            except Exception as e:
+                print(f"  [extract] two-pass failed ({type(e).__name__}: {e}); "
+                      f"using single-call extractor", file=sys.stderr)
+                data = None
+            if not (data and data.get("questions")):
+                data = extract_docx.extract_from_text(text, label=file_path.name)
             if data.get("questions"):
                 return data
             print("  [extract] Sarvam Vision yielded no questions; "
@@ -463,8 +479,13 @@ def full_task(self, job_id: str, meta: dict):
     try:
         src = next(jobs.input_dir(job_id).iterdir())
         extracted = _extract_any(src)
+        # low_confidence: questions the two-pass harness could not fully recover
+        # (genuinely unreadable OCR). The DELIVERABLE stays clean — these ship
+        # best-effort with no flag on the paper. We surface them ONLY in the job
+        # meta so the console can show a review note next to the output.
         jobs.update_meta(job_id, stage="review",
-                         n_questions=len(extracted.get("questions", [])))
+                         n_questions=len(extracted.get("questions", [])),
+                         low_confidence=extracted.get("low_confidence", []))
 
         data = _wrap_questions(extracted["questions"], meta)
         # light OCR proofread (only obvious typos; proper nouns/facts untouched)

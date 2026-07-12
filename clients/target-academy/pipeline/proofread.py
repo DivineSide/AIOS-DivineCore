@@ -16,6 +16,7 @@ text (we never drop or blank a question because proofreading hiccuped).
 """
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -24,6 +25,36 @@ from llm import _complete_one, MODELS, parse_json  # noqa: E402
 
 PROOFREAD = os.environ.get("PROOFREAD_OCR", "1") == "1"
 _BATCH = int(os.environ.get("PROOFREAD_BATCH", "8"))
+
+# ── mechanical diff-guard ────────────────────────────────────────────────────
+# Proofread is the ONE stage that lets AI rewrite Hindi, so the prompt's "never
+# change facts" rule is backed by CODE, not trust. A correction is accepted only
+# if it altered nothing but Devanagari spelling. These checks are the cage.
+_NUM = re.compile(r"\d+")
+_LATIN = re.compile(r"[A-Za-z]+")
+
+
+def _safe_correction(orig: str, corrected: str) -> bool:
+    """True if `corrected` is a legitimate spelling fix of `orig` — i.e. it did
+    NOT change any number, any English/Latin token, or rewrite the text wholesale.
+    Any False keeps the original text (fail-safe: a fact is never corrupted)."""
+    if not isinstance(corrected, str) or not corrected.strip():
+        return False
+    # numbers must be identical (multiset): blocks Article 14->15, year swaps, etc.
+    if sorted(_NUM.findall(orig)) != sorted(_NUM.findall(corrected)):
+        return False
+    # English/Latin tokens must be identical (case-insensitive multiset):
+    # blocks GSDP/OSI/DNS and English-name corruption.
+    if (sorted(t.lower() for t in _LATIN.findall(orig))
+            != sorted(t.lower() for t in _LATIN.findall(corrected))):
+        return False
+    # magnitude cap: a spelling fix nudges a few characters; a name-swap or
+    # paraphrase changes a large fraction. Reject whole-scale rewrites. Length
+    # ratio is a cheap, dependency-free proxy for "too much changed".
+    lo, hi = sorted((len(orig), len(corrected)))
+    if hi > 0 and lo / hi < 0.6:
+        return False
+    return True
 # The cost/quality strategy (Mayank): cheap Sarvam does the OCR, then a Claude
 # TEXT pass (far cheaper than Claude VISION — no image tokens) cleans the Hindi
 # spelling Sarvam mangles. Pin Claude's strong text model for the best Devanagari.
@@ -118,12 +149,18 @@ def proofread(data: dict) -> dict:
             q = questions[item["id"]]
             new_stem = str(c.get("stem", "")).strip()
             new_opts = c.get("options")
-            # only apply if structure is preserved (same option count)
-            if new_stem:
+            # MECHANICAL DIFF-GUARD: proofread is the one place we let AI rewrite
+            # Hindi, so cage it — a correction is applied ONLY if it changed
+            # nothing but Devanagari spelling. _safe_correction rejects any change
+            # to numbers, English/Latin tokens, or a whole-scale rewrite. On
+            # rejection we keep the ORIGINAL (fail-safe: never corrupt a fact).
+            if new_stem and _safe_correction(item["stem"], new_stem):
                 q["stem"] = new_stem
             if (isinstance(new_opts, list)
                     and len(new_opts) == len(item["options"])
-                    and all(isinstance(o, str) for o in new_opts)):
+                    and all(isinstance(o, str) for o in new_opts)
+                    and all(_safe_correction(o0, o1)
+                            for o0, o1 in zip(item["options"], new_opts))):
                 q["options"] = new_opts
             fixed += 1
     print(f"  [proofread] OCR-proofread {fixed}/{len(questions)} questions",
