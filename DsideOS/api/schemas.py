@@ -32,6 +32,14 @@ class Question(BaseModel):
     flag: Optional[str] = None
     image: Optional[str] = None
     option_images: Optional[list[str]] = None
+    # Structured complex-format fields (कथन / सुमेलित / A-R / क्रम). The paper
+    # builders render these natively (build_paper.add_questions); the generation
+    # harness emits them, and the build path must not strip them.
+    statements: Optional[list[str]] = None
+    match: Optional[list[list[str]]] = None
+    lead_in: Optional[str] = None
+    long_options: Optional[bool] = None
+    format: Optional[str] = None
 
 
 class BuildRequest(BaseModel):

@@ -169,7 +169,7 @@ def full(
 
 VALID_SUBJECTS = {
     "uk-history", "uk-geography", "uk-culture",
-    "uk-general-studies", "general-gk", "hindi",
+    "uk-general-studies", "general-gk", "hindi", "computer",
 }
 
 

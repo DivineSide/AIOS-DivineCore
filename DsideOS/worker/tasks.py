@@ -543,12 +543,15 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
     jobs.update_meta(job_id, status="RUNNING", stage="generate", font=font,
                      format=meta.get("format", "format-1"))
     try:
-        # phases 1-3: produce the questions list (async pipeline, run to completion)
-        questions = asyncio.run(generate.generate_questions(subject, count))
+        # phases 1-3: produce the questions list (async harness, run to completion).
+        # gen_meta carries drop notes / format plan-vs-actual — DASHBOARD data,
+        # never rendered on the paper (same contract as extraction's low_confidence).
+        questions, gen_meta = asyncio.run(generate.generate_questions(subject, count))
         if not questions:
             raise RuntimeError("Generation produced no questions.")
 
-        jobs.update_meta(job_id, stage="build", n_questions=len(questions))
+        jobs.update_meta(job_id, stage="build", n_questions=len(questions),
+                         gen_meta=gen_meta)
 
         # phase 4: identical to the build path the other tools use
         data = _wrap_questions(questions, meta)
