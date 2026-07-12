@@ -54,6 +54,36 @@ MIN_CHUNK_CHARS = 30
 # noise ("उत्तराखंड का इततहास" x3), not content.
 MAX_REPEATS = 2
 
+# Promo/front-matter junk — found ranking #1 on the very first passage retrieval
+# test (jardhari's copyright page + email + review plea merged into a "passage").
+# A chunk containing any of these is publisher furniture, not study material.
+import re
+_PROMO = re.compile(
+    r"@gmail\.com|@yahoo|youtube\.com|https?://|www\.|"
+    r"copyright|all rights reserved|£|"
+    r"हमारे\s+YouTube|जुड़ें\s+हमारे\s+साथ|निशुल्क\s+कोर्स|ननशुल्क",
+    re.IGNORECASE)
+# MCQ-dump sections (the jardhari books embed Topic-Wise MCQ lists: "Q19....
+# A.… B.… C.… D.…"). Question dumps are the wrong SHAPE for factual substance —
+# generation needs prose passages; style examples come from pyq_chunks.
+_MCQ_Q = re.compile(r"Q\s*\d{1,3}\s*[.।]")
+_MCQ_OPT = re.compile(r"(?:^|\s)[A-D]\s*[.)]\s*\S")
+# Table-of-contents blocks: several "chapter 4-10 / 11-21" page ranges in one
+# chunk. TOCs carry every chapter title, so they rank high on topic queries
+# while containing zero facts (caught polluting the गोरखा retrieval test).
+_TOC_RANGE = re.compile(r"\d{1,3}\s*[-–]\s*\d{1,3}")
+_TOC_WORDS = re.compile(r"content\s+page|तिर्षय\s*सूची|विषय\s*सूची|अनुक्रम", re.IGNORECASE)
+
+
+def _is_junk_content(t: str) -> str | None:
+    if _PROMO.search(t):
+        return "promo"
+    if _MCQ_Q.search(t) and len(_MCQ_OPT.findall(t)) >= 3:
+        return "mcq_dump"
+    if _TOC_WORDS.search(t) or len(_TOC_RANGE.findall(t)) >= 4:
+        return "toc"
+    return None
+
 # Digit-corrupted books (Tesseract read printed '1' as '4'; ~600 chunks carry
 # wrong years). Kept OUT of generation retrieval until their Sarvam re-OCR.
 DAMAGED_BOOKS = {
@@ -109,7 +139,8 @@ def merge_book(rows: list[tuple]) -> tuple[list[dict], dict]:
     norm_counts = Counter(_norm(t) for _, _, t in rows)
 
     passages: list[dict] = []
-    stats = {"junk_short": 0, "junk_repeat": 0, "kept_chunks": 0}
+    stats = {"junk_short": 0, "junk_repeat": 0, "junk_promo": 0,
+             "junk_mcq": 0, "junk_toc": 0, "kept_chunks": 0}
 
     cur_texts: list[str] = []
     cur_topics: list[str] = []
@@ -140,6 +171,16 @@ def merge_book(rows: list[tuple]) -> tuple[list[dict], dict]:
             continue
         if norm_counts[_norm(t)] > MAX_REPEATS:
             stats["junk_repeat"] += 1
+            continue
+        junk = _is_junk_content(t)
+        if junk == "promo":
+            stats["junk_promo"] += 1
+            continue
+        if junk == "mcq_dump":
+            stats["junk_mcq"] += 1
+            continue
+        if junk == "toc":
+            stats["junk_toc"] += 1
             continue
         stats["kept_chunks"] += 1
         # a single huge chunk that would blow the cap flushes what came before
@@ -234,7 +275,8 @@ def build(only_book: str | None, wipe: bool, include_damaged: bool):
         conn.close()
         print("book_passages wiped." if not only_book else f"rows wiped for {only_book}.")
 
-    grand = {"passages": 0, "junk_short": 0, "junk_repeat": 0, "kept_chunks": 0}
+    grand = {"passages": 0, "junk_short": 0, "junk_repeat": 0,
+             "junk_promo": 0, "junk_mcq": 0, "junk_toc": 0, "kept_chunks": 0}
     for book, subject in books:
         conn = _db()
         with conn.cursor() as cur:
@@ -250,7 +292,9 @@ def build(only_book: str | None, wipe: bool, include_damaged: bool):
         print(f"\n{book}  [{subject}]")
         print(f"  {len(rows)} chunks -> {len(passages)} passages "
               f"(avg {sum(lens)//len(lens)} chars) | junk dropped: "
-              f"{stats['junk_short']} short + {stats['junk_repeat']} repeated-header")
+              f"{stats['junk_short']} short + {stats['junk_repeat']} repeated-header "
+              f"+ {stats['junk_promo']} promo + {stats['junk_mcq']} mcq-dump "
+              f"+ {stats['junk_toc']} toc")
 
         embs = embed_texts([p["text"] for p in passages])
         for p, e in zip(passages, embs):
@@ -258,11 +302,16 @@ def build(only_book: str | None, wipe: bool, include_damaged: bool):
         store(passages, book, subject)
 
         grand["passages"] += len(passages)
-        for k in ("junk_short", "junk_repeat", "kept_chunks"):
+        for k in ("junk_short", "junk_repeat", "junk_promo", "junk_mcq",
+                  "junk_toc", "kept_chunks"):
             grand[k] += stats[k]
 
+    dropped = (grand['junk_short'] + grand['junk_repeat'] + grand['junk_promo']
+               + grand['junk_mcq'] + grand['junk_toc'])
     print(f"\nDONE: {grand['passages']} passages from {grand['kept_chunks']} chunks "
-          f"({grand['junk_short'] + grand['junk_repeat']} junk fragments dropped).")
+          f"({dropped} junk chunks dropped: {grand['junk_short']} short, "
+          f"{grand['junk_repeat']} header, {grand['junk_promo']} promo, "
+          f"{grand['junk_mcq']} mcq-dump, {grand['junk_toc']} toc).")
 
 
 if __name__ == "__main__":
