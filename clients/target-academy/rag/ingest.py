@@ -83,20 +83,26 @@ _embed: OpenAI | None = None
 _claude: anthropic.Anthropic | None = None
 
 def _oai() -> OpenAI:
-    """Embedding client — routed through OpenRouter (OpenAI-compatible), since the
-    direct OpenAI key is quota-exhausted. Uses OPENROUTER_API_KEY."""
+    """Segmentation + embedding client. OpenRouter when OPENROUTER_API_KEY is
+    present; otherwise the direct OpenAI key (works again as of 2026-07-12 —
+    the OpenRouter key was removed from .env). Model names differ per route:
+    OpenRouter prefixes "openai/"."""
     global _embed
     if _embed is None:
         key = os.environ.get("OPENROUTER_API_KEY", "")
-        if not key:
-            raise RuntimeError("OPENROUTER_API_KEY not set in .env")
-        _embed = OpenAI(
-            api_key=key,
-            base_url="https://openrouter.ai/api/v1",
-            timeout=90,
-            max_retries=5,
-        )
+        if key:
+            _embed = OpenAI(api_key=key, base_url="https://openrouter.ai/api/v1",
+                            timeout=90, max_retries=5)
+        else:
+            _embed = OpenAI(timeout=90, max_retries=5)  # direct OPENAI_API_KEY
     return _embed
+
+
+def _model_name(name: str) -> str:
+    """Map an "openai/<model>" id to the right form for the active route."""
+    if os.environ.get("OPENROUTER_API_KEY", ""):
+        return name
+    return name.removeprefix("openai/")
 
 def _anthropic() -> anthropic.Anthropic:
     global _claude
@@ -223,7 +229,27 @@ def _maybe_krutidev(text: str) -> str:
         return converted
     return text
 
+# Sarvam re-OCR sidecars (written by reocr_book.py). When one exists for a book,
+# it is ALWAYS preferred over local extraction — Sarvam Vision reads Hindi print
+# correctly where Tesseract mangles digits ('1'->'4'/'7') and conjuncts.
+REOCR_DIR = Path(__file__).resolve().parent / ".reocr"
+
+
+def _strip_sarvam_html(text: str) -> str:
+    """Sarvam markdown embeds tables as raw HTML. Flatten: cells of a row join
+    with ' | ', tags become line breaks. Keeps TOC/reference tables readable as
+    text (downstream junk rules drop them where they deserve it)."""
+    text = re.sub(r"</td>\s*<td[^>]*>", " | ", text)
+    text = re.sub(r"<br\s*/?>", " ", text)
+    text = re.sub(r"<[^>]+>", "\n", text)
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
 def extract_text(path: Path) -> str:
+    sidecar = REOCR_DIR / f"{path.stem}.full.md"
+    if sidecar.exists():
+        print(f"  Sarvam re-OCR sidecar found ({sidecar.name}) — using it, no local OCR.")
+        return _strip_sarvam_html(sidecar.read_text(encoding="utf-8"))
     if has_text_layer(path):
         print("  Digital PDF detected — extracting text layer...")
         text = extract_text_digital(path)
@@ -284,7 +310,7 @@ def _segment_window(window: str) -> list[dict]:
     numbered = "\n".join(f"[{i+1}] {s}" for i, s in enumerate(sentences))
 
     resp = _oai().chat.completions.create(
-        model=SEGMENT_MODEL,
+        model=_model_name(SEGMENT_MODEL),
         max_tokens=2048,          # boundaries only — never the body text
         messages=[
             {"role": "system", "content": SEGMENT_PROMPT},
@@ -431,7 +457,7 @@ def embed_chunks(chunks: list[dict]) -> list[dict]:
     def flush(texts, items):
         if not texts:
             return
-        resp = _oai().embeddings.create(model=EMBED_MODEL, input=texts)
+        resp = _oai().embeddings.create(model=_model_name(EMBED_MODEL), input=texts)
         for item, emb in zip(items, resp.data):
             results.append({**item, "embedding": emb.embedding})
         print(f"    embedded {len(results)}/{len(chunks)}", flush=True)
@@ -494,7 +520,7 @@ def store_chunks(chunks: list[dict], book_name: str, subject: str):
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
-def ingest(book_arg: str):
+def ingest(book_arg: str, replace: bool = False):
     # book_arg can be "hindi/KIRAN.pdf" or just "KIRAN.pdf"
     book_path = BOOKS_DIR / book_arg
     if not book_path.exists():
@@ -510,11 +536,24 @@ def ingest(book_arg: str):
     print(f"Path   : {book_path}")
     print(f"{'='*60}")
 
-    if _already_ingested(book_name):
-        print(f"  Already in DB — skipping.")
-        return
-
     checkpoint = CHECKPOINT / f"{book_name}.chunks.json"
+
+    if replace:
+        # Re-ingest (e.g. after a Sarvam re-OCR): the old DB rows AND the old
+        # checkpoint both hold the damaged extraction — the checkpoint would
+        # silently resurrect it, so it must go too.
+        if checkpoint.exists():
+            checkpoint.unlink()
+            print("  --replace: stale checkpoint deleted (held the old extraction).")
+        conn = _db()
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM book_chunks WHERE book_name = %s", (book_name,))
+            print(f"  --replace: {cur.rowcount} old rows deleted from book_chunks.")
+        conn.commit()
+        conn.close()
+    elif _already_ingested(book_name):
+        print(f"  Already in DB — skipping (use --replace to re-ingest).")
+        return
 
     chunks = None
     if checkpoint.exists():
@@ -557,5 +596,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--book", required=True, help="Path relative to book-sources/, e.g. hindi/KIRAN.pdf")
+    parser.add_argument("--replace", action="store_true",
+                        help="Delete the book's DB rows + stale checkpoint and re-ingest "
+                             "(use after a Sarvam re-OCR)")
     args = parser.parse_args()
-    ingest(args.book)
+    ingest(args.book, replace=args.replace)

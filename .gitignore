@@ -44,3 +44,4 @@ clients/*/resources/
 # RAG ingest checkpoints — full copyrighted book text (client IP, repo is PUBLIC).
 # Kept locally only; regenerable by re-running segmentation.
 clients/target-academy/rag/.checkpoints/
+clients/target-academy/rag/.reocr/
