@@ -95,8 +95,9 @@ def _is_junk_content(t: str) -> str | None:
 
 # Digit-corrupted books (Tesseract read printed '1' as '4'; ~600 chunks carry
 # wrong years). Kept OUT of generation retrieval until their Sarvam re-OCR.
+# BAHI302 graduated 2026-07-12: re-OCR'd via Sarvam (as "BAHI302.pdf"), 2/1338
+# flagged chunks vs 239/1015 before.
 DAMAGED_BOOKS = {
-    "BAHI302",
     "uttarakhand_ka_rajnaitik_itihas_ajay_rawat",
     "उत्तराखंड का इतिहास",
 }
