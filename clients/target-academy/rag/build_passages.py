@@ -73,6 +73,13 @@ _MCQ_OPT = re.compile(r"(?:^|\s)[A-D]\s*[.)]\s*\S")
 # while containing zero facts (caught polluting the गोरखा retrieval test).
 _TOC_RANGE = re.compile(r"\d{1,3}\s*[-–]\s*\d{1,3}")
 _TOC_WORDS = re.compile(r"content\s+page|तिर्षय\s*सूची|विषय\s*सूची|अनुक्रम", re.IGNORECASE)
+# Corrupted-year chunks: Tesseract reads a printed '1' as '4' or '7', producing
+# impossible CE dates ("7370 ई०" = 1370, "(4625-4638)" = 1625-1638). A passage
+# that TEACHES a wrong year is worse than a missing passage — the grounding
+# gate would DEFEND the wrong year, since the source states it. BCE dates
+# ("4000 ई० पू०") are real ancient-history facts and are exempt.
+_BAD_YEAR = re.compile(r"\b[4-9][0-9]{3}\s*(?:में|तक|से|ई(?![.०]?\s*पू))")
+_BAD_YEAR_RANGE = re.compile(r"\(\s*[0-9]{3,4}\s*[-–]\s*[4-9][0-9]{3}\s*\)")
 
 
 def _is_junk_content(t: str) -> str | None:
@@ -82,6 +89,8 @@ def _is_junk_content(t: str) -> str | None:
         return "mcq_dump"
     if _TOC_WORDS.search(t) or len(_TOC_RANGE.findall(t)) >= 4:
         return "toc"
+    if _BAD_YEAR.search(t) or _BAD_YEAR_RANGE.search(t):
+        return "bad_year"
     return None
 
 # Digit-corrupted books (Tesseract read printed '1' as '4'; ~600 chunks carry
@@ -140,7 +149,7 @@ def merge_book(rows: list[tuple]) -> tuple[list[dict], dict]:
 
     passages: list[dict] = []
     stats = {"junk_short": 0, "junk_repeat": 0, "junk_promo": 0,
-             "junk_mcq": 0, "junk_toc": 0, "kept_chunks": 0}
+             "junk_mcq": 0, "junk_toc": 0, "junk_bad_year": 0, "kept_chunks": 0}
 
     cur_texts: list[str] = []
     cur_topics: list[str] = []
@@ -181,6 +190,9 @@ def merge_book(rows: list[tuple]) -> tuple[list[dict], dict]:
             continue
         if junk == "toc":
             stats["junk_toc"] += 1
+            continue
+        if junk == "bad_year":
+            stats["junk_bad_year"] += 1
             continue
         stats["kept_chunks"] += 1
         # a single huge chunk that would blow the cap flushes what came before
@@ -276,7 +288,7 @@ def build(only_book: str | None, wipe: bool, include_damaged: bool):
         print("book_passages wiped." if not only_book else f"rows wiped for {only_book}.")
 
     grand = {"passages": 0, "junk_short": 0, "junk_repeat": 0,
-             "junk_promo": 0, "junk_mcq": 0, "junk_toc": 0, "kept_chunks": 0}
+             "junk_promo": 0, "junk_mcq": 0, "junk_toc": 0, "junk_bad_year": 0, "kept_chunks": 0}
     for book, subject in books:
         conn = _db()
         with conn.cursor() as cur:
@@ -294,7 +306,7 @@ def build(only_book: str | None, wipe: bool, include_damaged: bool):
               f"(avg {sum(lens)//len(lens)} chars) | junk dropped: "
               f"{stats['junk_short']} short + {stats['junk_repeat']} repeated-header "
               f"+ {stats['junk_promo']} promo + {stats['junk_mcq']} mcq-dump "
-              f"+ {stats['junk_toc']} toc")
+              f"+ {stats['junk_toc']} toc + {stats['junk_bad_year']} bad-year")
 
         embs = embed_texts([p["text"] for p in passages])
         for p, e in zip(passages, embs):
@@ -303,15 +315,15 @@ def build(only_book: str | None, wipe: bool, include_damaged: bool):
 
         grand["passages"] += len(passages)
         for k in ("junk_short", "junk_repeat", "junk_promo", "junk_mcq",
-                  "junk_toc", "kept_chunks"):
+                  "junk_toc", "junk_bad_year", "kept_chunks"):
             grand[k] += stats[k]
 
     dropped = (grand['junk_short'] + grand['junk_repeat'] + grand['junk_promo']
-               + grand['junk_mcq'] + grand['junk_toc'])
+               + grand['junk_mcq'] + grand['junk_toc'] + grand['junk_bad_year'])
     print(f"\nDONE: {grand['passages']} passages from {grand['kept_chunks']} chunks "
           f"({dropped} junk chunks dropped: {grand['junk_short']} short, "
           f"{grand['junk_repeat']} header, {grand['junk_promo']} promo, "
-          f"{grand['junk_mcq']} mcq-dump, {grand['junk_toc']} toc).")
+          f"{grand['junk_mcq']} mcq-dump, {grand['junk_toc']} toc, {grand['junk_bad_year']} bad-year).")
 
 
 if __name__ == "__main__":

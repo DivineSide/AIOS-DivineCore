@@ -49,8 +49,12 @@ _load_env()
 # Detector SQL fragments, per text column. Regexes are POSIX (Postgres ~).
 _DETECTORS = {
     # a 4-9xxx "year" in a year context, or a (dddd-dddd) range starting 4-9:
-    # impossible as dates; peak elevations etc. don't appear in these contexts.
-    "year_digit": (r"{col} ~ '\m[4-9][0-9]{{3}}\M\s*(में|ई|तक|से)'"
+    # impossible as CE dates; peak elevations etc. don't appear in these
+    # contexts. "ई० पू०"/"ई.पू." (BCE) is EXCLUDED — 4000 ई.पू. is a real
+    # ancient-history date, not corruption.
+    "year_digit": (r"({col} ~ '\m[4-9][0-9]{{3}}\M\s*(में|तक|से)'"
+                   r" OR ({col} ~ '\m[4-9][0-9]{{3}}\M\s*ई'"
+                   r"     AND {col} !~ '\m[4-9][0-9]{{3}}\M\s*ई[.०]?\s*पू'))"
                    r" OR {col} ~ '\(\s*[0-9]{{3,4}}\s*[-–]\s*[4-9][0-9]{{3}}\s*\)'"),
     # signature Tesseract conjunct-collapse tokens observed in this corpus
     "matra_garble": (r"{col} ~ '(इततहास|पंिार|िंश|ऐततहालसक|राजिंश|स्ितंत्र|प्रलसद्ध)'"),
