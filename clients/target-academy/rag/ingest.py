@@ -252,8 +252,13 @@ def extract_text(path: Path) -> str:
 # it is byte-for-byte exact — the model can't silently paraphrase or "fix"
 # Devanagari while copying (which the echo method risked, especially in Hindi).
 
-# Devanagari danda ।, double danda ॥, ASCII . ! ? and newlines end a sentence.
-_SENT_SPLIT = re.compile(r"(?<=[।॥.!?])\s+|\n+")
+# Devanagari danda ।, double danda ॥, ASCII . ! ? and PARAGRAPH breaks (2+
+# newlines) end a sentence. A single newline does NOT: OCR/PDF extraction emits
+# one per PRINTED LINE, and splitting there made every ~60-char print line a
+# "sentence" — the model's "1-6 sentence" chunks became one-fact fragments
+# (median 94-500 chars in book_chunks) and page headers became standalone
+# chunks. Root cause of the fragmentation that book_passages had to repair.
+_SENT_SPLIT = re.compile(r"(?<=[।॥.!?])\s+|\n{2,}")
 
 def _split_sentences(text: str) -> list[str]:
     parts = [s.strip() for s in _SENT_SPLIT.split(text)]
