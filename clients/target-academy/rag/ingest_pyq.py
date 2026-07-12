@@ -72,7 +72,7 @@ HINDI_RATIO_MIN  = 0.4    # >=40% Devanagari-of-letters => treat block as Hindi
 
 VALID_SUBJECTS = {
     "uk-history", "uk-geography", "uk-culture",
-    "uk-general-studies", "general-gk", "hindi",
+    "uk-general-studies", "general-gk", "hindi", "computer",
 }
 
 # ── env + clients ──────────────────────────────────────────────────────────────
@@ -334,7 +334,8 @@ uk-history        → Uttarakhand history, events, personalities, movements
 uk-geography      → Uttarakhand geography, rivers, peaks, districts, climate
 uk-culture        → Uttarakhand folk art, dance, music, festivals, traditions
 uk-general-studies → Uttarakhand polity, governance, schemes, current affairs, economy
-general-gk        → national GK, Indian polity/history, science, maths, reasoning, computer
+general-gk        → national GK, Indian polity/history, science, maths, reasoning
+computer          → computer awareness: hardware, software, MS Office, internet, memory, shortcuts
 hindi             → Hindi grammar, literature, vocabulary, sentence correction
 
 Question:

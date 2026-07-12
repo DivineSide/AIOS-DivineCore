@@ -87,6 +87,7 @@ SUBJECT_LABELS = {
     "uk-general-studies":  "उत्तराखंड सामान्य अध्ययन",
     "general-gk":          "सामान्य ज्ञान",
     "hindi":               "सामान्य हिंदी",
+    "computer":            "कंप्यूटर",
 }
 
 # Per-topic system prompt. Each call is scoped to ONE topic — the model only

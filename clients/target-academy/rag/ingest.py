@@ -114,7 +114,20 @@ def _db():
     url = os.environ.get("SUPABASE_DB_URL", "")
     if not url:
         raise RuntimeError("SUPABASE_DB_URL not set in .env")
-    return psycopg2.connect(url, connect_timeout=30)
+    # Flaky-network tolerance (observed at the client's office): a transient
+    # DNS/connect failure retries with backoff instead of losing a whole run
+    # right after the segmentation+embedding money was spent.
+    import time
+    last = None
+    for attempt in range(4):
+        try:
+            return psycopg2.connect(url, connect_timeout=30)
+        except psycopg2.OperationalError as e:
+            last = e
+            wait = 10 * (attempt + 1)
+            print(f"    DB connect failed ({e}); retrying in {wait}s...", flush=True)
+            time.sleep(wait)
+    raise last
 
 # ---------------------------------------------------------------------------
 # already ingested?
