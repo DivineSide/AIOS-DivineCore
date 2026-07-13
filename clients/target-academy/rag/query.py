@@ -77,6 +77,10 @@ def _embed(text: str) -> list[float]:
 
 def _search(embedding: list[float], top_k: int, threshold: float,
             subject: str | None = None) -> list[dict]:
+    # Searches book_passages (NOT book_chunks): since 2026-07-13 embeddings live
+    # only on the merged passage view — book_chunks is text-only canonical source
+    # (its 300MB of chunk-level vectors were dropped to fit the Supabase quota,
+    # and passages are the cleaner corpus anyway: junk-filtered, multi-fact).
     conn = _db()
     vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
     # optional subject filter — when set, only search that subject's books
@@ -86,9 +90,9 @@ def _search(embedding: list[float], top_k: int, threshold: float,
             book_name,
             subject,
             topic,
-            chunk_text,
+            passage_text,
             1 - (embedding <=> %s::vector) AS similarity
-        FROM book_chunks
+        FROM book_passages
         {where}
         ORDER BY embedding <=> %s::vector
         LIMIT %s
@@ -130,7 +134,7 @@ async def rag_lookup(
 
 def _pyq_search(embedding: list[float], subject: str, top_k: int,
                 threshold: float, format: str | None = None) -> list[dict]:
-    """Semantic search on pyq_chunks — same cosine similarity as book_chunks
+    """Semantic search on pyq_chunks — same cosine similarity as book_passages
     but hits the PYQ table. Returns questions whose meaning is close to the
     query embedding, preserving framing + distractor style. Optional `format`
     filter ("match", "assertion", ...) returns only that question format —
@@ -190,8 +194,9 @@ async def pyq_rag_lookup(
 def _passage_search(embedding: list[float], top_k: int, threshold: float,
                     subject: str | None = None) -> list[dict]:
     """Cosine search on book_passages — the merged, generation-grade view of the
-    corpus (multi-fact passages instead of one-line fragments). Same embedding
-    space as book_chunks; exact scan, no index (small table, perfect recall)."""
+    corpus (multi-fact passages instead of one-line fragments). Exact scan, no
+    index (small table, perfect recall). rag_lookup hits the same table now;
+    this variant differs only in defaults + fail-soft behaviour."""
     conn = _db()
     vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
     where = "WHERE subject = %s" if subject else ""

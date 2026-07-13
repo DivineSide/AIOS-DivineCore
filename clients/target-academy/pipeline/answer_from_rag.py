@@ -2,7 +2,7 @@
 """RAG-backed answer marking for extracted questions.
 
 Target Academy's rule (from the team): for each extracted MCQ, look the answer up
-in the institute's OWN database (book_chunks via rag_lookup). If we find it WITH
+in the institute's OWN database (book_passages via rag_lookup). If we find it WITH
 FULL CONFIDENCE, mark the correct option and write a short solution grounded in
 that source. If we can't find it confidently, leave the answer BLANK — never
 guess. No manual-review flag: a blank simply means "not confidently known".
@@ -31,8 +31,9 @@ sys.path.insert(0, str(RAG))
 from llm import complete, parse_json  # noqa: E402
 
 # Only attempt marking when the best retrieved passage is at least this similar.
-# book_chunks similarities run ~0.2-0.6; 0.42 keeps us to questions whose topic
-# the institute's books actually cover well. Tunable via env.
+# book_passages similarities run ~0.2-0.6 (same embedding model the chunks used);
+# 0.42 keeps us to questions whose topic the institute's books actually cover
+# well. Tunable via env if the passage-level distribution proves different.
 RAG_SIM_GATE = float(os.environ.get("ANSWER_RAG_SIM_GATE", "0.42"))
 # Enable/disable the whole feature without a code change.
 ANSWER_FROM_RAG = os.environ.get("ANSWER_FROM_RAG", "1") == "1"

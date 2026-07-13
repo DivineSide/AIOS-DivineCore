@@ -44,10 +44,8 @@ sys.path.insert(0, str(BASE / "pipeline"))
 from krutidev import krutidev_to_unicode
 CHECKPOINT.mkdir(exist_ok=True)
 
-EMBED_MODEL      = "openai/text-embedding-3-small"  # served via OpenRouter (OpenAI direct
-                                                     # key is quota-exhausted). Same 1536-dim
-                                                     # model — vectors stay compatible with
-                                                     # everything already in book_chunks.
+# (embedding removed 2026-07-13 — book_chunks is text-only; build_passages.py
+#  owns embedding on the merged passage view)
 SEGMENT_MODEL    = "openai/gpt-4o-mini"  # served via OpenRouter. This is the ORIGINAL
                                           # segmentation model (before the direct OpenAI
                                           # key ran out of quota) — the best-retrieving
@@ -64,8 +62,6 @@ WINDOW_OVERLAP   = 600   # each window re-includes the last 600 chars of the pre
                          # one, so a concept straddling an 8000-char boundary is seen
                          # whole by at least one window. Duplicate chunks the overlap
                          # produces are removed by _dedupe_chunks() before embedding.
-BATCH_CHARS      = 80_000
-BATCH_CHUNKS     = 64
 DB_BATCH         = 50
 SEGMENT_WORKERS  = 4   # was 8 — the concurrency itself was causing the timeouts
 
@@ -460,44 +456,56 @@ def segment_text(text: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 # embed
 # ---------------------------------------------------------------------------
-def embed_chunks(chunks: list[dict]) -> list[dict]:
-    print(f"  Embedding {len(chunks)} chunks...")
-    results = []
-    batch_texts = []
-    batch_items = []
-    batch_chars = 0
+# text-embedding-3-small rejects inputs over 8,192 tokens. Devanagari tokenizes
+# densely (~1-2 chars/token), so a punctuation-poor block (a TOC/index page
+# becomes ONE giant "sentence") can blow the cap and 400 the whole batch —
+# happened on Kiran SSC GK. Split any oversize chunk at sentence boundaries
+# into same-topic pieces before embedding.
+_EMBED_MAX_CHARS = 6000
 
-    def flush(texts, items):
-        if not texts:
-            return
-        resp = _oai().embeddings.create(model=_model_name(EMBED_MODEL), input=texts)
-        for item, emb in zip(items, resp.data):
-            results.append({**item, "embedding": emb.embedding})
-        print(f"    embedded {len(results)}/{len(chunks)}", flush=True)
 
-    for chunk in chunks:
-        t = chunk.get("text", "")
-        if not t.strip():
+def _split_oversize(chunks: list[dict]) -> list[dict]:
+    out = []
+    n_split = 0
+    for c in chunks:
+        t = c.get("text", "")
+        if len(t) <= _EMBED_MAX_CHARS:
+            out.append(c)
             continue
-        if batch_chars + len(t) > BATCH_CHARS or len(batch_items) >= BATCH_CHUNKS:
-            flush(batch_texts, batch_items)
-            batch_texts, batch_items, batch_chars = [], [], 0
-        batch_texts.append(t)
-        batch_items.append(chunk)
-        batch_chars += len(t)
+        n_split += 1
+        sentences = _split_sentences(t) or [t]
+        buf = ""
+        for s in sentences:
+            # a single "sentence" longer than the cap gets hard-cut
+            while len(s) > _EMBED_MAX_CHARS:
+                out.append({"topic": c.get("topic", ""), "text": s[:_EMBED_MAX_CHARS]})
+                s = s[_EMBED_MAX_CHARS:]
+            if len(buf) + len(s) + 1 > _EMBED_MAX_CHARS and buf:
+                out.append({"topic": c.get("topic", ""), "text": buf.strip()})
+                buf = ""
+            buf += " " + s
+        if buf.strip():
+            out.append({"topic": c.get("topic", ""), "text": buf.strip()})
+    if n_split:
+        print(f"  Split {n_split} oversize chunk(s) for the embedding cap "
+              f"({len(chunks)} -> {len(out)}).")
+    return out
 
-    flush(batch_texts, batch_items)
-    return results
 
 # ---------------------------------------------------------------------------
 # store
 # ---------------------------------------------------------------------------
+# NOTE (2026-07-13): chunks are stored TEXT-ONLY. Embeddings live exclusively on
+# book_passages (build_passages.py embeds the merged view) — chunk-level vectors
+# were 300MB of dead weight against the Supabase quota and nothing retrieves at
+# chunk granularity anymore. _split_oversize still runs so no single chunk can
+# later become an oversize passage that blows the embedding token cap.
 def store_chunks(chunks: list[dict], book_name: str, subject: str):
-    print(f"  Storing {len(chunks)} rows in Supabase...")
+    chunks = [c for c in _split_oversize(chunks) if c.get("text", "").strip()]
+    print(f"  Storing {len(chunks)} rows in Supabase (text only)...")
     rows = []
     for c in chunks:
-        vec = "[" + ",".join(str(x) for x in c["embedding"]) + "]"
-        rows.append((book_name, subject, c.get("topic", ""), c.get("text", ""), vec))
+        rows.append((book_name, subject, c.get("topic", ""), c.get("text", "")))
 
     # A single connection held open across thousands of inserts (potentially
     # minutes) can be dropped by Supabase's pooler mid-stream — observed
@@ -512,7 +520,7 @@ def store_chunks(chunks: list[dict], book_name: str, subject: str):
             try:
                 with conn.cursor() as cur:
                     cur.executemany(
-                        "INSERT INTO book_chunks (book_name, subject, topic, chunk_text, embedding) VALUES (%s,%s,%s,%s,%s::vector)",
+                        "INSERT INTO book_chunks (book_name, subject, topic, chunk_text) VALUES (%s,%s,%s,%s)",
                         batch,
                     )
                 conn.commit()
@@ -599,10 +607,10 @@ def ingest(book_arg: str, replace: bool = False):
             json.dump(chunks, f, ensure_ascii=False, indent=2)
         print(f"  Checkpoint saved.")
 
-    chunks_with_embeddings = embed_chunks(chunks)
-    store_chunks(chunks_with_embeddings, book_name, subject)
+    store_chunks(chunks, book_name, subject)
 
-    print(f"\n  DONE: {len(chunks_with_embeddings)} chunks ingested for '{book_name}'")
+    print(f"\n  DONE: {len(chunks)} chunks ingested for '{book_name}' "
+          f"(text only — run build_passages.py to make them retrievable)")
 
 
 if __name__ == "__main__":
