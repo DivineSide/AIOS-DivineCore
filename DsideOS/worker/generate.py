@@ -170,11 +170,25 @@ def _draft_anthropic(system: str, messages: list[dict]) -> str:
 
 
 def _draft_sarvam(system: str, messages: list[dict]) -> str:
+    # sarvam-105b is a REASONING model: without reasoning_effort it thinks at
+    # essay length into a hidden reasoning_content field, hits max_tokens, and
+    # returns EMPTY content (finish_reason=length) on every complex prompt.
+    # reasoning_effort=low bounds the think so the answer actually arrives.
+    # max_tokens: starter tier hard-caps at 4096; 3000 leaves room for
+    # ~1300 reasoning tokens + the JSON.
     resp = _sarvam_client().chat.completions.create(
-        model=SARVAM_MODEL, max_tokens=1500,
+        model=SARVAM_MODEL, max_tokens=3000,
+        extra_body={"reasoning_effort":
+                    os.environ.get("SARVAM_REASONING", "low")},
         messages=[{"role": "system", "content": system}] + messages,
     )
-    return (resp.choices[0].message.content or "").strip()
+    choice = resp.choices[0]
+    out = (choice.message.content or "").strip()
+    if not out:
+        logger.warning("SARVAM empty content (finish=%s, completion_toks=%s)",
+                       choice.finish_reason,
+                       getattr(resp.usage, "completion_tokens", "?"))
+    return out
 
 
 def _draft(system: str, messages: list[dict]) -> str:
@@ -315,6 +329,10 @@ async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
         draft = _parse_json_object(raw)
         if draft is None:
             reason = "reply was not a single valid JSON object"
+            # log the actual shape so provider quirks (reasoning preambles,
+            # fences, truncation) are diagnosable from the worker log alone
+            logger.warning("SLOT unparseable reply len=%d head=%r tail=%r",
+                           len(raw), raw[:300], raw[-120:] if len(raw) > 300 else "")
         else:
             try:
                 q = formats.build(fmt, draft, seed=_seed(subject, topic, slot_id, attempt))

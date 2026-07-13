@@ -37,6 +37,10 @@ services:
       - .env
     volumes:
       - jobs:/data/jobs
+      # Client branded assets — gitignored IP, so not in the image. Prod mounts
+      # them the same way (docker-compose.prod.yml); dev reads the repo copies.
+      - ../clients/target-academy/resources:/app/clients/target-academy/resources:ro
+      - ../clients/target-academy/templates:/app/clients/target-academy/templates:ro
     depends_on:
       - redis
 
