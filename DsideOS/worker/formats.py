@@ -54,7 +54,11 @@ PLAIN_PROMPT = """{{
   "options": ["<a>", "<b>", "<c>", "<d>"],
   "answer_index": <0-3, index of the CORRECT option in your list>,
   "reason": "<=160 chars: why the correct option is right>"
-}}"""
+}}
+DISTRACTORS (client rule): all 4 options must be the same KIND of thing and
+genuinely confusable — a wrong year NEAR the right one, a sibling ruler, a
+neighbouring place. Never one odd-shaped option (one date among three names)
+that students can eliminate without knowledge."""
 
 
 def build_plain(draft: dict, rng: random.Random) -> dict:
@@ -84,7 +88,12 @@ MATCH_PROMPT = """{{
   "pairs": [["<सूची-I item>", "<its CORRECT सूची-II match>"], ...exactly 4],
   "reason": "<=160 chars: source basis of the pairing>"
 }}
-The pairs you give ARE the correct answer — do not scramble them."""
+The pairs you give ARE the correct answer — do not scramble them.
+HOMOGENEITY (client rule): all 4 सूची-I items must be the same KIND of thing,
+and all 4 सूची-II items must be the same KIND of thing (all years, or all
+places, or all works, or all persons...). A mixed list (one date among three
+names) lets students eliminate by category without knowing the subject —
+rejected."""
 
 _MATCH_LEFT_LABELS = ["a", "b", "c", "d"]
 _LEAD_IN = "निम्नलिखित विकल्पों में से सही उत्तर चुनिए :"

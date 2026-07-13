@@ -78,6 +78,13 @@ PYQ_THRESHOLD = 0.10
 
 MAX_SLOT_ATTEMPTS = 3    # 1 draft + up to 2 informed retries per slot
 MAX_TOPUP = 8            # extra slots tried when drops leave the paper short
+# Slots are independent network-bound work; only the PaperGuard is
+# cross-question. Waves of K slots run fully parallel, then commit through the
+# guard sequentially at the wave boundary — a collision (two slots landing the
+# same answer entity) fails the later one, which re-runs next wave WITH the
+# collision reason (informed, not blind). K=6 ≈ 6x wall-clock with zero gate
+# skipped; above ~8 you brush API rate limits for marginal gain.
+GEN_CONCURRENCY = max(1, int(os.environ.get("GEN_CONCURRENCY", "6")))
 
 VALID_ANSWERS = {"a", "b", "c", "d"}
 
@@ -274,8 +281,10 @@ def _seed(*parts) -> int:
 
 
 async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
-                    guard: PaperGuard) -> tuple[dict | None, str]:
-    """Generate one question. Returns (question, "") or (None, last_reason)."""
+                    guard: PaperGuard, initial_reason: str = "") -> tuple[dict | None, str]:
+    """Generate one question. Returns (question, "") or (None, last_reason).
+    `initial_reason` injects feedback from a wave-boundary collision so the
+    re-run is informed, not a blind re-roll."""
     passages, ptxt, etxt = await _slot_context(subject, topic, fmt)
     if not passages:
         return None, f"no study material for topic '{topic}'"
@@ -286,8 +295,11 @@ async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
         contract=formats.FORMATS[fmt]["prompt"],
         examples=etxt, passages=ptxt,
     )
-    messages = [{"role": "user",
-                 "content": f"Write the question now. Format: {fmt}. JSON only."}]
+    first_user = f"Write the question now. Format: {fmt}. JSON only."
+    if initial_reason:
+        first_user += (f"\nNOTE: a previous attempt was rejected — {initial_reason}. "
+                       f"Avoid that problem.")
+    messages = [{"role": "user", "content": first_user}]
     reason = ""
     for attempt in range(MAX_SLOT_ATTEMPTS):
         try:
@@ -336,30 +348,51 @@ async def generate_questions(subject: str, count: int) -> tuple[list[dict], dict
     out: list[dict] = []
     drops: list[dict] = []
 
-    # concurrency: slots are independent network-bound work, but PaperGuard is
-    # shared and retries depend on its state — run a small window sequentially
-    # per topic instead. Simple + deterministic; a 12-q paper takes ~2 min.
-    for i, fmt in enumerate(slots):
-        topic = topics[i % len(topics)]
-        q, reason = await _gen_slot(subject, topic, fmt, i, guard)
-        if q is not None:
-            guard.commit(q)
-            out.append(q)
-        else:
-            drops.append({"topic": topic, "format": fmt, "reason": reason})
+    # WAVE CONCURRENCY: run GEN_CONCURRENCY slots in parallel, then commit their
+    # results through the shared PaperGuard sequentially. Every gate still runs;
+    # a wave-boundary collision (two parallel slots landing the same answer
+    # entity — rare, since each slot has its own topic) re-queues the later slot
+    # ONCE with the collision reason injected (informed re-run), then drops.
+    pending: list[tuple[int, str, str, str]] = [
+        (i, topics[i % len(topics)], fmt, "") for i, fmt in enumerate(slots)
+    ]
+    while pending:
+        wave, pending = pending[:GEN_CONCURRENCY], pending[GEN_CONCURRENCY:]
+        results = await asyncio.gather(*[
+            _gen_slot(subject, topic, fmt, sid, guard, initial_reason=reason)
+            for sid, topic, fmt, reason in wave
+        ])
+        for (sid, topic, fmt, was_requeued), (q, reason) in zip(wave, results):
+            if q is None:
+                drops.append({"topic": topic, "format": fmt, "reason": reason})
+                continue
+            collision = guard.check(q)
+            if collision is None:
+                guard.commit(q)
+                out.append(q)
+            elif not was_requeued:
+                logger.info("WAVE collision slot=%d: %s — informed re-run", sid, collision)
+                pending.append((sid, topic, fmt, collision))
+            else:
+                drops.append({"topic": topic, "format": fmt,
+                              "reason": f"wave collision persisted: {collision}"})
 
-    # top-up: recover the count with plain questions on fresh topics
+    # top-up: recover the count with plain questions on fresh topics (same waves)
     topup = 0
     while len(out) < count and topup < MAX_TOPUP:
-        topic = topics[(len(slots) + topup) % len(topics)]
-        q, reason = await _gen_slot(subject, topic, "plain",
-                                    1000 + topup, guard)
-        if q is not None:
-            guard.commit(q)
-            out.append(q)
-        else:
-            drops.append({"topic": topic, "format": "plain(topup)", "reason": reason})
-        topup += 1
+        need = min(count - len(out), GEN_CONCURRENCY, MAX_TOPUP - topup)
+        batch = [(1000 + topup + j, topics[(len(slots) + topup + j) % len(topics)])
+                 for j in range(need)]
+        results = await asyncio.gather(*[
+            _gen_slot(subject, topic, "plain", sid, guard) for sid, topic in batch
+        ])
+        for (sid, topic), (q, reason) in zip(batch, results):
+            if q is not None and guard.check(q) is None and len(out) < count:
+                guard.commit(q)
+                out.append(q)
+            elif q is None:
+                drops.append({"topic": topic, "format": "plain(topup)", "reason": reason})
+        topup += need
 
     for i, q in enumerate(out, 1):
         q["n"] = i

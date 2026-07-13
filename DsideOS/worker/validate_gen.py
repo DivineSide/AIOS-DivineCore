@@ -23,6 +23,31 @@ _LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 _YEAR = re.compile(r"\b([1-9][0-9]{3})\b(?!\s*ई[.०]?\s*पू)")
 _YEAR_MIN, _YEAR_MAX = 600, 2026
 
+# Shape classes for the eliminability check (client rule: options must be
+# confusing, never eliminable by KIND). Code can't judge semantic confusability
+# — the prompt owns that — but a 3-1 SHAPE split (one bare year among three
+# names) is the objectively eliminable case, and shape is mechanical.
+_SHAPE_YEAR = re.compile(r"^[0-9]{3,4}(\s*[-–]\s*[0-9]{2,4})?(\s*ई[.०]?(\s*पू[.०]?)?)?$")
+_SHAPE_NUM = re.compile(r"^[0-9][0-9,.\s/%]*$")
+
+
+def _shape_class(s: str) -> str:
+    t = str(s).strip()
+    if _SHAPE_YEAR.match(t):
+        return "year"
+    if _SHAPE_NUM.match(t):
+        return "number"
+    return "devanagari-text" if _dev_ratio(t) >= 0.5 else "latin-text"
+
+
+def _odd_shape_out(items: list[str]) -> str | None:
+    """The one item whose shape-class differs from the other three, or None."""
+    classes = [_shape_class(i) for i in items]
+    for cls in set(classes):
+        if classes.count(cls) == 1 and len(items) == 4:
+            return items[classes.index(cls)]
+    return None
+
 
 def _dev_ratio(text: str) -> float:
     letters = _LETTER.findall(text)
@@ -58,10 +83,24 @@ def validate_question(q: dict) -> str | None:
         return "answer must be one of a/b/c/d"
 
     fmt = q.get("format", "plain")
+    if fmt == "plain":
+        odd = _odd_shape_out(opts)
+        if odd is not None:
+            return (f"option '{odd}' is a different KIND from the other three — "
+                    f"students eliminate it without knowledge; make all 4 options "
+                    f"the same kind of thing")
     if fmt == "match":
         rows = q.get("match")
         if not isinstance(rows, list) or len(rows) != 4:
             return "match question needs exactly 4 सूची rows"
+        rights = [str(r[1]).split(". ", 1)[-1] for r in rows
+                  if isinstance(r, (list, tuple)) and len(r) == 2]
+        if len(rights) == 4:
+            odd = _odd_shape_out(rights)
+            if odd is not None:
+                return (f"सूची-II item '{odd}' is a different KIND from the other "
+                        f"three (mixed categories are eliminable) — all 4 must be "
+                        f"the same kind: all years, all places, all works, etc.")
     if fmt in ("statement", "assertion", "order"):
         stmts = q.get("statements")
         if not isinstance(stmts, list) or not stmts:
