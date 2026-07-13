@@ -48,8 +48,13 @@ import anthropic
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RAG = REPO_ROOT / "clients" / "target-academy" / "rag"
-if str(RAG) not in sys.path:
-    sys.path.insert(0, str(RAG))
+# Our own folder too: Celery imports this as worker.generate (package mode), so
+# `import blueprint` needs worker/ on sys.path explicitly — running generate.py
+# as a script from its own directory hides this, package mode does not.
+WORKER_DIR = Path(__file__).resolve().parent
+for _p in (str(WORKER_DIR), str(RAG)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 import query as rag  # noqa: E402
 
