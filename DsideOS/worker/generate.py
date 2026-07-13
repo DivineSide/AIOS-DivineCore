@@ -174,10 +174,10 @@ def _draft_sarvam(system: str, messages: list[dict]) -> str:
     # essay length into a hidden reasoning_content field, hits max_tokens, and
     # returns EMPTY content (finish_reason=length) on every complex prompt.
     # reasoning_effort=low bounds the think so the answer actually arrives.
-    # max_tokens: starter tier hard-caps at 4096; 3000 leaves room for
-    # ~1300 reasoning tokens + the JSON.
+    # max_tokens: starter tier hard-caps at 4096; run just under it — history
+    # prompts still produced len=0 (reasoning ate all 3000) at the lower cap.
     resp = _sarvam_client().chat.completions.create(
-        model=SARVAM_MODEL, max_tokens=3000,
+        model=SARVAM_MODEL, max_tokens=4000,
         extra_body={"reasoning_effort":
                     os.environ.get("SARVAM_REASONING", "low")},
         messages=[{"role": "system", "content": system}] + messages,
@@ -206,11 +206,18 @@ def _parse_json_object(text: str) -> dict | None:
     start, end = t.find("{"), t.rfind("}")
     if start == -1 or end <= start:
         return None
-    try:
-        data = json.loads(t[start:end + 1])
-        return data if isinstance(data, dict) else None
-    except json.JSONDecodeError:
-        return None
+    span = t[start:end + 1]
+    for candidate in (span,
+                      # models that echo template-escaped braces ({{...}}) —
+                      # observed with sarvam-105b copying the contract literally
+                      span.replace("{{", "{").replace("}}", "}")):
+        try:
+            data = json.loads(candidate)
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
+            continue
+    return None
 
 
 # ── Phase 1 — subject -> topics ──────────────────────────────────────────────

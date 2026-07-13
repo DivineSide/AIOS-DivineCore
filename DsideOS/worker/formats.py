@@ -49,12 +49,12 @@ def _clean_str(v, field: str) -> str:
 
 # ── plain ────────────────────────────────────────────────────────────────────
 
-PLAIN_PROMPT = """{{
+PLAIN_PROMPT = """{
   "stem": "<question text in Hindi>",
   "options": ["<a>", "<b>", "<c>", "<d>"],
   "answer_index": <0-3, index of the CORRECT option in your list>,
   "reason": "<=160 chars: why the correct option is right>"
-}}
+}
 DISTRACTORS (client rule): all 4 options must be the same KIND of thing and
 genuinely confusable — a wrong year NEAR the right one, a sibling ruler, a
 neighbouring place. Never one odd-shaped option (one date among three names)
@@ -83,11 +83,11 @@ def build_plain(draft: dict, rng: random.Random) -> dict:
 
 # ── match (सुमेलित) ──────────────────────────────────────────────────────────
 
-MATCH_PROMPT = """{{
+MATCH_PROMPT = """{
   "stem_subject": "<what is being matched, e.g. 'लेखक और उनकी रचनाएँ'>",
   "pairs": [["<सूची-I item>", "<its CORRECT सूची-II match>"], ...exactly 4],
   "reason": "<=160 chars: source basis of the pairing>"
-}}
+}
 The pairs you give ARE the correct answer — do not scramble them.
 HOMOGENEITY (client rule): all 4 सूची-I items must be the same KIND of thing,
 and all 4 सूची-II items must be the same KIND of thing (all years, or all
@@ -159,12 +159,12 @@ def build_match(draft: dict, rng: random.Random) -> dict:
 
 # ── statement (कथन-आधारित) ───────────────────────────────────────────────────
 
-STATEMENT_PROMPT = """{{
+STATEMENT_PROMPT = """{
   "context": "<topic line, e.g. 'उत्तराखंड की जलविद्युत परियोजनाओं के संदर्भ में'>",
   "statements": ["<कथन 1>", "<कथन 2>", ...2 to 3 statements],
   "correct_indexes": [<0-based indexes of the TRUE statements>],
   "reason": "<=160 chars: why the true ones are true / false one is false>"
-}}
+}
 At least one statement must be true and at least one false."""
 
 
@@ -220,12 +220,12 @@ def build_statement(draft: dict, rng: random.Random) -> dict:
 
 # ── assertion (अभिकथन-कारण) ──────────────────────────────────────────────────
 
-ASSERTION_PROMPT = """{{
+ASSERTION_PROMPT = """{
   "assertion": "<कथन (A): a TRUE or FALSE factual claim>",
   "reason": "<कारण (R): a TRUE or FALSE explanatory claim>",
   "relation": "<one of: both-true-explains | both-true-not-explains | a-true-r-false | a-false-r-true>",
   "why": "<=160 chars: source basis>"
-}}"""
+}"""
 
 _AR_OPTIONS = [
     "(A) और (R) दोनों सही हैं तथा (R), (A) की सही व्याख्या है",
@@ -263,11 +263,11 @@ def build_assertion(draft: dict, rng: random.Random) -> dict:
 
 # ── order (क्रम) ─────────────────────────────────────────────────────────────
 
-ORDER_PROMPT = """{{
+ORDER_PROMPT = """{
   "stem": "<what to order, e.g. 'निम्नलिखित को कालक्रमानुसार व्यवस्थित कीजिए'>",
   "items": ["<item 1>", ...exactly 4, ALREADY IN THE CORRECT ORDER],
   "reason": "<=160 chars: the dates/basis of the ordering>"
-}}"""
+}"""
 
 
 def build_order(draft: dict, rng: random.Random) -> dict:
