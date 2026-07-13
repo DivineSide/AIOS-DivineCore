@@ -26,28 +26,50 @@ Capture answers inline; they go straight into `blueprint.py` config + `brain/dec
 
 ## 2. Question formats (MCQ types)
 
-- [ ] **Format shares.** Measured from real papers: plain 87.5%, match 8.9%,
-      statement 1.9%, order 0.7%, assertion 0.5%. Keep realistic, or does he want
-      MORE complex formats than real papers (e.g. for practice intensity)? Get target
-      % per format, per exam if they differ.
-- [ ] **True/False type** — he mentioned it on the whiteboard list. It's NOT in our
-      current format set (plain/match/statement/assertion/order). What does a
-      true/false question look like in his papers (सत्य/असत्य कथन चुनिए)? If wanted:
-      an example from him, and its share.
-- [ ] **सुमेलित category preferences** — which pair-kinds does he rate highest
-      (author↔work, temple↔district, event↔year, scheme↔year…)? Any he avoids?
+**THE MENU — show him this table, he ticks + gives a % for each.** (Researched
+against UPSC/SSC/state-exam taxonomies so nothing is a blank "what are they?".
+Note: UPSC introduced type 4 in 2022 specifically to defeat option-elimination —
+the same philosophy as his "confusing, not obvious" rule.)
+
+| # | Format (Hindi = English) | What it looks like | In his PYQs | Our status |
+|---|---|---|---|---|
+| 1 | सीधा प्रश्न = **Single correct / direct** | One fact, 4 options: "X के सम्पादक कौन थे?" | 87.5% | ✅ ready |
+| 2 | सुमेलित / मिलान = **Match the Following** | सूची-I ↔ सूची-II + कूट (code) options | 8.9% | ✅ ready |
+| 3 | कथन-आधारित = **Multiple statements — which is/are correct** | "निम्न कथनों पर विचार कीजिए… कौन-सा/से सही है/हैं?" → "केवल 1 और 2" | 1.9% | ✅ ready |
+| 4 | उपर्युक्त में से कितने सही = **"How many of the above are correct?"** | Same statements, but options = "केवल एक/दो/तीन/सभी" — kills elimination (UPSC 2022+ trend) | rare | 🔶 30-min add (variant of #3) |
+| 5 | अभिकथन-कारण = **Assertion–Reason (A/R)** | कथन (A) + कारण (R) → 4 canonical options: both true & R explains A… | 0.5% | ✅ ready |
+| 6 | कथन-I/कथन-II = **Statement-I & Statement-II** | Newer UPSC A/R variant: two statements, does II explain I? | rare | 🔶 30-min add (variant of #5) |
+| 7 | सही क्रम / कालक्रम = **Chronological / sequence ordering** | "निम्न को कालक्रमानुसार व्यवस्थित कीजिए" → code options | 0.7% | ✅ ready |
+| 8 | सत्य/असत्य = **True / False** | "निम्न में से सत्य कथन चुनिए" (or a T/F pair grid) | ? (his whiteboard mention) | 🔶 needs his example first |
+| 9 | सही सुमेलित युग्म = **Which pairs are correctly matched** | 3-4 pairs listed inline → "कौन-सा/से युग्म सही सुमेलित है/हैं?" — match×statement hybrid, common in state exams | present in sources | 🔶 1-hr add |
+| 10 | निषेधात्मक = **Negative ("which is NOT…")** | "कौन-सा सही सुमेलित **नहीं** है?" / "…नहीं है?" | present | 🔶 trivial add (plain variant) |
+| 11 | विषम = **Odd one out** | "निम्न में से कौन भिन्न है?" | present | 🔶 trivial add |
+| 12 | रिक्त स्थान = **Fill in the blank** | Mostly in the Hindi-grammar section | present (hindi) | 🔶 trivial add |
+| 13 | अवधारणा-अनुप्रयोग = **Concept application / scenario** | A situation described → apply a concept (analytical, UPSC-style) | rare in UKSSSC | ⬜ later, if wanted |
+| — | आकृति-आधारित = **Figure/diagram-based** | Reasoning figures | ~0.4% | ❌ can't generate diagrams |
+
+- [ ] **Which formats does he want, at what % each?** (per exam if they differ).
+      Measured baseline from his real papers: #1 87.5%, #2 8.9%, #3 1.9%, #7 0.7%,
+      #5 0.5%. Keep realistic, or boost complex formats for practice intensity?
+- [ ] **True/False (#8)** — get ONE example from his papers of what it looks like,
+      then we build the contract same-day.
+- [ ] **सुमेलित (Match) category preferences** — which pair-kinds does he rate
+      highest (author↔work / लेखक↔रचना, temple↔district / मंदिर↔जिला,
+      event↔year / घटना↔वर्ष, scheme↔year / योजना↔वर्ष…)? Any he avoids?
 - [ ] **Difficulty mix** — easy/medium/hard shares? And HIS definition of hard
       (obscure fact? multi-step? close distractors?). Currently prompt-level only.
 
 ## 3. The quality bar — gold questions (the big ask)
 
-- [ ] **~15 gold-standard questions per complex format** (सुमेलित, कथन, अभिकथन-कारण,
-      क्रम + true/false if added) — picked from his own bank or written fresh.
-      These become the style examples the AI imitates; his taste becomes the target.
-      Format: plain list, each ending `Answer – (X)` — ingests as-is.
+- [ ] **~15 gold-standard questions per complex format** (Match the Following,
+      statement-based, Assertion–Reason, ordering + true/false if added) — picked
+      from his own bank or written fresh. These become the style examples the AI
+      imitates; his taste becomes the target. Format: plain list, each ending
+      `Answer – (X)` — ingests as-is.
 - [ ] **Distractor rules beyond "confusing, not eliminable"** (already enforced) —
-      any other rules he applies when writing options? (e.g. "no उपर्युक्त में से कोई
-      नहीं as correct answer"? how often as an option at all?)
+      any other rules he applies when writing options? (e.g. "उपर्युक्त में से कोई
+      नहीं" = "none of the above" — allowed as an option? allowed as the CORRECT
+      answer? how often?)
 - [ ] **Review the 12-question sample docx WITH him** — line by line. Capture every
       objection verbatim → each becomes a rule (mechanical if possible, prompt if not).
 
@@ -85,7 +107,7 @@ Capture answers inline; they go straight into `blueprint.py` config + `brain/dec
       /100-q paper at current rates.)
 - [ ] **Deliverable set for generated papers** — same trio as extraction (class PPT +
       teacher solution + branded paper + answer key)? Solutions: does he want the
-      विस्तृत व्याख्या style for every generated question?
+      विस्तृत व्याख्या (= detailed explanation) style for every generated question?
 
 ## 7. Housekeeping (2 min)
 
