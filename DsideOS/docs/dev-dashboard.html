@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DsideOS — Dev Dashboard (local testing only)</title>
+<style>
+  :root{--bg:#0f1420;--panel:#171e2e;--line:#2a3550;--txt:#dde4f2;--dim:#8fa0c2;
+        --acc:#e8b64c;--ok:#5dbb7a;--bad:#e06c6c;--mono:Consolas,monospace}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--txt);font:15px/1.55 "Segoe UI",system-ui,sans-serif;padding:28px}
+  h1{font-size:19px;letter-spacing:.4px} h1 span{color:var(--acc)}
+  .warn{color:var(--bad);font-size:12.5px;margin:4px 0 22px}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:14px}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:10px 0 4px}
+  select,input{width:100%;background:#0d1220;border:1px solid var(--line);color:var(--txt);
+        border-radius:6px;padding:8px 10px;font-size:14px}
+  button{margin-top:16px;width:100%;background:var(--acc);color:#141414;border:0;border-radius:7px;
+        padding:10px;font-size:14.5px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.45;cursor:default}
+  .muted{color:var(--dim);font-size:12.5px}
+  .stage{font-family:var(--mono);font-size:13px;padding:2px 8px;border-radius:5px;
+        background:#0d1220;border:1px solid var(--line);display:inline-block}
+  .DONE{color:var(--ok)} .FAILED{color:var(--bad)} .RUNNING,.QUEUED{color:var(--acc)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+  td,th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  a{color:var(--acc)} pre{font-family:var(--mono);font-size:12.5px;white-space:pre-wrap;
+        background:#0d1220;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px}
+  .pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:99px;
+        border:1px solid var(--line);color:var(--dim);margin:0 4px 4px 0}
+  .provenance{border-left:3px solid var(--acc);padding-left:12px;margin-top:14px}
+  .provenance h3{font-size:12.5px;color:var(--acc);letter-spacing:.5px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<h1>DsideOS <span>dev dashboard</span></h1>
+<p class="warn">LOCAL TESTING ONLY — talks to http://localhost:8000 (docker compose dev stack). Never deployed; clients never see this.</p>
+
+<div class="grid">
+  <div class="panel">
+    <h2>Generate (subject mode — live)</h2>
+    <label>Subject</label>
+    <select id="subject">
+      <option value="uk-history">uk-history — उत्तराखंड का इतिहास</option>
+      <option value="uk-geography">uk-geography — भूगोल</option>
+      <option value="uk-culture">uk-culture — संस्कृति</option>
+      <option value="uk-general-studies">uk-general-studies — सामान्य अध्ययन</option>
+      <option value="general-gk">general-gk — सामान्य ज्ञान</option>
+      <option value="hindi">hindi — सामान्य हिंदी</option>
+      <option value="computer">computer — कंप्यूटर (NEW)</option>
+    </select>
+    <label>Question count</label>
+    <input id="count" type="number" value="10" min="1" max="100">
+    <label>Paper name</label>
+    <input id="paper_name" value="Dev Test Paper">
+    <label>Font</label>
+    <select id="font"><option>unicode</option><option>krutidev</option></select>
+    <button id="go" onclick="startJob()">Generate</button>
+
+    <h2 style="margin-top:26px">Exam mode (Phase B — pending client quotas)</h2>
+    <label>Exam family</label>
+    <select disabled><option>vdo-vpdo</option><option>lekhpal-patwari</option><option>group-c</option></select>
+    <button disabled title="Enabled once the client locks per-exam quotas">Generate full paper</button>
+    <p class="muted" style="margin-top:8px">Spec note for the real console: this section
+    unlocks with POST /api/generate <code>exam</code> field (Phase B).</p>
+  </div>
+
+  <div class="panel">
+    <h2>Job</h2>
+    <div id="jobline" class="muted">No job yet.</div>
+    <div id="outputs"></div>
+    <div id="provenance"></div>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:8000";
+let timer = null;
+
+async function startJob(){
+  const btn = document.getElementById("go"); btn.disabled = true;
+  const fd = new FormData();
+  fd.append("subject", document.getElementById("subject").value);
+  fd.append("count", document.getElementById("count").value);
+  fd.append("paper_name", document.getElementById("paper_name").value);
+  fd.append("font", document.getElementById("font").value);
+  try{
+    const r = await fetch(API + "/api/generate", {method:"POST", body:fd});
+    if(!r.ok){ throw new Error(await r.text()); }
+    const {job_id} = await r.json();
+    poll(job_id);
+  }catch(e){
+    document.getElementById("jobline").innerHTML =
+      `<span class="stage FAILED">request failed</span> <span class="muted">${e.message}</span>`;
+    btn.disabled = false;
+  }
+}
+
+function poll(id){
+  clearInterval(timer);
+  timer = setInterval(async () => {
+    const r = await fetch(`${API}/api/jobs/${id}`);
+    const j = await r.json();
+    render(id, j);
+    if(j.status === "DONE" || j.status === "FAILED"){
+      clearInterval(timer);
+      document.getElementById("go").disabled = false;
+    }
+  }, 2500);
+}
+
+function render(id, j){
+  const extra = j.extra || {};
+  document.getElementById("jobline").innerHTML =
+    `<span class="stage ${j.status}">${j.status}</span>
+     <span class="muted">stage: ${j.stage || "—"} · questions: ${j.n_questions ?? "—"} · job ${id}</span>`;
+
+  document.getElementById("outputs").innerHTML = (j.outputs||[]).length
+    ? "<table><tr><th>output</th><th>size</th></tr>" + j.outputs.map(o =>
+        `<tr><td><a href="${API}/api/files/${id}/${encodeURIComponent(o.name)}">${o.name}</a></td>
+         <td class="muted">${(o.size/1024).toFixed(0)} KB</td></tr>`).join("") + "</table>"
+    : "";
+
+  // ── PROVENANCE PANEL — the spec for the real console ──────────────────────
+  // Renders gen_meta (generation) / low_confidence (extraction) from job meta.
+  // Clean deliverable for the client; full drop/retry provenance for the operator.
+  const gm = extra.gen_meta, lc = extra.low_confidence;
+  let html = "";
+  if(gm){
+    html += `<div class="provenance"><h3>GENERATION PROVENANCE (operator-only)</h3>`;
+    html += `<div>requested ${gm.requested} · generated ${gm.generated}</div>`;
+    html += `<div style="margin-top:4px">plan: ` +
+      Object.entries(gm.format_plan||{}).filter(([,v])=>v).map(([k,v])=>`<span class="pill">${k}:${v}</span>`).join("") +
+      ` · actual: ` +
+      Object.entries(gm.format_actual||{}).map(([k,v])=>`<span class="pill">${k}:${v}</span>`).join("") + `</div>`;
+    if((gm.drops||[]).length)
+      html += `<pre>${gm.drops.map(d=>`DROP [${d.format}] ${d.topic}\n  ↳ ${d.reason}`).join("\n")}</pre>`;
+    html += `</div>`;
+  }
+  if(lc && lc.length){
+    html += `<div class="provenance"><h3>EXTRACTION LOW-CONFIDENCE (operator-only)</h3>
+      <pre>${lc.map(x=>`Q${x.n}: ${x.reason}`).join("\n")}</pre></div>`;
+  }
+  document.getElementById("provenance").innerHTML = html;
+}
+</script>
+</body>
+</html>

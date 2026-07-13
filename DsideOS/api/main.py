@@ -58,6 +58,17 @@ def _dispatch(task, *args, task_id: str):
 
 app = FastAPI(title="DsideOS — Content Pipeline", version="0.1.0", lifespan=lifespan)
 
+# DEV ONLY: cross-origin access for the local test dashboard
+# (DsideOS/docs/dev-dashboard.html, opened as a file or from another port).
+# Gated behind an env flag that production compose never sets — in prod, Caddy
+# serves frontend and API same-origin and this middleware is never installed.
+import os as _os
+
+if _os.environ.get("DSIDEOS_DEV_CORS") == "1":
+    from fastapi.middleware.cors import CORSMiddleware
+    app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                       allow_methods=["*"], allow_headers=["*"])
+
 SUPPORTED_UPLOAD_EXTS = {".docx", ".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
 
