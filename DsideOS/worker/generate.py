@@ -116,8 +116,12 @@ RULES:
 - Language: Hindi (Devanagari). English proper nouns/technical terms stay English.
 - Every fact you use MUST be explicitly stated in the STUDY MATERIAL below.
   Do not use your own knowledge — an unverifiable fact gets your question rejected.
-- Distractors must be plausible: same category as the correct answer (a wrong
-  year near the right one, a sibling dynasty, a neighbouring district).
+- Distractors must be plausible: same category as the correct answer (a sibling
+  dynasty, a neighbouring district, a similar organisation, a wrong year near
+  the right one).
+- Prefer asking WHO/WHICH/WHAT (a person, place, organisation, book, scheme,
+  term) over WHEN/HOW MANY — in real papers ~90% of answers are text, not
+  years or numbers.
 - Mirror the framing and register of the REAL PAST QUESTIONS shown.
 
 ━━━ REAL PAST QUESTIONS (style reference) ━━━
@@ -374,7 +378,7 @@ async def generate_questions(subject: str, count: int) -> tuple[list[dict], dict
              for _ in range(fmt_counts.get(f, 0))]
     slots += ["plain"] * fmt_counts.get("plain", 0)
 
-    guard = PaperGuard()
+    guard = PaperGuard(total=count)
     out: list[dict] = []
     drops: list[dict] = []
 

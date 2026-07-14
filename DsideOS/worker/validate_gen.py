@@ -12,6 +12,8 @@ Two levels:
 """
 from __future__ import annotations
 
+import math
+import os
 import re
 
 _LETTERS = {"a", "b", "c", "d"}
@@ -115,34 +117,66 @@ def validate_question(q: dict) -> str | None:
     return None
 
 
-class PaperGuard:
-    """Cross-question guards for one paper. Mutable; one instance per run."""
+# Numeric-answer budget (answer-VARIETY gate, 2026-07-14). MEASURED from the
+# client's real answered PYQs (632 plain questions): text answers 88.3%,
+# number 6.2%, year 3.3%, latin 2.2%. Generation drifts hard toward year/number
+# answers (dates are the most quotable facts, so they pass grounding easiest —
+# survivorship bias): the first Sarvam paper came out ~90% numeric, the inverse
+# of the real exam. The cap gives 2x headroom over the measured ~10% share.
+_NUMERIC_SHARE_CAP = float(os.environ.get("GEN_NUMERIC_CAP", "0.2"))
+_NUMERIC_CLASSES = {"year", "number"}
 
-    def __init__(self):
+
+class PaperGuard:
+    """Cross-question guards for one paper. Mutable; one instance per run.
+
+    `total` (expected paper size) sizes the numeric-answer budget; without it
+    the budget is disabled (single-question/unknown-size callers)."""
+
+    def __init__(self, total: int | None = None):
         self._stems: set[str] = set()
         self._answer_texts: set[str] = set()
+        self._numeric_answers = 0
+        self._numeric_cap = (max(1, math.ceil(total * _NUMERIC_SHARE_CAP))
+                             if total else None)
+
+    @staticmethod
+    def _answer_text(q: dict) -> str | None:
+        """Correct-option text for plain questions, else None (कूट/statement
+        option texts are generic and would false-positive every guard)."""
+        if q.get("format", "plain") != "plain":
+            return None
+        opts = q.get("options") or []
+        idx = "abcd".find(str(q.get("answer", "")).lower())
+        return opts[idx] if 0 <= idx < len(opts) else None
 
     def check(self, q: dict) -> str | None:
         stem_key = _norm(q.get("stem", ""))
         if stem_key in self._stems:
             return "duplicate question: this stem already exists in the paper"
-        opts = q.get("options") or []
-        ans = str(q.get("answer", "")).lower()
-        idx = "abcd".find(ans)
+        atext = self._answer_text(q)
+        if atext is None:
+            return None
         # entity-repeat: the same correct-answer TEXT appearing twice means the
         # paper asks about the same entity twice (नित्यानंद स्वामी ×3 bug).
-        # Only meaningful for plain questions — कूट/statement option texts are
-        # generic ("1 2 3 4", "केवल 1 और 2") and would false-positive.
-        if q.get("format", "plain") == "plain" and 0 <= idx < len(opts):
-            akey = _norm(opts[idx])
-            if akey in self._answer_texts:
-                return (f"the correct answer '{opts[idx]}' is already the answer of "
-                        f"another question — ask about a DIFFERENT fact/entity")
+        if _norm(atext) in self._answer_texts:
+            return (f"the correct answer '{atext}' is already the answer of "
+                    f"another question — ask about a DIFFERENT fact/entity")
+        # numeric-answer budget: real papers are ~90% text-answered; a paper
+        # full of साल/संख्या answers reads machine-made and tests only dates.
+        if (self._numeric_cap is not None
+                and _shape_class(atext) in _NUMERIC_CLASSES
+                and self._numeric_answers >= self._numeric_cap):
+            return (f"this paper already has {self._numeric_answers} questions "
+                    f"whose answer is a year/number — real papers are ~90% "
+                    f"text-answered. Ask WHO/WHICH/WHAT about this topic: a "
+                    f"person, place, organisation, book, scheme or term")
         return None
 
     def commit(self, q: dict) -> None:
         self._stems.add(_norm(q.get("stem", "")))
-        opts = q.get("options") or []
-        idx = "abcd".find(str(q.get("answer", "")).lower())
-        if q.get("format", "plain") == "plain" and 0 <= idx < len(opts):
-            self._answer_texts.add(_norm(opts[idx]))
+        atext = self._answer_text(q)
+        if atext is not None:
+            self._answer_texts.add(_norm(atext))
+            if _shape_class(atext) in _NUMERIC_CLASSES:
+                self._numeric_answers += 1
