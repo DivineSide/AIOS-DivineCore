@@ -97,12 +97,11 @@ def _is_junk_content(t: str) -> str | None:
 # wrong years). Kept OUT of generation retrieval until their Sarvam re-OCR.
 # BAHI302 graduated 2026-07-12: re-OCR'd via Sarvam (as "BAHI302.pdf"), 2/1338
 # flagged chunks vs 239/1015 before.
-DAMAGED_BOOKS = {
-    # ajay_rawat graduated 2026-07-14 (full Sarvam re-OCR, all 434 pages).
-    # उत्तराखंड का इतिहास: re-OCR 230/317 pages checkpointed, stalled on
-    # Sarvam credits (~₹45 to finish) — excluded until its re-ingest lands.
-    "उत्तराखंड का इतिहास",
-}
+# EMPTY since 2026-07-14: every digit-corrupted book has been Sarvam re-OCR'd
+# and re-ingested (BAHI302 2026-07-12; ajay_rawat + उत्तराखंड का इतिहास
+# 2026-07-14). Add a book here (DB book_name) to exclude it from passages if
+# corpus_health ever flags fact-level damage again.
+DAMAGED_BOOKS: set[str] = set()
 
 
 def _load_env():
