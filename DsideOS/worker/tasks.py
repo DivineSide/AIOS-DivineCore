@@ -537,12 +537,16 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
     (RAG + LLM, see worker.generate) -> run the existing build pipeline -> same
     deliverables as /api/full. No upload involved."""
     import asyncio
-    from . import generate
 
     font = (meta.get("font") or "krutidev").lower()
     jobs.update_meta(job_id, status="RUNNING", stage="generate", font=font,
                      format=meta.get("format", "format-1"))
     try:
+        # import INSIDE the try: an import-time crash (missing module, syntax
+        # error in the generate stack) must mark the job FAILED like any other
+        # error — outside it, the job ghosts at RUNNING and the console polls
+        # a corpse forever (2026-07-13, three times).
+        from . import generate
         # phases 1-3: produce the questions list (async harness, run to completion).
         # gen_meta carries drop notes / format plan-vs-actual — DASHBOARD data,
         # never rendered on the paper (same contract as extraction's low_confidence).
