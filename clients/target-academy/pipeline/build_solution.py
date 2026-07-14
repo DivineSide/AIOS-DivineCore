@@ -143,6 +143,31 @@ def _label_up(i: int) -> str:
     return chr(ord("A") + i) if i < 26 else str(i + 1)
 
 
+def _lock_match_table(tbl, widths):
+    """Fixed column widths the layout engine cannot autofit away — mirrors
+    build_paper._lock_table_widths (fixed layout + tblGrid + per-cell tcW).
+    Without this, a long सूची-I item collapses सूची-II off-view."""
+    tbl.autofit = False
+    tbl.allow_autofit = False
+    tblPr = tbl._tbl.tblPr
+    tblPr.append(tblPr.makeelement(qn("w:tblLayout"), {qn("w:type"): "fixed"}))
+    grid = tbl._tbl.find(qn("w:tblGrid"))
+    if grid is not None:
+        for gc in list(grid):
+            grid.remove(gc)
+        for w in widths:
+            grid.append(grid.makeelement(qn("w:gridCol"),
+                                         {qn("w:w"): str(int(w.twips))}))
+    for row in tbl.rows:
+        for cell, w in zip(row.cells, widths):
+            cell.width = w
+            tcPr = cell._tc.get_or_add_tcPr()
+            for old in tcPr.findall(qn("w:tcW")):
+                tcPr.remove(old)
+            tcPr.append(tcPr.makeelement(
+                qn("w:tcW"), {qn("w:w"): str(int(w.twips)), qn("w:type"): "dxa"}))
+
+
 def add_question(doc, q, official: bool):
     # Tolerate a missing/odd answer (imported papers often have no printed key).
     # -1 means "no correct option to highlight" rather than a hard crash.
@@ -158,7 +183,8 @@ def add_question(doc, q, official: bool):
         add_mixed(tight(doc.add_paragraph(), 1), f"   {i}. {st}")
 
     # match pairs — real two-column सूची-I/सूची-II table (single-column doc,
-    # so wider cells than build_paper's). Inline pairs wrapped into soup.
+    # so wider cells than build_paper's). Widths locked at the XML level so
+    # the layout engine can't collapse सूची-II (see build_paper._lock helper).
     match_rows = q.get("match") or []
     if match_rows:
         tbl = doc.add_table(rows=1 + len(match_rows), cols=2)
@@ -166,11 +192,7 @@ def add_question(doc, q, official: bool):
             tbl.style = doc.styles["Normal Table"]
         except KeyError:
             pass
-        tbl.autofit = False
-        widths = (Cm(9.0), Cm(6.0))
-        for row in tbl.rows:
-            for cell, w in zip(row.cells, widths):
-                cell.width = w
+        _lock_match_table(tbl, (Cm(9.0), Cm(6.0)))
         for cell, title in zip(tbl.rows[0].cells, ("सूची-I", "सूची-II")):
             add_mixed(tight(cell.paragraphs[0], 1), title, bold=True)
         for r, (left_t, right_t) in enumerate(match_rows, start=1):

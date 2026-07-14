@@ -190,6 +190,41 @@ def set_columns(section, num, space_twips=567):
     cols.set(qn("w:space"), str(space_twips))
 
 
+def _lock_table_widths(tbl, widths):
+    """Force fixed column widths that Word/LibreOffice cannot autofit away.
+    python-docx's cell.width alone is advisory — inside a narrow page column
+    the layout engine renegotiates and can collapse a cell to zero. We set
+    tblLayout=fixed and stamp an explicit <w:tcW> (in twips) on every cell,
+    plus a <w:tblGrid> matching the widths, so the grid is authoritative."""
+    tbl.autofit = False
+    tbl.allow_autofit = False
+    total_twips = 0
+    for w in widths:
+        total_twips += int(w.twips)
+    tblPr = tbl._tbl.tblPr
+    # fixed layout
+    layout = tblPr.makeelement(qn("w:tblLayout"), {qn("w:type"): "fixed"})
+    tblPr.append(layout)
+    # authoritative grid
+    grid = tbl._tbl.find(qn("w:tblGrid"))
+    if grid is not None:
+        for gc in list(grid):
+            grid.remove(gc)
+        for w in widths:
+            col = grid.makeelement(qn("w:gridCol"), {qn("w:w"): str(int(w.twips))})
+            grid.append(col)
+    # per-cell width
+    for row in tbl.rows:
+        for cell, w in zip(row.cells, widths):
+            cell.width = w
+            tcPr = cell._tc.get_or_add_tcPr()
+            for old in tcPr.findall(qn("w:tcW")):
+                tcPr.remove(old)
+            tcW = tcPr.makeelement(qn("w:tcW"),
+                                   {qn("w:w"): str(int(w.twips)), qn("w:type"): "dxa"})
+            tcPr.append(tcW)
+
+
 def _opt_labels(q) -> list[str]:
     """One label per option, generated so we never index past the end. Questions
     can legitimately have 2-6+ options; a fixed list raised IndexError on more."""
@@ -216,19 +251,18 @@ def add_questions(doc, questions):
         match_rows = q.get("match") or []
         if match_rows:
             # सूची-I / सूची-II as a REAL two-column table. Inline "left - right"
-            # paragraphs wrap into soup inside the narrow page column the moment
-            # a सूची item is longer than a few words (client feedback 2026-07-14).
-            # Borderless, widths sized to the 2-col section (~8.7cm usable).
+            # paragraphs wrapped into soup (client feedback 2026-07-14). This
+            # table lives INSIDE the paper's narrow 2-column section (~8.5cm
+            # per page-column), so the two cells MUST sum to less than that or
+            # Word collapses the second cell off-view (सूची-II vanished on the
+            # first prod paper). Cells 4.7 + 3.4 = 8.1cm, locked at the XML
+            # level (fixed layout + explicit tcW) so autofit can't override.
             tbl = doc.add_table(rows=1 + len(match_rows), cols=2)
             try:
                 tbl.style = doc.styles["Normal Table"]  # borderless everywhere
             except KeyError:
                 pass
-            tbl.autofit = False
-            widths = (Cm(5.2), Cm(3.4))
-            for row in tbl.rows:
-                for cell, w in zip(row.cells, widths):
-                    cell.width = w
+            _lock_table_widths(tbl, (Cm(4.7), Cm(3.4)))
             for cell, title in zip(tbl.rows[0].cells, ("सूची-I", "सूची-II")):
                 hp = tight(cell.paragraphs[0])
                 add_mixed(hp, title, bold=True)
