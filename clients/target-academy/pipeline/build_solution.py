@@ -157,12 +157,25 @@ def add_question(doc, q, official: bool):
     for i, st in enumerate(q.get("statements") or [], start=1):
         add_mixed(tight(doc.add_paragraph(), 1), f"   {i}. {st}")
 
-    # match pairs
-    for left_t, right_t in q.get("match") or []:
-        mp = tight(doc.add_paragraph(), 1)
-        add_mixed(mp, f"   {left_t}")
-        add_latin(mp, "  —  ")
-        add_mixed(mp, right_t)
+    # match pairs — real two-column सूची-I/सूची-II table (single-column doc,
+    # so wider cells than build_paper's). Inline pairs wrapped into soup.
+    match_rows = q.get("match") or []
+    if match_rows:
+        tbl = doc.add_table(rows=1 + len(match_rows), cols=2)
+        try:
+            tbl.style = doc.styles["Normal Table"]
+        except KeyError:
+            pass
+        tbl.autofit = False
+        widths = (Cm(9.0), Cm(6.0))
+        for row in tbl.rows:
+            for cell, w in zip(row.cells, widths):
+                cell.width = w
+        for cell, title in zip(tbl.rows[0].cells, ("सूची-I", "सूची-II")):
+            add_mixed(tight(cell.paragraphs[0], 1), title, bold=True)
+        for r, (left_t, right_t) in enumerate(match_rows, start=1):
+            for cell, text in zip(tbl.rows[r].cells, (left_t, right_t)):
+                add_mixed(tight(cell.paragraphs[0], 1), str(text))
 
     if q.get("lead_in"):
         add_mixed(tight(doc.add_paragraph(), 2), f"   {q['lead_in']}")

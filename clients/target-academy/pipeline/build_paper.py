@@ -213,12 +213,31 @@ def add_questions(doc, questions):
             sp = tight(doc.add_paragraph())
             add_mixed(sp, f"{i}. {st}")
             q_paras.append(sp)
-        for left, right in q.get("match") or []:
-            mp = tight(doc.add_paragraph())
-            add_mixed(mp, left)
-            add_latin(mp, "\t-\t")
-            add_mixed(mp, right)
-            q_paras.append(mp)
+        match_rows = q.get("match") or []
+        if match_rows:
+            # सूची-I / सूची-II as a REAL two-column table. Inline "left - right"
+            # paragraphs wrap into soup inside the narrow page column the moment
+            # a सूची item is longer than a few words (client feedback 2026-07-14).
+            # Borderless, widths sized to the 2-col section (~8.7cm usable).
+            tbl = doc.add_table(rows=1 + len(match_rows), cols=2)
+            try:
+                tbl.style = doc.styles["Normal Table"]  # borderless everywhere
+            except KeyError:
+                pass
+            tbl.autofit = False
+            widths = (Cm(5.2), Cm(3.4))
+            for row in tbl.rows:
+                for cell, w in zip(row.cells, widths):
+                    cell.width = w
+            for cell, title in zip(tbl.rows[0].cells, ("सूची-I", "सूची-II")):
+                hp = tight(cell.paragraphs[0])
+                add_mixed(hp, title, bold=True)
+                q_paras.append(hp)
+            for r, (left, right) in enumerate(match_rows, start=1):
+                for cell, text in zip(tbl.rows[r].cells, (left, right)):
+                    cp = tight(cell.paragraphs[0])
+                    add_mixed(cp, str(text))
+                    q_paras.append(cp)
         if q.get("lead_in"):
             lp = tight(doc.add_paragraph())
             add_mixed(lp, q["lead_in"])
