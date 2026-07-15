@@ -23,7 +23,16 @@ import anthropic
 
 logger = logging.getLogger(__name__)
 
-GROUND_MODEL = os.environ.get("GROUND_MODEL", "claude-haiku-4-5-20251001")
+# The grounding JUDGE. Default stays Anthropic/Haiku (battle-tested), but the
+# provider is switchable so the gate can run on OpenAI (gpt-5.4-nano — ~4-5x
+# cheaper, validated on a 50-case test to match Haiku once the prompt is
+# tightened + few-shot). The judge must NOT be the drafting model (see .env:
+# "the judge must not be the model being judged") — with GEN_PROVIDER=sarvam,
+# an OpenAI or Anthropic judge both satisfy that.
+GROUND_PROVIDER = os.environ.get("GROUND_PROVIDER", "anthropic").lower()
+_DEFAULT_MODEL = ("gpt-5.4-nano" if GROUND_PROVIDER == "openai"
+                  else "claude-haiku-4-5-20251001")
+GROUND_MODEL = os.environ.get("GROUND_MODEL", _DEFAULT_MODEL)
 GROUND = os.environ.get("GEN_GROUNDING", "1") == "1"
 
 _SYSTEM = """# ROLE
@@ -114,6 +123,7 @@ Reminder: quote the exact supporting sentence FIRST; if you cannot quote it
 verbatim from the passages above, "supported" is false. JSON only."""
 
 _client: anthropic.Anthropic | None = None
+_oai_client = None
 
 
 def _anthropic() -> anthropic.Anthropic:
@@ -121,6 +131,30 @@ def _anthropic() -> anthropic.Anthropic:
     if _client is None:
         _client = anthropic.Anthropic(timeout=60, max_retries=3)
     return _client
+
+
+def _openai():
+    global _oai_client
+    if _oai_client is None:
+        from openai import OpenAI
+        _oai_client = OpenAI(timeout=60, max_retries=3)
+    return _oai_client
+
+
+def _run_judge(system: str, user: str) -> str:
+    """Call the configured grounding judge and return its raw text reply.
+    Provider-switched: Anthropic (system/messages) or OpenAI chat (system+user
+    as two messages). Both return the same quote-first JSON the parser expects."""
+    if GROUND_PROVIDER == "openai":
+        r = _openai().chat.completions.create(
+            model=GROUND_MODEL, max_completion_tokens=2000,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}])
+        return (r.choices[0].message.content or "").strip()
+    msg = _anthropic().messages.create(
+        model=GROUND_MODEL, max_tokens=300,
+        system=system, messages=[{"role": "user", "content": user}])
+    return msg.content[0].text.strip() if msg.content else ""
 
 
 def _question_text(q: dict) -> str:
@@ -153,15 +187,9 @@ def check(q: dict, passages: list[dict]) -> tuple[bool, str]:
     claim_line = f"CLAIMED FACT: {q['_claim']}\n" if q.get("_claim") else ""
 
     try:
-        msg = _anthropic().messages.create(
-            model=GROUND_MODEL,
-            max_tokens=300,
-            system=_SYSTEM,
-            messages=[{"role": "user", "content": _USER.format(
-                passages=ptxt, question=_question_text(q),
-                answer=ans, answer_text=answer_text, claim_line=claim_line)}],
-        )
-        raw = msg.content[0].text.strip() if msg.content else ""
+        raw = _run_judge(_SYSTEM, _USER.format(
+            passages=ptxt, question=_question_text(q),
+            answer=ans, answer_text=answer_text, claim_line=claim_line))
         raw = raw.strip("`").removeprefix("json").strip()
         data = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
     except Exception as e:
