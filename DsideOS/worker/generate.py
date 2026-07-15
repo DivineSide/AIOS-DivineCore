@@ -106,29 +106,50 @@ SUBJECT_LABELS = {
 # Per-slot system prompt. Lean by design: the format CONTRACT carries the
 # structural rules, the passages carry the facts, the examples carry the style
 # — prose only states what code cannot enforce.
-SLOT_SYSTEM = """You are an Indian competitive-exam question writer (UKSSSC-style).
-Write ONE question of the format: {format_label} — topic: "{topic}" (subject: {subject}).
+SLOT_SYSTEM = """# ROLE
+You are an Indian competitive-exam question writer (UKSSSC-style), writing in
+Hindi (Devanagari). English proper nouns and technical terms stay in English.
 
+# OBJECTIVE
+Write ONE question of the format: {format_label} — topic: "{topic}" (subject:
+{subject}) — whose correct answer is a fact EXPLICITLY STATED in the STUDY
+MATERIAL below. Every question you write is checked by a separate grounding
+model against that same material; a question whose answer is not literally in
+the material is rejected and wasted. So your only path to success is a question
+the material itself proves.
+
+# THE ONE RULE THAT MATTERS
+Build the question around a fact you can point to in the study material — a
+specific sentence stating a name, place, year, work, scheme, or pairing.
+- If the material clearly states such a fact: write the question on it.
+- If the material only mentions the topic in passing, or you'd have to rely on
+  your own knowledge to answer, DO NOT force a question. It is better to write
+  a simpler question on a fact the material DOES state than to invent one it
+  doesn't. Never supply a name/date/place from your own knowledge that is
+  absent from the material — that is the single most common way questions fail.
+
+# QUALITY RULES
+- Distractors must be plausible: same category as the correct answer (a sibling
+  dynasty, a neighbouring district, a similar organisation, a wrong year near
+  the right one) — but the CORRECT option must be the material-supported one.
+- Prefer WHO/WHICH/WHAT (a person, place, organisation, book, scheme, term)
+  over WHEN/HOW MANY — in real papers ~90% of answers are text, not numbers.
+- Mirror the framing and register of the REAL PAST QUESTIONS shown.
+
+# OUTPUT
 Return ONLY this JSON object (no prose, no fences):
 {contract}
 
-RULES:
-- Language: Hindi (Devanagari). English proper nouns/technical terms stay English.
-- Every fact you use MUST be explicitly stated in the STUDY MATERIAL below.
-  Do not use your own knowledge — an unverifiable fact gets your question rejected.
-- Distractors must be plausible: same category as the correct answer (a sibling
-  dynasty, a neighbouring district, a similar organisation, a wrong year near
-  the right one).
-- Prefer asking WHO/WHICH/WHAT (a person, place, organisation, book, scheme,
-  term) over WHEN/HOW MANY — in real papers ~90% of answers are text, not
-  years or numbers.
-- Mirror the framing and register of the REAL PAST QUESTIONS shown.
-
-━━━ REAL PAST QUESTIONS (style reference) ━━━
+━━━ REAL PAST QUESTIONS (style reference only — NOT a source of facts) ━━━
 {examples}
 
 ━━━ STUDY MATERIAL (your ONLY source of facts) ━━━
-{passages}"""
+{passages}
+
+━━━ FINAL CHECK before you answer ━━━
+Point to the sentence in the STUDY MATERIAL above that makes your correct
+option correct. If no sentence states it, choose a different fact from the
+material — do NOT fall back on your own knowledge."""
 
 _RETRY_USER = """Your previous attempt was rejected. Problem: {reason}
 
@@ -278,10 +299,20 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
 
 # ── the slot engine ──────────────────────────────────────────────────────────
 
-async def _slot_context(subject: str, topic: str, fmt: str) -> tuple[list, str, str]:
-    """Retrieve one slot's context. Returns (passages, passages_txt, examples_txt)."""
-    passages = await rag.passage_lookup(topic, subject=subject,
-                                        top_k=BOOK_TOP_K, threshold=PASSAGE_THRESHOLD)
+async def _slot_context(subject: str, topic: str, fmt: str,
+                        top_k: int = BOOK_TOP_K,
+                        query_extra: str = "") -> tuple[list, str, str]:
+    """Retrieve one slot's context. Returns (passages, passages_txt, examples_txt).
+
+    `top_k`/`query_extra` support agentic RE-RETRIEVAL: when a draft is rejected
+    by the grounding gate ("fact not in passages"), the caller re-invokes this
+    with a WIDER top_k and the rejected question's own terms appended to the
+    query — so the retry sees MORE and DIFFERENT passages instead of being handed
+    the same thin material that produced the ungrounded question. Retrying with
+    new evidence beats shipping a doubtful fact."""
+    search_topic = f"{topic} {query_extra}".strip() if query_extra else topic
+    passages = await rag.passage_lookup(search_topic, subject=subject,
+                                        top_k=top_k, threshold=PASSAGE_THRESHOLD)
     if not passages:
         # topic string too narrow — fall back to the subject's canonical label
         passages = await rag.passage_lookup(SUBJECT_LABELS.get(subject, subject),
@@ -310,6 +341,31 @@ def _seed(*parts) -> int:
     return zlib.crc32("|".join(str(p) for p in parts).encode("utf-8"))
 
 
+def _rejected_terms(draft: dict | None, topic: str) -> str:
+    """Pull the entity the rejected draft was ASKING about, to steer the wider
+    re-retrieval toward passages that actually contain it. We use the stem +
+    the claimed-correct option — that's the fact that failed grounding, so the
+    new search should hunt specifically for material stating it."""
+    if not isinstance(draft, dict):
+        return ""
+    parts = []
+    stem = draft.get("stem") or draft.get("question") or ""
+    if isinstance(stem, str):
+        parts.append(stem)
+    # the claimed answer text (draft shapes vary: "answer" letter + options, or
+    # an explicit answer string) — include whatever names the target fact
+    opts = draft.get("options")
+    ans = draft.get("answer")
+    if isinstance(opts, list) and isinstance(ans, str) and len(ans) == 1:
+        idx = "abcd".find(ans.lower())
+        if 0 <= idx < len(opts):
+            parts.append(str(opts[idx]))
+    elif isinstance(ans, str):
+        parts.append(ans)
+    text = " ".join(parts).strip()
+    return text[:200]   # keep the augmentation bounded
+
+
 async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
                     guard: PaperGuard, initial_reason: str = "") -> tuple[dict | None, str]:
     """Generate one question. Returns (question, "") or (None, last_reason).
@@ -331,6 +387,7 @@ async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
                        f"Avoid that problem.")
     messages = [{"role": "user", "content": first_user}]
     reason = ""
+    grounding_failed = False   # set when the last rejection was the grounding gate
     for attempt in range(MAX_SLOT_ATTEMPTS):
         try:
             raw = await asyncio.to_thread(_draft, system, messages)
@@ -338,6 +395,7 @@ async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
             logger.warning("SLOT %s/%s draft failed: %s", topic, fmt, e)
             return None, f"model call failed: {e}"
         draft = _parse_json_object(raw)
+        grounding_failed = False
         if draft is None:
             reason = "reply was not a single valid JSON object"
             # log the actual shape so provider quirks (reasoning preambles,
@@ -354,11 +412,44 @@ async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
                         logger.info("SLOT ok topic=%r fmt=%s attempt=%d", topic, fmt, attempt + 1)
                         return q, ""
                     reason = greason
+                    grounding_failed = True   # the fact wasn't in these passages
             except formats.FormatError as e:
                 reason = str(e)
         logger.info("SLOT retry topic=%r fmt=%s attempt=%d reason=%s",
                     topic, fmt, attempt + 1, reason)
-        # INFORMED retry: the failure reason goes back to the model verbatim.
+
+        # AGENTIC RE-RETRIEVAL: a grounding failure means the passages didn't
+        # contain the fact — re-drafting against the SAME passages just invites
+        # the same hallucination. Instead, fetch WIDER + DIFFERENT passages
+        # (bigger top_k, query augmented by the rejected question's own terms)
+        # and rebuild the prompt so the retry reasons over fresh evidence. This
+        # is the "retry rather than ship a doubtful fact" loop. Parse/format
+        # failures are the model's fault, not the material's — those keep the
+        # same passages and just get the reason fed back (rewrite, below).
+        if grounding_failed and attempt + 1 < MAX_SLOT_ATTEMPTS:
+            wider = BOOK_TOP_K + 3 * (attempt + 1)   # 7, then 10, ...
+            q_terms = _rejected_terms(draft, topic)
+            new_passages, new_ptxt, new_etxt = await _slot_context(
+                subject, topic, fmt, top_k=wider, query_extra=q_terms)
+            if new_passages:
+                passages, ptxt, etxt = new_passages, new_ptxt, new_etxt
+                system = SLOT_SYSTEM.format(
+                    format_label=formats.FORMATS[fmt]["label"], topic=topic,
+                    subject=SUBJECT_LABELS.get(subject, subject),
+                    contract=formats.FORMATS[fmt]["prompt"],
+                    examples=etxt, passages=ptxt,
+                )
+                logger.info("SLOT re-retrieved topic=%r wider_k=%d (grounding miss)",
+                            topic, wider)
+                # fresh evidence -> a clean draft prompt, not a rewrite of the
+                # rejected attempt (which was anchored to the old passages)
+                messages = [{"role": "user", "content":
+                             f"Write the question now. Format: {fmt}. JSON only. "
+                             f"Base it ONLY on a fact explicitly stated in the "
+                             f"study material above."}]
+                continue
+
+        # INFORMED retry (rewrite): the failure reason goes back to the model verbatim.
         messages = messages[:1] + [
             {"role": "assistant", "content": raw[:2000]},
             {"role": "user", "content": _RETRY_USER.format(reason=reason)},

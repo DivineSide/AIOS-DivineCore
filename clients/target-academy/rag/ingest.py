@@ -8,6 +8,18 @@ Usage:
 
 Books live in: clients/target-academy/corpus/book-sources/<subject>/<file>.pdf
 The --book argument is relative to that folder (can include subfolder).
+
+INGESTION RULE (locked 2026-07-15, Mayank): EVERY new book is Sarvam re-OCR'd
+FIRST — `reocr_book.py --book <path>` — then ingested from the clean
+`.reocr/<stem>.full.md` sidecar (extract_text() picks it up automatically).
+Sarvam reads the rendered page image, so it is immune to the whole class of
+failures the local text-layer/Tesseract paths hit: Kruti-Dev AND other legacy
+Hindi fonts (Chanakya/APS/Shusha) that render fine but extract as gibberish,
+Tesseract digit corruption (1→4/7), and matra-garble. It is the quality bar
+for the corpus — quality over quantity (3-4 great books/subject, not 1000s).
+The local text-layer / Tesseract / Kruti-Dev branches below are the LEGACY
+fallback for books already ingested before this rule; do not ingest a new
+book through them.
 """
 
 import io

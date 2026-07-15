@@ -232,6 +232,99 @@ def _passage_search(embedding: list[float], top_k: int, threshold: float,
     return results
 
 
+# ── hybrid retrieval (dense + lexical) ─────────────────────────────────────────
+# WHY: pure dense cosine misses exact-token facts (a specific year, a proper
+# noun, an act name) — it matches on MEANING and blurs precisely the tokens an
+# exam fact hinges on. It also loses recall when the retrieved passage simply
+# doesn't contain the answer (measured 2026-07-15: Sarvam hallucinated 15% of
+# questions, all on thin/off-target passages). Adding a Postgres full-text
+# (BM25-style) channel and fusing the two rankings recovers those cases.
+#
+# Postgres 'simple' config tokenises Devanagari correctly (verified), so no
+# language pack is needed. Fusion is Reciprocal Rank Fusion (RRF): rank-based,
+# parameter-free, and robust to the two scores being on different scales.
+# All of this runs IN the database — zero extra API cost.
+
+RRF_K = 60          # standard RRF constant; smooths rank contributions
+HYBRID = os.environ.get("RAG_HYBRID", "0") == "1"
+HYDE   = os.environ.get("RAG_HYDE", "0") == "1"
+HYDE_MODEL = os.environ.get("RAG_HYDE_MODEL", "gpt-5.4-nano")
+
+
+def _hybrid_search(embedding: list[float], query_text: str, top_k: int,
+                   threshold: float, subject: str | None = None) -> list[dict]:
+    """Dense cosine + lexical full-text, fused by RRF. Pulls a wide candidate
+    pool from each channel, ranks each, then combines rank positions. A passage
+    surfaced by EITHER channel can win — that's the point: dense catches
+    paraphrase, lexical catches exact tokens."""
+    conn = _db()
+    vec = "[" + ",".join(str(x) for x in embedding) + "]"
+    subj_where = "WHERE subject = %s" if subject else ""
+    pool = max(top_k * 5, 20)   # candidate pool per channel
+    # Dense channel: nearest by cosine.
+    dense_sql = f"""
+        SELECT id, book_name, subject, topic, passage_text,
+               1 - (embedding <=> %s::vector) AS sim
+        FROM book_passages {subj_where}
+        ORDER BY embedding <=> %s::vector LIMIT %s"""
+    # Lexical channel: full-text rank on the same query tokens.
+    lex_where = "to_tsvector('simple', passage_text) @@ plainto_tsquery('simple', %s)"
+    lex_sql = f"""
+        SELECT id, book_name, subject, topic, passage_text,
+               ts_rank(to_tsvector('simple', passage_text),
+                       plainto_tsquery('simple', %s)) AS rnk
+        FROM book_passages
+        WHERE {lex_where} {('AND subject = %s' if subject else '')}
+        ORDER BY rnk DESC LIMIT %s"""
+    with conn.cursor() as cur:
+        cur.execute(dense_sql, [vec, vec, pool] if not subject else [vec, subject, vec, pool])
+        dense = cur.fetchall()
+        lp = [query_text, query_text, pool] if not subject else [query_text, query_text, subject, pool]
+        cur.execute(lex_sql, lp)
+        lex = cur.fetchall()
+
+    # RRF fuse: score = sum over channels of 1/(RRF_K + rank)
+    scores: dict = {}
+    meta: dict = {}
+    for rank, row in enumerate(dense):
+        rid = row[0]
+        scores[rid] = scores.get(rid, 0.0) + 1.0 / (RRF_K + rank)
+        meta[rid] = row
+    for rank, row in enumerate(lex):
+        rid = row[0]
+        scores[rid] = scores.get(rid, 0.0) + 1.0 / (RRF_K + rank)
+        meta.setdefault(rid, row)
+    ordered = sorted(scores, key=lambda r: scores[r], reverse=True)
+
+    out = []
+    for rid in ordered[:top_k]:
+        _id, book, subj, topic, text, score = meta[rid]
+        out.append({"book": book, "subject": subj or "", "topic": topic or "",
+                    "text": text, "similarity": round(float(scores[rid]), 4)})
+    return out
+
+
+_HYDE_SYS = ("Write ONE short factual Hindi sentence that would plausibly be the "
+             "answer passage for the given exam topic. Invent nothing verifiable-"
+             "critical; just mirror the STYLE and vocabulary of a textbook sentence "
+             "on that topic. Output only the sentence.")
+
+
+def _hyde_expand(topic: str) -> str:
+    """HyDE: turn the topic into a hypothetical answer sentence, so we embed
+    something shaped like the target PASSAGE instead of like a query. Cheap
+    model; failure falls back to the raw topic."""
+    try:
+        r = _oai().chat.completions.create(
+            model=HYDE_MODEL, max_completion_tokens=120,
+            messages=[{"role": "system", "content": _HYDE_SYS},
+                      {"role": "user", "content": f"विषय: {topic}"}])
+        s = (r.choices[0].message.content or "").strip()
+        return f"{topic}\n{s}" if s else topic
+    except Exception:
+        return topic
+
+
 async def passage_lookup(
     topic: str,
     subject: str | None = None,
@@ -240,9 +333,17 @@ async def passage_lookup(
 ) -> list[dict]:
     """Generation-side retrieval: multi-fact passages from book_passages.
     Same result shape as rag_lookup, so it's a drop-in for generate.py.
+
+    Retrieval mode is env-flagged (default = original dense-only path, unchanged):
+      RAG_HYBRID=1  fuse dense + lexical (RRF)  — recovers exact-token / thin-passage misses
+      RAG_HYDE=1    embed a hypothetical answer sentence instead of the raw topic
     Returns [] on any error (fail soft — e.g. table not built yet)."""
     try:
-        embedding = await asyncio.to_thread(_embed, topic)
+        embed_text = await asyncio.to_thread(_hyde_expand, topic) if HYDE else topic
+        embedding = await asyncio.to_thread(_embed, embed_text)
+        if HYBRID:
+            return await asyncio.to_thread(_hybrid_search, embedding, topic,
+                                           top_k, threshold, subject)
         return await asyncio.to_thread(_passage_search, embedding, top_k,
                                        threshold, subject)
     except Exception:
