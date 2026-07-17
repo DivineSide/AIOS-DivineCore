@@ -351,8 +351,12 @@ async def passage_lookup(
 
 
 async def pyq_lookup(subject: str, top_k: int = 20) -> list[dict]:
-    """Random fetch fallback — kept for backwards compatibility but no longer
-    used by the generate pipeline (pyq_rag_lookup replaced it)."""
+    """Random sample of a subject's real PYQs — used by generate.py's
+    _extract_topics() as the seed set an LLM summarizes into distinct exam
+    topics. Not a stand-in for pyq_rag_lookup(), which does semantic search
+    for a single already-chosen topic's style examples; this one is for
+    discovering the topic taxonomy in the first place, so a random (not
+    semantic) sample is the correct input."""
     try:
         conn = _db()
         sql = """
