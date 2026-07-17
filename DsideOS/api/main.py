@@ -278,9 +278,15 @@ def _check_owner(meta: dict, x_institute_id: str) -> None:
     (not 403 — don't confirm the job exists to a non-owner). Jobs created before
     this change have no institute_id and stay readable (back-compat); once every
     create stamps it, absence only happens for legacy jobs.
+
+    FAIL CLOSED: an owned job with NO caller institute header is refused. Earlier
+    this skipped the check when the header was empty, so any token holder could
+    read any owned job simply by omitting the header. A blank owner (legacy job)
+    stays readable for back-compat.
     """
     owner = meta.get("institute_id")
-    if owner and x_institute_id and owner != x_institute_id:
+    if owner and owner != x_institute_id:
+        # Covers both a mismatched header AND a missing/blank header on an owned job.
         raise HTTPException(404, "Unknown job_id.")
 
 
@@ -309,10 +315,12 @@ def job_status(job_id: str, x_institute_id: str = Header(default="")):
 def download(job_id: str, name: str, x_institute_id: str = Header(default="")):
     if "/" in name or "\\" in name or ".." in name:
         raise HTTPException(400, "Invalid filename.")
-    # per-tenant scoping: only the owning institute may download a job's files
+    # per-tenant scoping: only the owning institute may download a job's files.
+    # No meta = we cannot verify ownership, so refuse rather than serve blind.
     meta = jobs.read_meta(job_id)
-    if meta:
-        _check_owner(meta, x_institute_id)
+    if not meta:
+        raise HTTPException(404, "Unknown job_id.")
+    _check_owner(meta, x_institute_id)
     path = jobs.output_dir(job_id) / name
     if not path.is_file():
         raise HTTPException(404, "File not found.")

@@ -149,7 +149,8 @@ def keep_question_together(paras):
 def make_watermark(logo_path: Path, out_path: Path, alpha=0.10):
     """Faint logo with TRUE alpha transparency (no background) — text stays
     readable regardless of how a renderer stacks the watermark vs text."""
-    logo = Image.open(logo_path).convert("RGBA")
+    with Image.open(logo_path) as src:  # context manager: no leaked file handle
+        logo = src.convert("RGBA")
     a = logo.split()[3].point(lambda v: int(v * alpha))
     logo.putalpha(a)
     logo.save(out_path, "PNG")
@@ -342,25 +343,30 @@ def build(questions_path: Path, out_path: Path, font: str = DEFAULT_FONT):
     # regenerate the watermark into a writable temp file (templates/ is :ro)
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _wm:
         watermark_img = Path(_wm.name)
-    make_watermark(LOGO_IMG, watermark_img)  # always regenerate (recipe may change)
-    add_watermark_header(doc.sections[-1], watermark_img)
-    first_q_para = add_questions(doc, data["questions"])
-    # questions must start on a fresh page after the front matter
-    ppr = first_q_para._p.get_or_add_pPr()
-    ppr.insert(0, ppr.makeelement(qn("w:pageBreakBefore"), {}))
-    add_answer_key(doc, data["questions"])
-    # Referral QR on the last page (opt-in via REFERRAL_QR=1). Every paper a
-    # student receives becomes a self-registration point for the referral
-    # program, with zero owner effort. Best-effort: a QR failure must never
-    # break the paper build.
-    if os.environ.get("REFERRAL_QR", "").strip() == "1":
-        try:
-            from referral_qr import add_referral_block_docx
-            add_referral_block_docx(doc)
-        except Exception as e:  # noqa: BLE001
-            print(f"WARN: referral QR skipped: {e}")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(out_path)
+    try:
+        make_watermark(LOGO_IMG, watermark_img)  # always regenerate (recipe may change)
+        add_watermark_header(doc.sections[-1], watermark_img)
+        first_q_para = add_questions(doc, data["questions"])
+        # questions must start on a fresh page after the front matter
+        ppr = first_q_para._p.get_or_add_pPr()
+        ppr.insert(0, ppr.makeelement(qn("w:pageBreakBefore"), {}))
+        add_answer_key(doc, data["questions"])
+        # Referral QR on the last page (opt-in via REFERRAL_QR=1). Every paper a
+        # student receives becomes a self-registration point for the referral
+        # program, with zero owner effort. Best-effort: a QR failure must never
+        # break the paper build.
+        if os.environ.get("REFERRAL_QR", "").strip() == "1":
+            try:
+                from referral_qr import add_referral_block_docx
+                add_referral_block_docx(doc)
+            except Exception as e:  # noqa: BLE001
+                print(f"WARN: referral QR skipped: {e}")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        doc.save(out_path)
+    finally:
+        # The watermark PNG is already embedded in the docx; remove the temp
+        # file so it does not leak one PNG per build.
+        watermark_img.unlink(missing_ok=True)
     print(f"OK: {out_path}")
 
 

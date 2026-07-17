@@ -118,9 +118,18 @@ def validate(path: Path) -> dict:
             ans = str(q["answer"]).strip().lower()
             if ans and ans not in list("abcdef"[:n_opts]):
                 return f"Q{qid}: answer '{q['answer']}' out of range for {n_opts} options"
+        base = crop_base.resolve()
         for ref in ([q["image"]] if q.get("image") else []) + (opt_imgs or []):
             rp = Path(ref)
-            if not (rp if rp.is_absolute() else crop_base / rp).exists():
+            # Reject absolute paths and any ref that escapes the job dir, so a
+            # malicious image ref (another tenant's scan, a licensed template,
+            # a server file) is DROPPED at the gate, not just at the builder.
+            if rp.is_absolute():
+                return f"Q{qid}: image path must be relative -> {ref}"
+            dest = (base / rp).resolve()
+            if base != dest and base not in dest.parents:
+                return f"Q{qid}: image path escapes the job dir -> {ref}"
+            if not dest.exists():
                 return f"Q{qid}: image not found -> {ref}"
         return None
 

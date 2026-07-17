@@ -20,7 +20,10 @@ from pathlib import Path
 
 import qrcode
 
-DEFAULT_KIT_URL = "https://dsideos.divinesideai.com/kit/target-academy?k=b261f1851839457d8a90cd20fbad50ab"
+# The kit URL is per-institute and secret (it carries the institute's kit
+# token), so it MUST come from the REFERRAL_KIT_URL env var and is never
+# committed here. If it is unset or malformed, kit_url() returns None and the
+# QR block is skipped (the builders treat that as best-effort, no crash).
 
 # English only (product rule): the caption on the block. The paper body is
 # Hindi/Kruti-Dev, but this referral block is DSideOS product surface.
@@ -28,29 +31,51 @@ CAPTION = "Refer a friend and earn a reward"
 SUBCAPTION = "Scan to get your personal referral link"
 
 
-def kit_url() -> str:
-    return os.environ.get("REFERRAL_KIT_URL", DEFAULT_KIT_URL).strip() or DEFAULT_KIT_URL
+def kit_url() -> str | None:
+    """The configured kit URL, or None if unset/invalid (block is then skipped)."""
+    raw = os.environ.get("REFERRAL_KIT_URL", "").strip()
+    if not raw:
+        return None
+    # Must be a well-formed https kit link, or the QR would be a dead link.
+    from urllib.parse import urlparse
+    try:
+        u = urlparse(raw)
+    except ValueError:
+        return None
+    if u.scheme != "https" or not u.netloc or "/kit/" not in u.path:
+        return None
+    return raw
 
 
 def render_qr_png(url: str | None = None, box_size: int = 10, border: int = 2) -> Path:
     """Render the kit-URL QR to a temp PNG and return its path.
 
     High error correction so the code still scans if a printed page is smudged
-    or the QR is slightly small on paper.
+    or the QR is slightly small on paper. Raises ValueError if no kit URL is
+    configured, so the caller skips the block instead of shipping a dead QR.
     """
+    target = url or kit_url()
+    if not target:
+        raise ValueError("no REFERRAL_KIT_URL configured; skipping referral QR")
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_H,
         box_size=box_size,
         border=border,
     )
-    qr.add_data(url or kit_url())
+    qr.add_data(target)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     fd, name = tempfile.mkstemp(suffix=".png", prefix="referral_qr_")
     os.close(fd)
     out = Path(name)
-    img.save(out)
+    # If the save raises, remove the empty temp file we just created so it does
+    # not leak (the caller's finally cannot clean up a path it never received).
+    try:
+        img.save(out)
+    except Exception:
+        out.unlink(missing_ok=True)
+        raise
     return out
 
 
