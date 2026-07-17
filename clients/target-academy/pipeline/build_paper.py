@@ -17,6 +17,7 @@ Usage: python build_paper.py [questions.json] [out.docx]
 
 import copy
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -348,6 +349,16 @@ def build(questions_path: Path, out_path: Path, font: str = DEFAULT_FONT):
     ppr = first_q_para._p.get_or_add_pPr()
     ppr.insert(0, ppr.makeelement(qn("w:pageBreakBefore"), {}))
     add_answer_key(doc, data["questions"])
+    # Referral QR on the last page (opt-in via REFERRAL_QR=1). Every paper a
+    # student receives becomes a self-registration point for the referral
+    # program, with zero owner effort. Best-effort: a QR failure must never
+    # break the paper build.
+    if os.environ.get("REFERRAL_QR", "").strip() == "1":
+        try:
+            from referral_qr import add_referral_block_docx
+            add_referral_block_docx(doc)
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN: referral QR skipped: {e}")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(out_path)
     print(f"OK: {out_path}")

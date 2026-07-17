@@ -15,6 +15,7 @@ Usage: python build_deck.py [questions.json] [out.pptx]
 
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -253,6 +254,14 @@ def build(questions_path: Path, out_path: Path, answer_key: bool = True,
         add_question_slide(prs, layout, banner, q)
     if answer_key:
         add_answer_slide(prs, layout, banner, data["questions"])
+    # Referral QR final slide (opt-in via REFERRAL_QR=1). Best-effort: never let
+    # a QR failure break the deck build.
+    if os.environ.get("REFERRAL_QR", "").strip() == "1":
+        try:
+            from referral_qr import add_referral_slide_pptx
+            add_referral_slide_pptx(prs, layout)
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN: referral QR slide skipped: {e}")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     prs.save(out_path)
     print(f"OK: {out_path}")
