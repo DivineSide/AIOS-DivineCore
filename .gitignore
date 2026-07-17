@@ -45,3 +45,4 @@ clients/*/resources/
 # Kept locally only; regenerable by re-running segmentation.
 clients/target-academy/rag/.checkpoints/
 clients/target-academy/rag/.reocr/
+clients/target-academy/rag/.translate/
