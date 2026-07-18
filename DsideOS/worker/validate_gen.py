@@ -62,11 +62,29 @@ def _norm(s: str) -> str:
     return " ".join(str(s).split()).lower()
 
 
+# The student never sees the retrieval passages, so neither the stem nor the
+# teacher-facing reason may cite them (prompt teaches this; this gate enforces
+# it — informed retry rewrites offenders). Phrases only, not bare words:
+# "स्रोत" alone is legal ("ऊर्जा के स्रोत"), citation phrasings are not.
+_MATERIAL_REFS = (
+    "पाठ के अनुसार", "सामग्री के अनुसार", "अध्ययन सामग्री", "प्रदत्त सामग्री",
+    "दी गई सामग्री", "उपरोक्त सामग्री", "पाठ में", "स्रोत [",
+    "के साथ उल्लेखित", "सामग्री में", "सामग्री से",
+)
+
+
 def validate_question(q: dict) -> str | None:
     """None if valid, else a model-actionable reason."""
     stem = q.get("stem") or ""
     if len(stem.strip()) < 15:
         return "stem is missing or under 15 characters"
+    for ref in _MATERIAL_REFS:
+        where = "stem" if ref in stem else (
+            "reason" if ref in str(q.get("reason") or "") else None)
+        if where:
+            return (f"the {where} contains '{ref}' — the student never sees the "
+                    f"study material, so never refer to it; ask a standalone "
+                    f"question and state the reason as the bare fact")
     full_text = " ".join([stem] + [str(s) for s in (q.get("statements") or [])]
                          + [" ".join(map(str, r)) for r in (q.get("match") or [])])
     if _dev_ratio(full_text) < 0.5:

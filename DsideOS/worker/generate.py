@@ -144,9 +144,23 @@ specific sentence stating a name, place, year, work, scheme, or pairing.
 - Distractors must be plausible: same category as the correct answer (a sibling
   dynasty, a neighbouring district, a similar organisation, a wrong year near
   the right one) — but the CORRECT option must be the material-supported one.
+- Every distractor must be WRONG for this stem. Before finalising, test each
+  distractor against the question: if it could also be a correct answer, the
+  question is broken. (Asking "which is a प्रमुख विभाषा?" with four विभाषाएं
+  as options fails this — when the stem asks membership of a set, distractors
+  must come from OUTSIDE that set.)
 - Prefer WHO/WHICH/WHAT (a person, place, organisation, book, scheme, term)
   over WHEN/HOW MANY — in real papers ~90% of answers are text, not numbers.
 - Mirror the framing and register of the REAL PAST QUESTIONS shown.
+- The student NEVER sees the study material — it exists only for you. The stem
+  and the reason must therefore never refer to it: no "पाठ के अनुसार", no
+  "प्रदत्त सामग्री के अनुसार", no "अध्ययन सामग्री में", no "स्रोत [N]". Ask the
+  question as a standalone fact of the world, and write the reason as the bare
+  fact in one sentence — "मेरठ की खड़ी बोली आदर्श और मानक मानी जाती है।" is
+  right; "सामग्री के अनुसार, ..." is wrong. The same ban covers IMPLICIT
+  references: a stem like "X के साथ उल्लेखित है" or "सूची में सम्मिलित है"
+  depends on how the material happens to group things — if the question only
+  makes sense relative to a text the student cannot see, it is broken.
 
 # OUTPUT
 Return ONLY this JSON object (no prose, no fences):
