@@ -58,6 +58,19 @@ SUBJECT_MIX: dict[str, dict[str, float]] = {
         "uk-culture": 0.11, "uk-geography": 0.10, "hindi": 0.04,
         "computer": 0.03,
     },
+    # police-constable (आरक्षी जनपदीय पुलिस/PAC-IRB, Advt 65/2024): NO measured
+    # papers in pyq_chunks yet, so this mix is DERIVED, not measured — the
+    # part-level split is OFFICIAL (परिशिष्ट-1: हिंदी 20 / GK-GS 40 / UK 40,
+    # verified identical to the Group C master syllabus), and the within-part
+    # sub-splits borrow group-c's measured ratios. तर्कशक्ति (reasoning) sits
+    # inside the GK-GS part officially but has no generation path yet — its
+    # share is folded into general-gk until reasoning-mode ships.
+    "police-constable": {
+        "hindi": 0.20,
+        "general-gk": 0.37, "computer": 0.03,               # भाग-2 = 0.40
+        "uk-history": 0.15, "uk-general-studies": 0.09,     # भाग-3 = 0.40
+        "uk-culture": 0.08, "uk-geography": 0.08,
+    },
 }
 
 

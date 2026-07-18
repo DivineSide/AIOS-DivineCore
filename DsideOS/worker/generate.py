@@ -30,14 +30,25 @@ Per-slot flow (ONE topic, ONE format, its own context — variety by structure):
 
 Modes:
     generate_questions(subject, count) -> (questions, meta)   # Phase A (live)
-    generate_exam(exam, total)         -> (questions, meta)   # Phase B shell —
+    generate_exam(exam, total)         -> (questions, meta)   # Phase B —
         per-exam quotas get locked WITH THE CLIENT; blueprint's measured
         SUBJECT_MIX is the opening proposal.
+
+Topic sourcing differs by mode (2026-07-18, syllabus.py):
+    subject mode — no exam context exists, so topics are inferred from a
+        random PYQ sample (what the exam family actually tests, in aggregate).
+    exam mode    — the OFFICIAL syllabus (syllabus.py, transcribed from the
+        commission's advertisement PDFs) seeds the topics; PYQs then only
+        supply per-topic style examples. A syllabus topic with zero PYQ
+        coverage still generates (style prompt degrades gracefully) — this is
+        how a fresh syllabus revision gets covered before any past paper
+        tests it, and it decouples topic VARIETY from PYQ-pool size.
 """
 import asyncio
 import json
 import logging
 import os
+import random
 import sys
 import zlib
 from pathlib import Path
@@ -61,6 +72,7 @@ import query as rag  # noqa: E402
 import blueprint  # noqa: E402
 import formats  # noqa: E402
 import ground  # noqa: E402
+import syllabus  # noqa: E402
 from validate_gen import PaperGuard, validate_question  # noqa: E402
 
 HAIKU = "claude-haiku-4-5-20251001"
@@ -264,14 +276,36 @@ def _parse_json_array(text: str) -> list:
         return []
 
 
-async def _extract_topics(subject: str, count: int) -> list[str]:
-    """Derive distinct exam topics from a random sample of the subject's real
-    PYQs (topic signal comes from what the exam actually tests)."""
+async def _extract_topics(subject: str, count: int,
+                          exam: str | None = None) -> list[str]:
+    """Derive distinct exam topics for `count` questions.
+
+    Exam mode (exam on the master syllabus): the OFFICIAL taxonomy seeds the
+    list — variety comes from the commission's own syllabus, not from
+    whatever a 40-row PYQ sample happens to contain. Shortfall (official
+    list smaller than n_topics) tops up from PYQ inference below.
+
+    Subject mode (exam=None): PYQ-sample inference, unchanged — with no exam
+    anchor there is no single official syllabus to consult."""
     n_topics = max(1, min(count // TOPICS_DIVISOR, TOPICS_CAP))
+
+    official = syllabus.topics_for(subject, exam)
+    if official:
+        if len(official) >= n_topics:
+            picked = random.sample(official, n_topics)
+            logger.info("topics[%s/%s]: %d/%d from official syllabus",
+                        subject, exam, len(picked), n_topics)
+            return picked
+        # official list exhausted — keep ALL of it, top up from PYQ inference
+        n_topics -= len(official)
+        logger.info("topics[%s/%s]: all %d official + %d PYQ-inferred",
+                    subject, exam, len(official), n_topics)
+    else:
+        official = []
 
     seed_pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SEED_K)
     if not seed_pyqs:
-        return [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
+        return official or [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
 
     examples = "\n".join(f"- {p['text'][:300]}" for p in seed_pyqs)
     prompt = (
@@ -293,8 +327,8 @@ async def _extract_topics(subject: str, count: int) -> list[str]:
         raw = ""
     topics = [t for t in _parse_json_array(raw) if isinstance(t, str) and t.strip()]
     if not topics:
-        return [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
-    return topics[:n_topics]
+        return official or [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
+    return official + topics[:n_topics]
 
 
 # ── the slot engine ──────────────────────────────────────────────────────────
@@ -459,10 +493,13 @@ async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
 
 # ── orchestrators ────────────────────────────────────────────────────────────
 
-async def generate_questions(subject: str, count: int) -> tuple[list[dict], dict]:
-    """Subject mode. Returns (questions, meta) — meta carries drop notes for the
-    dashboard; the questions list is always clean (no flags)."""
-    topics = await _extract_topics(subject, count)
+async def generate_questions(subject: str, count: int,
+                             exam: str | None = None) -> tuple[list[dict], dict]:
+    """Subject mode (exam=None) or one subject of an exam paper (exam set —
+    official-syllabus topic seeding kicks in). Returns (questions, meta) —
+    meta carries drop notes for the dashboard; the questions list is always
+    clean (no flags)."""
+    topics = await _extract_topics(subject, count, exam=exam)
     fmt_counts = blueprint.allocate(count, blueprint.format_mix())
     # slot list: rare formats first so they land on distinct early topics
     slots = [f for f in ("match", "statement", "assertion", "order")
@@ -538,15 +575,17 @@ async def generate_questions(subject: str, count: int) -> tuple[list[dict], dict
 
 
 async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
-    """Exam mode — PHASE B SHELL. Mechanics are final (harness owns the counts);
-    the per-exam SUBJECT_MIX numbers are the client-session deliverable."""
+    """Exam mode. Harness owns the counts (blueprint SUBJECT_MIX — measured
+    opening proposal, client-lockable); the OFFICIAL syllabus owns the topic
+    taxonomy (syllabus.py, per-subject seeding inside generate_questions).
+    Per-exam SUBJECT_MIX numbers remain the client-session deliverable."""
     per_subject = blueprint.allocate(total, blueprint.subject_mix(exam))
     out: list[dict] = []
     metas: dict[str, dict] = {}
     for subject, n in per_subject.items():
         if n == 0:
             continue
-        qs, meta = await generate_questions(subject, n)
+        qs, meta = await generate_questions(subject, n, exam=exam)
         for q in qs:
             q["subject"] = subject
         out.extend(qs)

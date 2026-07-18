@@ -183,11 +183,17 @@ VALID_SUBJECTS = {
     "uk-general-studies", "general-gk", "hindi", "computer",
 }
 
+# Exam families with a blueprint SUBJECT_MIX + official-syllabus topic seeding
+# (worker.blueprint / worker.syllabus). Kept in sync manually — the API must
+# not import worker modules (separate container).
+VALID_EXAMS = {"vdo-vpdo", "lekhpal-patwari", "group-c", "police-constable"}
+
 
 @app.post("/api/generate", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def generate(
-    subject: str = Form(...),
+    subject: str = Form(""),
     count: int = Form(...),
+    exam: str = Form(""),
     paper_name: str = Form("Paper"),
     format: str = Form("format-1"),
     font: str = Form("krutidev"),
@@ -195,9 +201,18 @@ def generate(
     subtitle_hindi: str = Form(""),
     x_institute_id: str = Header(default=""),
 ):
-    """AI Generative: pick a subject + question count -> generate questions from
-    the embedded book corpus -> same deliverables as /api/full (no file upload)."""
-    if subject not in VALID_SUBJECTS:
+    """AI Generative — two modes, same deliverables as /api/full:
+      subject mode: subject + count -> N questions of that subject.
+      exam mode:    exam + count    -> a full paper; the harness allocates
+                    per-subject counts (blueprint) and the official UKSSSC
+                    syllabus seeds the topics (worker.syllabus)."""
+    exam = exam.strip().lower()
+    if exam:
+        if exam not in VALID_EXAMS:
+            raise HTTPException(400, f"Unknown exam {exam!r}. "
+                                     f"Valid: {sorted(VALID_EXAMS)}")
+        subject = subject or "exam-paper"   # job-record label; worker ignores it
+    elif subject not in VALID_SUBJECTS:
         raise HTTPException(400, f"Unknown subject {subject!r}. "
                                  f"Valid: {sorted(VALID_SUBJECTS)}")
     if not (1 <= count <= 100):
@@ -209,6 +224,7 @@ def generate(
         "font": font,
         "title_hindi": title_hindi,
         "subtitle_hindi": subtitle_hindi,
+        "exam": exam,
     }
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="generate", subject=subject,

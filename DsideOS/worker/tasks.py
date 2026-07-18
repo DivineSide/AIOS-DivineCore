@@ -550,7 +550,13 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
         # phases 1-3: produce the questions list (async harness, run to completion).
         # gen_meta carries drop notes / format plan-vs-actual — DASHBOARD data,
         # never rendered on the paper (same contract as extraction's low_confidence).
-        questions, gen_meta = asyncio.run(generate.generate_questions(subject, count))
+        # meta.exam switches to exam mode: blueprint allocates per-subject counts
+        # and the official syllabus (worker.syllabus) seeds the topics.
+        exam = (meta.get("exam") or "").strip().lower() or None
+        if exam:
+            questions, gen_meta = asyncio.run(generate.generate_exam(exam, count))
+        else:
+            questions, gen_meta = asyncio.run(generate.generate_questions(subject, count))
         if not questions:
             raise RuntimeError("Generation produced no questions.")
 
