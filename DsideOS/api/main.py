@@ -160,6 +160,9 @@ def full(
     font: str = Form("krutidev"),
     title_hindi: str = Form(""),
     subtitle_hindi: str = Form(""),
+    tool_title: str = Form(""),
+    tool_path: str = Form(""),
+    mode: str = Form("import"),
     x_institute_id: str = Header(default=""),
 ):
     """One-shot: upload a paper -> all deliverables in the chosen format + font."""
@@ -169,6 +172,9 @@ def full(
         "font": font,
         "title_hindi": title_hindi,
         "subtitle_hindi": subtitle_hindi,
+        "tool_title": tool_title,
+        "tool_path": tool_path,
+        "mode": mode,
     }
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="full", institute_id=x_institute_id or None, **meta)
@@ -194,6 +200,9 @@ def generate(
     font: str = Form("krutidev"),
     title_hindi: str = Form(""),
     subtitle_hindi: str = Form(""),
+    tool_title: str = Form(""),
+    tool_path: str = Form(""),
+    mode: str = Form("generative"),
     x_institute_id: str = Header(default=""),
 ):
     """AI Generative: pick a subject + question count -> generate questions from
@@ -210,6 +219,9 @@ def generate(
         "font": font,
         "title_hindi": title_hindi,
         "subtitle_hindi": subtitle_hindi,
+        "tool_title": tool_title,
+        "tool_path": tool_path,
+        "mode": mode,
     }
     job_id = jobs.new_id()
     jobs.create(job_id, workflow="generate", subject=subject,
