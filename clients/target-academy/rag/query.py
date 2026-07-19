@@ -15,6 +15,7 @@ CLI:
 import asyncio
 import io
 import os
+import re
 import sys
 import threading
 from pathlib import Path
@@ -325,6 +326,48 @@ def _hyde_expand(topic: str) -> str:
         return topic
 
 
+# Same impossible-sequence signatures as DsideOS/worker/validate_gen.py's
+# _garble_hit, PLUS orphan_matra — duplicated (not imported, different import
+# path) — keep both files in sync if either changes. orphan_matra is too
+# noisy for a HARD per-field reject (validate_gen leaves it out: a bullet
+# list item can look like a false hit) but is fine as a RANKING signal here —
+# a passage with several orphan matras nearby is real evidence of damage even
+# if any single instance might be a false positive.
+_GARBLE_RX = re.compile(
+    r"्[ा-ौॢॣ]"          # halant + vowel sign (impossible — halant only joins consonants)
+    r"|््"                # double halant
+    r"|[॒॑]"              # Vedic accent marks in exam prose
+    r"|<[ऀ-ॿ]|[ऀ-ॿ]>"     # angle bracket wrapping Devanagari
+    r"|(?:^|[\s(«»])[ा-ौ]"  # matra with no preceding consonant
+)
+# Separate class: not a composition violation, a REPETITION anomaly — e.g.
+# "्ण्ण्ण्ण्ण्ण्ण्ण्ण्ण" (table-border/layout OCR artifact repeating one
+# consonant+halant many times). _GARBLE_RX has no opinion on this (each
+# halant-consonant pair is individually legal); this catches it separately.
+_REPEAT_RX = re.compile(r"(.्)\1{3,}")   # same halant-joined char, 4+ times running
+
+
+def _garble_score(text: str) -> float:
+    """Garble-signature hit density (hits per 100 chars) — used only to RANK
+    candidates (most-garbled last), never to reject one outright. Density,
+    not a raw count: repeated-conjunct garbage (े.g. "्ण्ण्ण्ण्ण्ण्ण्ण्ण्ण्ण्ण्ण्ण")
+    packs many signature instances into few characters, but consecutive hits
+    share boundary characters so a plain non-overlapping findall() undercounts
+    it — re.finditer with overlap (step back 1 char per match) catches that."""
+    text = text or ""
+    if not text:
+        return 0.0
+    hits, pos = 0, 0
+    while pos < len(text):
+        m = _GARBLE_RX.search(text, pos)
+        if not m:
+            break
+        hits += 1
+        pos = m.start() + 1   # step by 1, not m.end(), so overlapping runs all count
+    repeat_hits = sum(m.end() - m.start() for m in _REPEAT_RX.finditer(text))
+    return 100.0 * (hits + repeat_hits) / len(text)
+
+
 async def passage_lookup(
     topic: str,
     subject: str | None = None,
@@ -337,15 +380,26 @@ async def passage_lookup(
     Retrieval mode is env-flagged (default = original dense-only path, unchanged):
       RAG_HYBRID=1  fuse dense + lexical (RRF)  — recovers exact-token / thin-passage misses
       RAG_HYDE=1    embed a hypothetical answer sentence instead of the raw topic
+
+    Over-fetches by a margin and drops the most garble-heavy candidates before
+    truncating to top_k — a passage riddled with OCR-impossible sequences
+    (un-re-OCR'd hindi/general-gk book tier) makes a worse fact source even
+    when it's a good semantic match, and every extra retry it causes is a
+    live-cost, not just a quality issue. Never drops below top_k candidates
+    even if all of them are somewhat garbled — thin retrieval beats none.
     Returns [] on any error (fail soft — e.g. table not built yet)."""
     try:
         embed_text = await asyncio.to_thread(_hyde_expand, topic) if HYDE else topic
         embedding = await asyncio.to_thread(_embed, embed_text)
+        fetch_k = top_k + 4
         if HYBRID:
-            return await asyncio.to_thread(_hybrid_search, embedding, topic,
-                                           top_k, threshold, subject)
-        return await asyncio.to_thread(_passage_search, embedding, top_k,
-                                       threshold, subject)
+            candidates = await asyncio.to_thread(_hybrid_search, embedding, topic,
+                                                 fetch_k, threshold, subject)
+        else:
+            candidates = await asyncio.to_thread(_passage_search, embedding, fetch_k,
+                                                 threshold, subject)
+        candidates.sort(key=lambda p: _garble_score(p.get("passage_text", "")))
+        return candidates[:top_k]
     except Exception:
         return []
 

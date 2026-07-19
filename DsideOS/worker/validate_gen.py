@@ -62,6 +62,34 @@ def _norm(s: str) -> str:
     return " ".join(str(s).split()).lower()
 
 
+# ── Devanagari garble detector (2026-07-19) ──────────────────────────────────
+# NOT a spellchecker — cannot tell ठकुराइन (correct) from ठक्राइन (OCR-mangled
+# but still a valid character sequence). What IS mechanically checkable:
+# character sequences Devanagari's composition rules make IMPOSSIBLE, no
+# dictionary needed — same idea as flagging "q́x" in English. OCR garble
+# from the un-re-OCR'd hindi/general-gk book tier is overwhelmingly built from
+# exactly these impossible sequences (audited 2026-07-19 against live
+# student-visible leaks: <अतीद्धिय>, "बतृंमान", "साध् िमें", "प्र्ययं१").
+# A hit here is a HARD reject (structurally impossible), unlike the softer
+# style/reference gates above.
+_GARBLE_SIGNATURES = {
+    "halant_vowel": re.compile(r"्[ा-ौॢॣ]"),      # halant only joins consonants
+    "double_halant": re.compile(r"््"),
+    "vedic_accent": re.compile(r"[॒॑]"),           # Vedic-only marks in exam prose
+    "angle_bracket_dev": re.compile(r"<[ऀ-ॿ]|[ऀ-ॿ]>"),
+    "orphan_matra": re.compile(r"(?:^|[\s(«»])[ा-ौ]"),  # matra with no preceding consonant
+}
+
+
+def _garble_hit(text: str) -> str | None:
+    """First matched signature name, or None. Checked on Devanagari-bearing
+    text only — Latin/numeric fields never false-positive here."""
+    for name, rx in _GARBLE_SIGNATURES.items():
+        if rx.search(text or ""):
+            return name
+    return None
+
+
 # The student never sees the retrieval passages, so neither the stem nor the
 # teacher-facing reason may cite them (prompt teaches this; this gate enforces
 # it — informed retry rewrites offenders). Phrases only, not bare words:
@@ -97,6 +125,23 @@ def validate_question(q: dict) -> str | None:
         return "every option must be non-empty text"
     if len({_norm(o) for o in opts}) != 4:
         return "options must be 4 distinct values"
+
+    # garble gate — every field the student actually reads, checked BEFORE the
+    # shape/format checks below so a garbled option never survives on a
+    # technicality (e.g. still being "4 distinct values").
+    garble_fields = [("stem", stem), ("reason", str(q.get("reason") or ""))]
+    garble_fields += [(f"option '{o}'", o) for o in opts]
+    garble_fields += [(f"statement '{s}'", str(s)) for s in (q.get("statements") or [])]
+    for row in (q.get("match") or []):
+        for cell in row if isinstance(row, (list, tuple)) else ():
+            garble_fields.append((f"match item '{cell}'", str(cell)))
+    for label, text in garble_fields:
+        sig = _garble_hit(text)
+        if sig:
+            return (f"{label} contains an OCR-corrupted character sequence "
+                    f"({sig}) inherited from a damaged source passage — this is "
+                    f"not a real word; rebuild this field from a DIFFERENT, "
+                    f"cleanly-stated fact in the study material")
 
     ans = str(q.get("answer", "")).lower()
     if ans not in _LETTERS:
