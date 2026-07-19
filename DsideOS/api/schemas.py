@@ -61,10 +61,22 @@ class OutputFile(BaseModel):
 
 class JobStatus(BaseModel):
     job_id: str
-    status: str                       # QUEUED | RUNNING | DONE | FAILED
+    status: str                       # QUEUED | RUNNING | DONE | FAILED | CANCELLED | EXPIRED
     stage: Optional[str] = None
+    progress: Optional[int] = None
+    workflow: Optional[str] = None
+    tool_title: Optional[str] = None
+    tool_path: Optional[str] = None
+    mode: Optional[str] = None
+    paper_name: Optional[str] = None
     n_questions: Optional[int] = None
     outputs: list[OutputFile] = []
     error: Optional[str] = None
-    created_at: Optional[int] = None
+    created_at: Optional[int | str] = None
+    finished_at: Optional[int | str] = None
+    expires_at: Optional[int | str] = None
     extra: dict[str, Any] = {}
+
+
+class JobListResponse(BaseModel):
+    jobs: list[JobStatus]

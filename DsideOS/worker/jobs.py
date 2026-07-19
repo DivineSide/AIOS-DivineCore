@@ -21,6 +21,86 @@ from pathlib import Path
 from .settings import settings
 
 JOBS_DIR = Path(settings.JOBS_DIR)
+TERMINAL_STATUSES = {"DONE", "FAILED", "TIMEOUT", "CANCELLED", "EXPIRED"}
+STAGE_PROGRESS = {
+    "extract": 10,
+    "generate": 20,
+    "review": 55,
+    "generate_explanations": 70,
+    "answer_key": 75,
+    "solutions": 75,
+    "build": 85,
+}
+
+
+def _now() -> int:
+    return int(time.time())
+
+
+def retention_seconds() -> int:
+    return settings.RETENTION_DAYS * 24 * 3600
+
+
+def expires_at_for(created_at: int | float | str | None) -> int | None:
+    try:
+        created = int(created_at) if created_at is not None else None
+    except (TypeError, ValueError):
+        created = None
+    if created is None:
+        return None
+    return created + retention_seconds()
+
+
+def _normalise_progress(meta: dict) -> int | None:
+    value = meta.get("progress")
+    if value is None:
+        return None
+    try:
+        return max(0, min(100, int(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _apply_lifecycle_defaults(meta: dict, changes: dict | None = None) -> dict:
+    """Keep lifecycle fields consistent in one place."""
+    merged = dict(meta)
+    if changes:
+        merged.update(changes)
+
+    created = merged.get("created_at")
+    if created is None:
+        created = _now()
+        merged["created_at"] = created
+    if merged.get("expires_at") is None:
+        merged["expires_at"] = expires_at_for(created)
+
+    status = str(merged.get("status", "QUEUED")).upper()
+    merged["status"] = status
+
+    current_progress = _normalise_progress(meta)
+    explicit_progress = _normalise_progress(changes or {})
+    stage_progress = STAGE_PROGRESS.get(str(merged.get("stage", "")).lower())
+
+    if status == "DONE":
+        next_progress = 100
+    elif explicit_progress is not None:
+        next_progress = explicit_progress
+    elif current_progress is not None and stage_progress is not None:
+        next_progress = max(current_progress, stage_progress)
+    elif stage_progress is not None:
+        next_progress = stage_progress
+    elif current_progress is not None:
+        next_progress = current_progress
+    elif status == "QUEUED":
+        next_progress = 0
+    else:
+        next_progress = None
+    if next_progress is not None:
+        merged["progress"] = max(current_progress or 0, min(100, next_progress))
+
+    if status in TERMINAL_STATUSES and merged.get("finished_at") is None:
+        merged["finished_at"] = _now()
+    return merged
 
 
 def new_id() -> str:
@@ -50,10 +130,13 @@ def create(job_id: str, **meta) -> Path:
     d = job_dir(job_id)
     input_dir(job_id).mkdir(parents=True, exist_ok=True)
     output_dir(job_id).mkdir(parents=True, exist_ok=True)
+    created_at = _now()
     base = {
         "job_id": job_id,
         "status": "QUEUED",
-        "created_at": int(time.time()),
+        "created_at": created_at,
+        "expires_at": expires_at_for(created_at),
+        "progress": 0,
         "outputs": [],
         "error": None,
     }
@@ -106,7 +189,7 @@ def write_meta(job_id: str, meta: dict) -> None:
 
 def update_meta(job_id: str, **changes) -> dict:
     meta = read_meta(job_id) or {"job_id": job_id}
-    meta.update(changes)
+    meta = _apply_lifecycle_defaults(meta, changes)
     write_meta(job_id, meta)
     return meta
 
@@ -123,19 +206,76 @@ def list_outputs(job_id: str) -> list[dict]:
     return out
 
 
-def cleanup_expired(ttl_hours: int) -> int:
-    """Delete job folders older than ttl_hours. Returns count removed."""
+def _delete_output_files(job_id: str) -> None:
+    od = output_dir(job_id)
+    if od.exists():
+        shutil.rmtree(od, ignore_errors=True)
+    od.mkdir(parents=True, exist_ok=True)
+
+
+def mark_expired(job_id: str, reason: str = "Generated files expired.") -> dict:
+    _delete_output_files(job_id)
+    return update_meta(job_id, status="EXPIRED", outputs=[], error=reason)
+
+
+def is_expired(meta: dict, now: int | None = None) -> bool:
+    if str(meta.get("status", "")).upper() == "EXPIRED":
+        return True
+    expires = meta.get("expires_at") or expires_at_for(meta.get("created_at"))
+    if expires is None:
+        return False
+    return (now or _now()) > int(expires)
+
+
+def list_jobs(limit: int = 50, status: str = "all", institute_id: str = "") -> list[dict]:
+    """Return known jobs newest-first from filesystem metadata."""
+    if not JOBS_DIR.exists():
+        return []
+    wanted = status.lower()
+    rows: list[dict] = []
+    for d in JOBS_DIR.iterdir():
+        if not d.is_dir():
+            continue
+        meta = read_meta(d.name)
+        if not meta:
+            continue
+        owner = meta.get("institute_id")
+        if owner and owner != institute_id:
+            continue
+        meta = _apply_lifecycle_defaults(meta)
+        if is_expired(meta):
+            meta = mark_expired(d.name)
+        job_status = str(meta.get("status", "UNKNOWN")).upper()
+        active = job_status in {"QUEUED", "RUNNING", "PENDING"}
+        if wanted == "active" and not active:
+            continue
+        if wanted in {"done", "history", "finished"} and active:
+            continue
+        rows.append(meta)
+    rows.sort(key=lambda item: int(item.get("created_at") or 0), reverse=True)
+    return rows[: max(1, min(limit, 200))]
+
+
+def cleanup_expired(retention_days: int | None = None) -> int:
+    """Expire output files past retention while keeping job metadata."""
     if not JOBS_DIR.exists():
         return 0
-    cutoff = time.time() - ttl_hours * 3600
+    days = retention_days or settings.RETENTION_DAYS
+    cutoff = _now() - days * 24 * 3600
     removed = 0
     for d in JOBS_DIR.iterdir():
         if not d.is_dir():
             continue
         meta = read_meta(d.name)
-        created = (meta or {}).get("created_at", d.stat().st_mtime)
-        if created < cutoff:
-            shutil.rmtree(d, ignore_errors=True)
+        if not meta:
+            # Orphan folders have no history to preserve.
+            if d.stat().st_mtime < cutoff:
+                shutil.rmtree(d, ignore_errors=True)
+                removed += 1
+            continue
+        created = int(meta.get("created_at", d.stat().st_mtime))
+        if created < cutoff and str(meta.get("status", "")).upper() != "EXPIRED":
+            mark_expired(d.name)
             removed += 1
     return removed
 

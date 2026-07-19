@@ -21,6 +21,7 @@ the frontend polls GET /api/jobs/{id} and downloads from GET /api/files/{id}/{na
 import json
 import secrets
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -36,7 +37,7 @@ from worker.tasks import (
     solutions_task,
 )
 
-from .schemas import BuildRequest, JobAccepted, JobStatus
+from .schemas import BuildRequest, JobAccepted, JobListResponse, JobStatus
 from worker.celery_app import celery_app
 
 
@@ -290,25 +291,90 @@ def _check_owner(meta: dict, x_institute_id: str) -> None:
         raise HTTPException(404, "Unknown job_id.")
 
 
+def _as_iso(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _tool_info(meta: dict) -> tuple[str, str, str]:
+    if meta.get("tool_title") and meta.get("tool_path"):
+        return meta.get("tool_title"), meta.get("tool_path"), meta.get("mode") or "import"
+    if meta.get("workflow") == "generate":
+        return "Generate: Full Run", "/dashboard/generate/full", "generative"
+    return "Import: Full Run", "/dashboard/import/questions", "import"
+
+
+def _job_response(job_id: str, meta: dict) -> JobStatus:
+    known = {
+        "job_id", "status", "stage", "progress", "workflow", "tool_title",
+        "tool_path", "mode", "paper_name", "n_questions", "outputs", "error",
+        "created_at", "finished_at", "expires_at",
+    }
+    meta = jobs.update_meta(job_id)
+    if jobs.is_expired(meta):
+        meta = jobs.mark_expired(job_id)
+    tool_title, tool_path, mode = _tool_info(meta)
+    return JobStatus(
+        job_id=job_id,
+        status=meta.get("status", "UNKNOWN"),
+        stage=meta.get("stage"),
+        progress=meta.get("progress"),
+        workflow=meta.get("workflow"),
+        tool_title=tool_title,
+        tool_path=tool_path,
+        mode=mode,
+        paper_name=meta.get("paper_name") or "Paper",
+        n_questions=meta.get("n_questions"),
+        outputs=meta.get("outputs", []),
+        error=_client_error(meta),
+        created_at=_as_iso(meta.get("created_at")),
+        finished_at=_as_iso(meta.get("finished_at")),
+        expires_at=_as_iso(meta.get("expires_at")),
+        extra={k: v for k, v in meta.items() if k not in known and k != "error"},
+    )
+
+
+@app.get("/api/jobs", response_model=JobListResponse, dependencies=[Depends(require_token)])
+def list_jobs(limit: int = 50, status: str = "all", x_institute_id: str = Header(default="")):
+    rows = jobs.list_jobs(limit=limit, status=status, institute_id=x_institute_id)
+    return JobListResponse(jobs=[_job_response(row["job_id"], row) for row in rows])
+
+
 @app.get("/api/jobs/{job_id}", response_model=JobStatus, dependencies=[Depends(require_token)])
 def job_status(job_id: str, x_institute_id: str = Header(default="")):
     meta = jobs.read_meta(job_id)
     if not meta:
         raise HTTPException(404, "Unknown job_id.")
     _check_owner(meta, x_institute_id)
-    known = {"job_id", "status", "stage", "n_questions", "outputs", "error", "created_at"}
-    # never surface the raw internal error string (paths / stderr / provider bodies)
-    # to the client — return only the safe stage-keyed summary.
-    return JobStatus(
-        job_id=job_id,
-        status=meta.get("status", "UNKNOWN"),
-        stage=meta.get("stage"),
-        n_questions=meta.get("n_questions"),
-        outputs=meta.get("outputs", []),
-        error=_client_error(meta),
-        created_at=meta.get("created_at"),
-        extra={k: v for k, v in meta.items() if k not in known and k != "error"},
+    return _job_response(job_id, meta)
+
+
+@app.post("/api/jobs/{job_id}/cancel", response_model=JobStatus, dependencies=[Depends(require_token)])
+def cancel_job(job_id: str, x_institute_id: str = Header(default="")):
+    meta = jobs.read_meta(job_id)
+    if not meta:
+        raise HTTPException(404, "Unknown job_id.")
+    _check_owner(meta, x_institute_id)
+    status = str(meta.get("status", "")).upper()
+    if status in jobs.TERMINAL_STATUSES:
+        return _job_response(job_id, meta)
+    try:
+        celery_app.control.revoke(job_id, terminate=True, signal="SIGTERM")
+    except Exception:
+        raise HTTPException(503, "Cancel is unavailable. The worker broker could not be reached.")
+    meta = jobs.update_meta(
+        job_id,
+        status="CANCELLED",
+        error="Generation was cancelled.",
+        outputs=[],
     )
+    return _job_response(job_id, meta)
 
 
 @app.get("/api/files/{job_id}/{name}", dependencies=[Depends(require_token)])
@@ -321,7 +387,12 @@ def download(job_id: str, name: str, x_institute_id: str = Header(default="")):
     if not meta:
         raise HTTPException(404, "Unknown job_id.")
     _check_owner(meta, x_institute_id)
+    if jobs.is_expired(meta):
+        jobs.mark_expired(job_id)
+        raise HTTPException(410, "Generated files have expired.")
     path = jobs.output_dir(job_id) / name
     if not path.is_file():
+        if str(meta.get("status", "")).upper() == "EXPIRED":
+            raise HTTPException(410, "Generated files have expired.")
         raise HTTPException(404, "File not found.")
     return FileResponse(str(path), filename=name)
