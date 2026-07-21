@@ -141,7 +141,12 @@ def reocr(book_rel: str, status_only: bool = False):
 
     doc = fitz.open(str(src))
     total = doc.page_count
-    out_dir = REOCR_DIR / src.stem
+    # .strip() the stem: MuPDF's C path handling silently drops a trailing
+    # space that Python's own pathlib/Windows APIs preserve (mkdir + .exists()
+    # succeed against the space-suffixed path, but part.save() then fails with
+    # "No such file or directory" because MuPDF looks for the stripped name) —
+    # hit on "Kiran SSC GK Hindi .pdf" (stem ends in a space) 2026-07-19.
+    out_dir = REOCR_DIR / src.stem.strip()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     ranges = [(s, min(s + PAGES_PER_JOB - 1, total - 1))

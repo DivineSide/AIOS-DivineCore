@@ -5,6 +5,7 @@ temp_pkg/
 *.pyc
 *.pyo
 AGENTS.md
+claude-code_subagents.md
 # Celery Beat schedule state file (runtime, not source)
 celerybeat-schedule
 celerybeat-schedule.*
