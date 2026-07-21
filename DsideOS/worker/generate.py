@@ -103,6 +103,24 @@ MAX_TOPUP = 8            # extra slots tried when drops leave the paper short
 # skipped; above ~8 you brush API rate limits for marginal gain.
 GEN_CONCURRENCY = max(1, int(os.environ.get("GEN_CONCURRENCY", "6")))
 
+# Global cap on in-flight _gen_slot calls, shared across ALL subjects of an
+# exam-mode paper — not per-subject. Without this, generate_exam() running
+# subjects concurrently (2026-07-22 fix for the sequential-subject slowdown)
+# would let each subject wave up to GEN_CONCURRENCY on its own, stacking to
+# subjects*GEN_CONCURRENCY simultaneous calls at peak (e.g. 7*6=42) — well
+# past the ~6-8 ceiling before Sarvam rate-limits (see GEN_CONCURRENCY
+# comment above). This semaphore keeps TOTAL concurrency at GEN_CONCURRENCY
+# regardless of how many subjects are running at once; created lazily so it
+# binds to whichever event loop is actually running the task.
+_slot_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_slot_semaphore() -> asyncio.Semaphore:
+    global _slot_semaphore
+    if _slot_semaphore is None:
+        _slot_semaphore = asyncio.Semaphore(GEN_CONCURRENCY)
+    return _slot_semaphore
+
 VALID_ANSWERS = {"a", "b", "c", "d"}
 
 SUBJECT_LABELS = {
@@ -416,6 +434,18 @@ def _rejected_terms(draft: dict | None, topic: str) -> str:
 
 async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
                     guard: PaperGuard, initial_reason: str = "") -> tuple[dict | None, str]:
+    """Generate one question — thin wrapper enforcing the GLOBAL concurrency
+    cap (see _get_slot_semaphore) before doing any real work. Every caller
+    (waves in generate_questions, its top-up loop, across every subject a
+    concurrent generate_exam() is running) goes through this one gate, so
+    total in-flight API calls never exceeds GEN_CONCURRENCY no matter how
+    many subjects/waves are active at once."""
+    async with _get_slot_semaphore():
+        return await _gen_slot_inner(subject, topic, fmt, slot_id, guard, initial_reason)
+
+
+async def _gen_slot_inner(subject: str, topic: str, fmt: str, slot_id: int,
+                          guard: PaperGuard, initial_reason: str = "") -> tuple[dict | None, str]:
     """Generate one question. Returns (question, "") or (None, last_reason).
     `initial_reason` injects feedback from a wave-boundary collision so the
     re-run is informed, not a blind re-roll."""
@@ -592,14 +622,26 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
     """Exam mode. Harness owns the counts (blueprint SUBJECT_MIX — measured
     opening proposal, client-lockable); the OFFICIAL syllabus owns the topic
     taxonomy (syllabus.py, per-subject seeding inside generate_questions).
-    Per-exam SUBJECT_MIX numbers remain the client-session deliverable."""
+    Per-exam SUBJECT_MIX numbers remain the client-session deliverable.
+
+    Subjects run CONCURRENTLY, not one after another: each subject gets its
+    own PaperGuard (created fresh inside generate_questions), so there is no
+    shared state a race could corrupt — a sequential for-loop here was only
+    ever adding wall-clock time, not correctness. Measured: a 10-question
+    exam paper (7 subjects, ~1-3 questions each) took ~10 minutes serial;
+    each subject barely used the wave concurrency inside generate_questions
+    because 1-3 slots rarely fills a GEN_CONCURRENCY=6 wave anyway — the
+    real waste was subjects waiting on each other, not slots within a
+    subject waiting on each other."""
     per_subject = blueprint.allocate(total, blueprint.subject_mix(exam))
+    subjects = [(subject, n) for subject, n in per_subject.items() if n > 0]
+    results = await asyncio.gather(*[
+        generate_questions(subject, n, exam=exam) for subject, n in subjects
+    ])
+
     out: list[dict] = []
     metas: dict[str, dict] = {}
-    for subject, n in per_subject.items():
-        if n == 0:
-            continue
-        qs, meta = await generate_questions(subject, n, exam=exam)
+    for (subject, _), (qs, meta) in zip(subjects, results):
         for q in qs:
             q["subject"] = subject
         out.extend(qs)
