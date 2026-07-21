@@ -15,6 +15,7 @@ Usage: python build_deck.py [questions.json] [out.pptx]
 
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -46,9 +47,21 @@ _IMG_BASE = BASE
 
 
 def _img_path(rel):
-    """Resolve a JSON image reference against the questions-file folder."""
+    """Resolve a JSON image reference, CONFINED to the job's image base.
+
+    image/option_images come from the API request body (free strings), so an
+    absolute path or a "../" traversal would let a caller embed an arbitrary
+    server-side file (another tenant's scan, a licensed template) into their
+    deck. Reject absolute paths and any ref that resolves outside _IMG_BASE.
+    Matches the guard in build_paper.py / build_solution.py."""
+    base = Path(_IMG_BASE).resolve()
     p = Path(rel)
-    return p if p.is_absolute() else (_IMG_BASE / p)
+    if p.is_absolute():
+        raise ValueError(f"image path must be relative to the job dir: {rel!r}")
+    dest = (base / p).resolve()
+    if base != dest and base not in dest.parents:
+        raise ValueError(f"image path escapes the job dir: {rel!r}")
+    return dest
 
 
 def _png_size_px(path):
@@ -253,6 +266,14 @@ def build(questions_path: Path, out_path: Path, answer_key: bool = True,
         add_question_slide(prs, layout, banner, q)
     if answer_key:
         add_answer_slide(prs, layout, banner, data["questions"])
+    # Referral QR final slide (opt-in via REFERRAL_QR=1). Best-effort: never let
+    # a QR failure break the deck build.
+    if os.environ.get("REFERRAL_QR", "").strip() == "1":
+        try:
+            from referral_qr import add_referral_slide_pptx
+            add_referral_slide_pptx(prs, layout)
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN: referral QR slide skipped: {e}")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     prs.save(out_path)
     print(f"OK: {out_path}")

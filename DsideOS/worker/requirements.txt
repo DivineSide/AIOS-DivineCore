@@ -17,6 +17,7 @@ python-docx>=1.1.0
 python-pptx>=0.6.23
 PyMuPDF>=1.24.0
 Pillow>=10.0.0
+qrcode>=7.4   # referral QR on papers/decks (pipeline/referral_qr.py)
 
 # NOTE: .docx -> .pdf on the server uses LibreOffice headless (installed in the
 # Docker image), NOT pywin32. The Kruti Dev 010 + Nirmala UI fonts must be

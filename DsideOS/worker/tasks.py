@@ -576,8 +576,8 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
 
 @shared_task(name="worker.tasks.cleanup_jobs")
 def cleanup_jobs():
-    """Beat task: purge job folders past their TTL."""
-    return jobs.cleanup_expired(settings.JOB_TTL_HOURS)
+    """Beat task: expire generated outputs past retention."""
+    return jobs.cleanup_expired(settings.RETENTION_DAYS)
 
 
 # A RUNNING job whose meta.json hasn't been touched in this long is dead — past

@@ -27,8 +27,12 @@ class Settings(BaseSettings):
     # Where job inputs/outputs live on disk. One folder per job_id underneath.
     JOBS_DIR: str = str(DSIDEOS_ROOT / "storage" / "jobs")
 
-    # Auto-delete job folders older than this many hours (cleanup beat task).
-    JOB_TTL_HOURS: int = 24
+    # Generated output retention window. Metadata is kept so history can show
+    # EXPIRED jobs after output files are removed.
+    RETENTION_DAYS: int = 7
+
+    # Deprecated compatibility knob. New cleanup code uses RETENTION_DAYS.
+    JOB_TTL_HOURS: int = 168
 
     # Max upload size (MB) — guards against giant files.
     MAX_UPLOAD_MB: int = 50

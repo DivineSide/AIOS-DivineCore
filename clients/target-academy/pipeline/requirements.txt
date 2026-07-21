@@ -14,3 +14,7 @@ playwright>=1.44.0
 httpx>=0.27.0
 beautifulsoup4>=4.12.0
 python-dotenv>=1.0.0
+
+# Referral QR on papers/decks (referral_qr.py): every document a student
+# receives becomes a self-registration point for the referral program.
+qrcode>=7.4
