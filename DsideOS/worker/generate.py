@@ -82,16 +82,17 @@ SONNET = "claude-sonnet-4-6"
 GEN_MODEL = os.environ.get("GEN_MODEL", SONNET)
 
 GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "anthropic").lower()
-# sarvam-30b (32B total, ~2.4B active/token MoE, 64K context) over sarvam-105b
-# (106B total, 128K context): per Sarvam's own model docs + Artificial
-# Analysis benchmarks, 30b is the faster/cheaper pick and 105b's extra
-# accuracy is aimed at long/complex document tasks, not a single short MCQ.
-# Measured real slot prompt (2026-07-22, full RAG context + PYQ examples +
-# system prompt via tiktoken cl100k_base as a proxy): ~6000 tokens; +4000
-# output budget is ~10000 total, well inside 30b's 64K window with margin
-# to spare even accounting for tokenizer differences or unusually long
-# passages on some slots.
-SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-30b")
+# Tried sarvam-30b (2026-07-22): ~9x faster per raw draft call than 105b, but
+# a real 50Q pipeline test showed it ignores SLOT_SYSTEM's "never reference
+# the study material in the reason text" rule far more often than 105b does
+# (~86% of all drops were this one instruction-following miss, not real
+# grounding failures) — the retry churn from that made the NET paper slower
+# than 105b despite the faster raw calls (32/50 questions in 26.9 min).
+# Reverted to 105b; reasoning_effort stays disabled below regardless of
+# model (see _sarvam_reasoning_effort) since that part of the speedup is
+# real and doesn't carry this tradeoff. Revisit 30b if the prompt gets
+# tightened enough to close the instruction-following gap.
+SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-105b")
 SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
 
 TOPICS_DIVISOR = 2       # ~count/2 distinct topics (was 4 — variety collapsed)
