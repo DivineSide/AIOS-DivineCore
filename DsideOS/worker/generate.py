@@ -82,7 +82,16 @@ SONNET = "claude-sonnet-4-6"
 GEN_MODEL = os.environ.get("GEN_MODEL", SONNET)
 
 GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "anthropic").lower()
-SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-105b")
+# sarvam-30b (32B total, ~2.4B active/token MoE, 64K context) over sarvam-105b
+# (106B total, 128K context): per Sarvam's own model docs + Artificial
+# Analysis benchmarks, 30b is the faster/cheaper pick and 105b's extra
+# accuracy is aimed at long/complex document tasks, not a single short MCQ.
+# Measured real slot prompt (2026-07-22, full RAG context + PYQ examples +
+# system prompt via tiktoken cl100k_base as a proxy): ~6000 tokens; +4000
+# output budget is ~10000 total, well inside 30b's 64K window with margin
+# to spare even accounting for tokenizer differences or unusually long
+# passages on some slots.
+SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-30b")
 SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
 
 TOPICS_DIVISOR = 2       # ~count/2 distinct topics (was 4 — variety collapsed)
@@ -220,17 +229,30 @@ def _draft_anthropic(system: str, messages: list[dict]) -> str:
     return msg.content[0].text.strip() if msg.content else ""
 
 
+def _sarvam_reasoning_effort() -> str | None:
+    """None fully disables sarvam's hidden reasoning phase (Sarvam's own docs:
+    "use None to completely disable reasoning when you want the fastest
+    possible responses" — a distinct, lower state than the string "low", not
+    just the bottom of the low/medium/high enum). This task (one short MCQ,
+    facts-only, structural JSON) has no need for multi-step reasoning — the
+    "thinking" was pure overhead, and per Sarvam's docs a too-small token
+    budget for reasoning is exactly what caused the empty-content bug below,
+    not a fluke of this codebase. SARVAM_REASONING env can still force a
+    level ("low"/"medium"/"high") for comparison, but the default is now off.
+    NOTE: must be Python None / JSON null, not the string "none" — Sarvam's
+    API expects the enum values or a null, not a fourth string value."""
+    val = os.environ.get("SARVAM_REASONING", "").strip().lower()
+    return val if val in ("low", "medium", "high") else None
+
+
 def _draft_sarvam(system: str, messages: list[dict]) -> str:
-    # sarvam-105b is a REASONING model: without reasoning_effort it thinks at
-    # essay length into a hidden reasoning_content field, hits max_tokens, and
-    # returns EMPTY content (finish_reason=length) on every complex prompt.
-    # reasoning_effort=low bounds the think so the answer actually arrives.
-    # max_tokens: starter tier hard-caps at 4096; run just under it — history
-    # prompts still produced len=0 (reasoning ate all 3000) at the lower cap.
+    # max_tokens: starter tier hard-caps at 4096; run just under it. With
+    # reasoning disabled (see _sarvam_reasoning_effort) the old "reasoning ate
+    # the whole budget, content came back empty" failure mode shouldn't recur,
+    # but the warning below stays as a canary in case it does.
     resp = _sarvam_client().chat.completions.create(
         model=SARVAM_MODEL, max_tokens=4000,
-        extra_body={"reasoning_effort":
-                    os.environ.get("SARVAM_REASONING", "low")},
+        extra_body={"reasoning_effort": _sarvam_reasoning_effort()},
         messages=[{"role": "system", "content": system}] + messages,
     )
     choice = resp.choices[0]
