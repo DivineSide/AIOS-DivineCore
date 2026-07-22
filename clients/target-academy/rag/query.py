@@ -60,13 +60,25 @@ def _oai() -> OpenAI:
     return _openai
 
 
+DB_CONNECT_TIMEOUT = 10   # seconds — TCP connect ceiling, see below
+DB_STATEMENT_TIMEOUT_MS = 30_000   # 30s — per-query ceiling, enforced server-side
+
+
 def _db():
     conn = getattr(_thread_local, "conn", None)
     if conn is None or conn.closed:
         url = os.environ.get("SUPABASE_DB_URL", "")
         if not url:
             raise RuntimeError("SUPABASE_DB_URL not set in .env")
-        conn = psycopg2.connect(url)
+        # psycopg2.connect() has NO default timeout on TCP connect or query
+        # execution — a network partition or a wedged query blocks forever,
+        # and since _db() is called via asyncio.to_thread inside
+        # asyncio.gather (generate.py's waves), one stuck connection hangs
+        # that entire wave with no ceiling. connect_timeout bounds the
+        # connect phase; statement_timeout (a session GUC, enforced by
+        # Postgres itself, not the client) bounds every query after that.
+        conn = psycopg2.connect(url, connect_timeout=DB_CONNECT_TIMEOUT,
+                                options=f"-c statement_timeout={DB_STATEMENT_TIMEOUT_MS}")
         _thread_local.conn = conn
     return conn
 
