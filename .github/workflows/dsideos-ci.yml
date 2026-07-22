@@ -9,11 +9,13 @@ on:
     paths:
       - "DsideOS/**"
       - "clients/target-academy/pipeline/**"
+      - "clients/target-academy/rag/**"
       - ".github/workflows/dsideos-ci.yml"
   pull_request:
     paths:
       - "DsideOS/**"
       - "clients/target-academy/pipeline/**"
+      - "clients/target-academy/rag/**"
   workflow_dispatch:
 
 permissions:
