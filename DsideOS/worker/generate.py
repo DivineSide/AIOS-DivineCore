@@ -103,24 +103,6 @@ MAX_TOPUP = 8            # extra slots tried when drops leave the paper short
 # skipped; above ~8 you brush API rate limits for marginal gain.
 GEN_CONCURRENCY = max(1, int(os.environ.get("GEN_CONCURRENCY", "6")))
 
-# Global cap on in-flight _gen_slot calls, shared across ALL subjects of an
-# exam-mode paper — not per-subject. Without this, generate_exam() running
-# subjects concurrently (2026-07-22 fix for the sequential-subject slowdown)
-# would let each subject wave up to GEN_CONCURRENCY on its own, stacking to
-# subjects*GEN_CONCURRENCY simultaneous calls at peak (e.g. 7*6=42) — well
-# past the ~6-8 ceiling before Sarvam rate-limits (see GEN_CONCURRENCY
-# comment above). This semaphore keeps TOTAL concurrency at GEN_CONCURRENCY
-# regardless of how many subjects are running at once; created lazily so it
-# binds to whichever event loop is actually running the task.
-_slot_semaphore: asyncio.Semaphore | None = None
-
-
-def _get_slot_semaphore() -> asyncio.Semaphore:
-    global _slot_semaphore
-    if _slot_semaphore is None:
-        _slot_semaphore = asyncio.Semaphore(GEN_CONCURRENCY)
-    return _slot_semaphore
-
 VALID_ANSWERS = {"a", "b", "c", "d"}
 
 SUBJECT_LABELS = {
@@ -448,15 +430,28 @@ def _rejected_terms(draft: dict | None, topic: str) -> str:
 
 
 async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
-                    guard: PaperGuard, initial_reason: str = "",
+                    guard: PaperGuard, slot_sem: asyncio.Semaphore,
+                    initial_reason: str = "",
                     exam: str | None = None) -> tuple[dict | None, str]:
     """Generate one question — thin wrapper enforcing the GLOBAL concurrency
-    cap (see _get_slot_semaphore) before doing any real work. Every caller
-    (waves in generate_questions, its top-up loop, across every subject a
-    concurrent generate_exam() is running) goes through this one gate, so
-    total in-flight API calls never exceeds GEN_CONCURRENCY no matter how
-    many subjects/waves are active at once."""
-    async with _get_slot_semaphore():
+    cap via `slot_sem` before doing any real work. Every caller (waves in
+    generate_questions, its top-up loop, across every subject a concurrent
+    generate_exam() is running) shares the SAME semaphore instance, so total
+    in-flight API calls never exceeds GEN_CONCURRENCY no matter how many
+    subjects/waves are active at once.
+
+    `slot_sem` is created fresh per top-level call (generate_exam /
+    generate_questions — the two functions each Celery task wraps in its own
+    asyncio.run()) and passed down, rather than cached as a module global.
+    A semaphore is bound to the event loop that created it; asyncio.run()
+    makes a NEW loop per job, so a global would occasionally survive a prior
+    job's crash/timeout still locked and bound to that job's now-dead loop —
+    the next job on the same worker process would then fail immediately with
+    "bound to a different event loop" (observed 2026-07-22, job
+    6c9771500e9a47ce, right after a prior job hit its Celery soft time
+    limit mid-run). Scoping the semaphore to the call, not the process,
+    makes that impossible — nothing outlives the job that created it."""
+    async with slot_sem:
         return await _gen_slot_inner(subject, topic, fmt, slot_id, guard, initial_reason, exam)
 
 
@@ -555,11 +550,23 @@ async def _gen_slot_inner(subject: str, topic: str, fmt: str, slot_id: int,
 # ── orchestrators ────────────────────────────────────────────────────────────
 
 async def generate_questions(subject: str, count: int,
-                             exam: str | None = None) -> tuple[list[dict], dict]:
+                             exam: str | None = None,
+                             slot_sem: asyncio.Semaphore | None = None,
+                             ) -> tuple[list[dict], dict]:
     """Subject mode (exam=None) or one subject of an exam paper (exam set —
     official-syllabus topic seeding kicks in). Returns (questions, meta) —
     meta carries drop notes for the dashboard; the questions list is always
-    clean (no flags)."""
+    clean (no flags).
+
+    `slot_sem` caps total concurrent _gen_slot calls at GEN_CONCURRENCY (see
+    _gen_slot's docstring for why this must be created fresh per job, not
+    cached as a module global). Callers running multiple subjects concurrently
+    (generate_exam) must create ONE semaphore and pass it to every subject's
+    call, so the cap is shared across subjects, not per-subject. Subject-mode
+    callers (this function invoked directly, its own top-level asyncio.run)
+    leave it unset and get one scoped to just this call."""
+    if slot_sem is None:
+        slot_sem = asyncio.Semaphore(GEN_CONCURRENCY)
     topics = await _extract_topics(subject, count, exam=exam)
     fmt_counts = blueprint.allocate(count, blueprint.format_mix())
     # slot list: rare formats first so they land on distinct early topics
@@ -582,7 +589,8 @@ async def generate_questions(subject: str, count: int,
     while pending:
         wave, pending = pending[:GEN_CONCURRENCY], pending[GEN_CONCURRENCY:]
         results = await asyncio.gather(*[
-            _gen_slot(subject, topic, fmt, sid, guard, initial_reason=reason, exam=exam)
+            _gen_slot(subject, topic, fmt, sid, guard, slot_sem,
+                     initial_reason=reason, exam=exam)
             for sid, topic, fmt, reason in wave
         ])
         for (sid, topic, fmt, was_requeued), (q, reason) in zip(wave, results):
@@ -607,7 +615,8 @@ async def generate_questions(subject: str, count: int,
         batch = [(1000 + topup + j, topics[(len(slots) + topup + j) % len(topics)])
                  for j in range(need)]
         results = await asyncio.gather(*[
-            _gen_slot(subject, topic, "plain", sid, guard, exam=exam) for sid, topic in batch
+            _gen_slot(subject, topic, "plain", sid, guard, slot_sem, exam=exam)
+            for sid, topic in batch
         ])
         for (sid, topic), (q, reason) in zip(batch, results):
             if q is not None and guard.check(q) is None and len(out) < count:
@@ -649,11 +658,20 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
     each subject barely used the wave concurrency inside generate_questions
     because 1-3 slots rarely fills a GEN_CONCURRENCY=6 wave anyway — the
     real waste was subjects waiting on each other, not slots within a
-    subject waiting on each other."""
+    subject waiting on each other.
+
+    One semaphore is created HERE and shared across every subject's
+    generate_questions() call, so the GEN_CONCURRENCY cap applies to the
+    whole paper at once, not per-subject (see generate_questions'/_gen_slot's
+    docstrings) — and because it's scoped to this single call (this function
+    is exactly what each Celery task wraps in its own asyncio.run()), it can
+    never survive into a later job's event loop."""
     per_subject = blueprint.allocate(total, blueprint.subject_mix(exam))
     subjects = [(subject, n) for subject, n in per_subject.items() if n > 0]
+    slot_sem = asyncio.Semaphore(GEN_CONCURRENCY)
     results = await asyncio.gather(*[
-        generate_questions(subject, n, exam=exam) for subject, n in subjects
+        generate_questions(subject, n, exam=exam, slot_sem=slot_sem)
+        for subject, n in subjects
     ])
 
     out: list[dict] = []
