@@ -105,6 +105,12 @@ PYQ_THRESHOLD = 0.10
 
 MAX_SLOT_ATTEMPTS = 3    # 1 draft + up to 2 informed retries per slot
 MAX_TOPUP = 8            # extra slots tried when drops leave the paper short
+IN_FORMAT_TOPUP_RETRIES = 2   # a dropped rare-format slot gets this many
+                              # top-up attempts in its OWN format before
+                              # falling back to plain (see generate_questions'
+                              # top-up loop) — counts against MAX_TOPUP same
+                              # as any other attempt, just doesn't give up on
+                              # the pre-planned format immediately
 # Slots are independent network-bound work; only the PaperGuard is
 # cross-question. Waves of K slots run fully parallel, then commit through the
 # guard sequentially at the wave boundary — a collision (two slots landing the
@@ -575,6 +581,7 @@ async def _gen_slot_inner(subject: str, topic: str, fmt: str, slot_id: int,
 async def generate_questions(subject: str, count: int,
                              exam: str | None = None,
                              slot_sem: asyncio.Semaphore | None = None,
+                             fmt_counts: dict[str, int] | None = None,
                              ) -> tuple[list[dict], dict]:
     """Subject mode (exam=None) or one subject of an exam paper (exam set —
     official-syllabus topic seeding kicks in). Returns (questions, meta) —
@@ -587,11 +594,20 @@ async def generate_questions(subject: str, count: int,
     (generate_exam) must create ONE semaphore and pass it to every subject's
     call, so the cap is shared across subjects, not per-subject. Subject-mode
     callers (this function invoked directly, its own top-level asyncio.run)
-    leave it unset and get one scoped to just this call."""
+    leave it unset and get one scoped to just this call.
+
+    `fmt_counts` (exam mode only): the pre-decided {format: count} for THIS
+    subject, computed once for the whole paper by blueprint.exam_format_plan
+    before any subject starts generating (see generate_exam) — real
+    per-subject historical format proportions, not one ratio flattened
+    across every subject. Subject-mode callers leave this unset and fall
+    back to the global format_mix(), unchanged from before this parameter
+    existed."""
     if slot_sem is None:
         slot_sem = asyncio.Semaphore(GEN_CONCURRENCY)
     topics = await _extract_topics(subject, count, exam=exam)
-    fmt_counts = blueprint.allocate(count, blueprint.format_mix())
+    if fmt_counts is None:
+        fmt_counts = blueprint.allocate(count, blueprint.format_mix())
     # slot list: rare formats first so they land on distinct early topics
     slots = [f for f in ("match", "statement", "assertion", "order")
              for _ in range(fmt_counts.get(f, 0))]
@@ -631,22 +647,50 @@ async def generate_questions(subject: str, count: int,
                 drops.append({"topic": topic, "format": fmt,
                               "reason": f"wave collision persisted: {collision}"})
 
-    # top-up: recover the count with plain questions on fresh topics (same waves)
+    # top-up: recover the count on fresh topics (same waves). Each dropped
+    # slot gets up to IN_FORMAT_TOPUP_RETRIES attempts IN ITS OWN ORIGINAL
+    # FORMAT before falling back to plain — a paper pre-planned (via
+    # blueprint.exam_format_plan) for N match questions must not have every
+    # failed match slot silently become plain; that would throw away the
+    # whole point of the per-subject-per-format plan through the exact
+    # mechanism it was built to fix. `drops` already carries each failure's
+    # original `format`, so this is a queue of (format, retries_left) rather
+    # than a single hardcoded "plain" — plain-format drops still get exactly
+    # MAX_TOPUP total attempts as before (retries_left starts at 0 for them,
+    # i.e. no special in-format retry needed since they're already plain).
+    topup_queue: list[tuple[str, int]] = [
+        (d["format"], IN_FORMAT_TOPUP_RETRIES if d["format"] != "plain" else 0)
+        for d in drops
+    ]
     topup = 0
     while len(out) < count and topup < MAX_TOPUP:
         need = min(count - len(out), GEN_CONCURRENCY, MAX_TOPUP - topup)
-        batch = [(1000 + topup + j, topics[(len(slots) + topup + j) % len(topics)])
-                 for j in range(need)]
+        batch = []
+        for j in range(need):
+            if topup_queue:
+                fmt, retries_left = topup_queue.pop(0)
+            else:
+                fmt, retries_left = "plain", 0
+            sid = 1000 + topup + j
+            topic = topics[(len(slots) + topup + j) % len(topics)]
+            batch.append((sid, topic, fmt, retries_left))
         results = await asyncio.gather(*[
-            _gen_slot(subject, topic, "plain", sid, guard, slot_sem, exam=exam)
-            for sid, topic in batch
+            _gen_slot(subject, topic, fmt, sid, guard, slot_sem, exam=exam)
+            for sid, topic, fmt, _ in batch
         ])
-        for (sid, topic), (q, reason) in zip(batch, results):
+        for (sid, topic, fmt, retries_left), (q, reason) in zip(batch, results):
             if q is not None and guard.check(q) is None and len(out) < count:
                 guard.commit(q)
                 out.append(q)
             elif q is None:
-                drops.append({"topic": topic, "format": "plain(topup)", "reason": reason})
+                if retries_left > 0:
+                    # re-queue in the SAME format, one fewer retry left —
+                    # still counts against MAX_TOPUP overall, just doesn't
+                    # give up on the original format immediately
+                    topup_queue.append((fmt, retries_left - 1))
+                else:
+                    drops.append({"topic": topic, "format": f"{fmt}(topup)",
+                                 "reason": reason})
         topup += need
 
     for i, q in enumerate(out, 1):
@@ -688,12 +732,26 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
     whole paper at once, not per-subject (see generate_questions'/_gen_slot's
     docstrings) — and because it's scoped to this single call (this function
     is exactly what each Celery task wraps in its own asyncio.run()), it can
-    never survive into a later job's event loop."""
+    never survive into a later job's event loop.
+
+    Format variety is ALSO pre-decided here, once, before any subject starts
+    generating: blueprint.exam_format_plan() measures each subject's REAL
+    historical format mix from pyq_chunks (not one ratio flattened across
+    every subject — see blueprint.py's per-subject-format-planning section)
+    and hands each subject's generate_questions() call its own fmt_counts.
+    Uses rag._db() (query.py's thread-local psycopg2 connection, already
+    timeout-bounded) via asyncio.to_thread since this is a sync DB call in
+    an async function; any failure here is caught inside exam_format_plan
+    itself and degrades to today's global-format_mix-per-subject behavior,
+    so a planning-query hiccup never blocks the job."""
     per_subject = blueprint.allocate(total, blueprint.subject_mix(exam))
     subjects = [(subject, n) for subject, n in per_subject.items() if n > 0]
+    fmt_plan = await asyncio.to_thread(
+        blueprint.exam_format_plan, exam, dict(subjects), rag._db())
     slot_sem = asyncio.Semaphore(GEN_CONCURRENCY)
     results = await asyncio.gather(*[
-        generate_questions(subject, n, exam=exam, slot_sem=slot_sem)
+        generate_questions(subject, n, exam=exam, slot_sem=slot_sem,
+                          fmt_counts=fmt_plan[subject])
         for subject, n in subjects
     ])
 
@@ -706,4 +764,5 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
         metas[subject] = meta
     for i, q in enumerate(out, 1):
         q["n"] = i
-    return out, {"exam": exam, "per_subject_plan": per_subject, "subjects": metas}
+    return out, {"exam": exam, "per_subject_plan": per_subject,
+                 "format_plan": fmt_plan, "subjects": metas}

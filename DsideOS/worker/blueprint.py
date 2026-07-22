@@ -26,6 +26,7 @@ e.g. GEN_FORMAT_MIX="plain:80,match:12,statement:5,assertion:2,order:1".
 from __future__ import annotations
 
 import os
+import random
 
 # ── measured defaults (see docstring queries) ────────────────────────────────
 
@@ -122,3 +123,87 @@ def allocate(total: int, mix: dict[str, float]) -> dict[str, int]:
     for k in order[:leftover]:
         counts[k] += 1
     return counts
+
+
+# ── per-subject format planning (2026-07-22) ────────────────────────────────
+# WHY: the global FORMAT_MIX above is measured across ALL subjects combined,
+# then applied identically to every subject's own slice of the paper. Real
+# papers don't work that way — some subjects (e.g. history) carry far more
+# match-the-following / statement questions than others (e.g. computer) in
+# the actual PYQ corpus. Flattening everyone to one ratio, at real per-subject
+# sizes (5-16 questions), rounds rare formats to 0 for most subjects even when
+# the paper-level plan calls for them elsewhere. This section computes a
+# REAL per-subject-per-format mix from pyq_chunks instead of guessing, then
+# reuses allocate() (same largest-remainder mechanics, no new algorithm) to
+# turn it into exact counts. Exam-mode only — subject mode has no exam
+# context to scope the measurement to (see generate.py's own docstrings).
+
+ALPHA = 5.0   # additive-smoothing strength: how hard sparse subjects get
+              # pulled toward the global FORMAT_MIX (see subject_format_mix)
+JITTER_SPREAD = 0.15   # ±15% relative — "small range for random" per spec
+
+
+def subject_format_mix(exam: str, subject: str, conn) -> dict[str, float]:
+    """Real per-format shares for ONE subject within ONE exam, measured from
+    pyq_chunks. Falls back exam-scoped -> subject-global (any exam) -> the
+    plain FORMAT_MIX when a subject has too little real data to trust on its
+    own — additive smoothing blends toward FORMAT_MIX proportionally to
+    sample size, so 3 real "match" questions don't produce a 100% match
+    ratio, but 200 real examples barely move off their own true ratio.
+    `conn` is a short-lived sync psycopg2 connection (planning-time
+    aggregate query, not the async RAG lookup path in rag/query.py)."""
+    def _counts(where_exam: bool) -> dict[str, int]:
+        sql = ("SELECT format, count(*) FROM pyq_chunks "
+               "WHERE subject = %s AND format IS NOT NULL"
+               + (" AND exam = %s" if where_exam else ""))
+        params = (subject, exam) if where_exam else (subject,)
+        with conn.cursor() as cur:
+            cur.execute(sql + " GROUP BY format", params)
+            return {fmt: n for fmt, n in cur.fetchall()}
+
+    counts = _counts(where_exam=True)
+    if not counts:
+        counts = _counts(where_exam=False)   # widen: this subject, any exam
+    if not counts:
+        return dict(FORMAT_MIX)              # no real data at all — plain default
+
+    total_n = sum(counts.values())
+    return {
+        fmt: (counts.get(fmt, 0) + ALPHA * base_share) / (total_n + ALPHA)
+        for fmt, base_share in FORMAT_MIX.items()
+    }
+
+
+def _jitter(mix: dict[str, float], rng: random.Random,
+           spread: float = JITTER_SPREAD) -> dict[str, float]:
+    """Multiply each share by (1 + U(-spread, spread)), renormalize to sum 1.
+    Randomizes the MIX, not the final integer counts — allocate()'s
+    sum-to-total guarantee is preserved automatically since it always
+    operates on a valid (summing-to-1) distribution."""
+    jittered = {k: v * (1 + rng.uniform(-spread, spread)) for k, v in mix.items()}
+    total = sum(jittered.values())
+    return {k: v / total for k, v in jittered.items()}
+
+
+def exam_format_plan(exam: str, per_subject: dict[str, int], conn,
+                     seed: int | None = None) -> dict[str, dict[str, int]]:
+    """The full pre-decision: for every subject in this exam's paper, compute
+    its real (smoothed) format mix, jitter it for run-to-run variation, then
+    allocate() exact integer counts. Returns {subject: {format: count}},
+    each subject's counts summing to per_subject[subject].
+
+    Called ONCE per exam, before generation starts — the harness owns this
+    decision up front, same philosophy as subject_mix/format_mix above, just
+    scoped per-subject instead of flattened globally. `seed=None` (default)
+    means real entropy-seeded variation across runs; pass an int for
+    deterministic tests. On any DB failure, falls back to today's exact
+    global-FORMAT_MIX-per-subject behavior for the whole exam — a planning
+    query failing must never block a generation job."""
+    rng = random.Random(seed)
+    try:
+        return {
+            subject: allocate(n, _jitter(subject_format_mix(exam, subject, conn), rng))
+            for subject, n in per_subject.items()
+        }
+    except Exception:
+        return {subject: allocate(n, format_mix()) for subject, n in per_subject.items()}
