@@ -335,7 +335,7 @@ async def _extract_topics(subject: str, count: int,
     else:
         official = []
 
-    seed_pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SEED_K)
+    seed_pyqs = await rag.pyq_lookup(subject, top_k=PYQ_SEED_K, exam=exam)
     if not seed_pyqs:
         return official or [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
 
@@ -367,7 +367,8 @@ async def _extract_topics(subject: str, count: int,
 
 async def _slot_context(subject: str, topic: str, fmt: str,
                         top_k: int = BOOK_TOP_K,
-                        query_extra: str = "") -> tuple[list, str, str]:
+                        query_extra: str = "",
+                        exam: str | None = None) -> tuple[list, str, str]:
     """Retrieve one slot's context. Returns (passages, passages_txt, examples_txt).
 
     `top_k`/`query_extra` support agentic RE-RETRIEVAL: when a draft is rejected
@@ -375,7 +376,16 @@ async def _slot_context(subject: str, topic: str, fmt: str,
     with a WIDER top_k and the rejected question's own terms appended to the
     query — so the retry sees MORE and DIFFERENT passages instead of being handed
     the same thin material that produced the ungrounded question. Retrying with
-    new evidence beats shipping a doubtful fact."""
+    new evidence beats shipping a doubtful fact.
+
+    `exam` (exam mode only) restricts PYQ style examples to THIS exam's own
+    real papers — a vdo-vpdo slot must not imitate group-c's or driver's
+    format mix. The any-subject-same-format fallback below intentionally
+    KEEPS the exam filter (a rare format's shape still needs to come from
+    this exam's own papers, just a different subject within it); only the
+    final no-exam-context fallback drops it, and only because at that point
+    no example beats a wrong-exam example less than no example at all — see
+    the unfiltered call below."""
     search_topic = f"{topic} {query_extra}".strip() if query_extra else topic
     passages = await rag.passage_lookup(search_topic, subject=subject,
                                         top_k=top_k, threshold=PASSAGE_THRESHOLD)
@@ -385,13 +395,18 @@ async def _slot_context(subject: str, topic: str, fmt: str,
                                             subject=subject, top_k=BOOK_TOP_K,
                                             threshold=0.10)
     examples = await rag.pyq_rag_lookup(topic, subject, top_k=PYQ_TOP_K,
-                                        threshold=PYQ_THRESHOLD, format=fmt)
+                                        threshold=PYQ_THRESHOLD, format=fmt,
+                                        exam=exam)
     if not examples and fmt != "plain":
         # rare format with no nearby example of that format — any-subject example
         # of the SAME FORMAT still teaches the shape better than nothing
         examples = await rag.pyq_rag_lookup(formats.FORMATS[fmt]["label"], subject,
-                                            top_k=PYQ_TOP_K, threshold=0.0, format=fmt)
+                                            top_k=PYQ_TOP_K, threshold=0.0, format=fmt,
+                                            exam=exam)
     if not examples:
+        # last resort: drop the exam filter too (no format-true example exists
+        # anywhere in this exam's own corpus) — any real PYQ of this subject
+        # still teaches better than the placeholder text in etxt below
         examples = await rag.pyq_rag_lookup(topic, subject, top_k=PYQ_TOP_K,
                                             threshold=PYQ_THRESHOLD)
 
@@ -433,7 +448,8 @@ def _rejected_terms(draft: dict | None, topic: str) -> str:
 
 
 async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
-                    guard: PaperGuard, initial_reason: str = "") -> tuple[dict | None, str]:
+                    guard: PaperGuard, initial_reason: str = "",
+                    exam: str | None = None) -> tuple[dict | None, str]:
     """Generate one question — thin wrapper enforcing the GLOBAL concurrency
     cap (see _get_slot_semaphore) before doing any real work. Every caller
     (waves in generate_questions, its top-up loop, across every subject a
@@ -441,15 +457,16 @@ async def _gen_slot(subject: str, topic: str, fmt: str, slot_id: int,
     total in-flight API calls never exceeds GEN_CONCURRENCY no matter how
     many subjects/waves are active at once."""
     async with _get_slot_semaphore():
-        return await _gen_slot_inner(subject, topic, fmt, slot_id, guard, initial_reason)
+        return await _gen_slot_inner(subject, topic, fmt, slot_id, guard, initial_reason, exam)
 
 
 async def _gen_slot_inner(subject: str, topic: str, fmt: str, slot_id: int,
-                          guard: PaperGuard, initial_reason: str = "") -> tuple[dict | None, str]:
+                          guard: PaperGuard, initial_reason: str = "",
+                          exam: str | None = None) -> tuple[dict | None, str]:
     """Generate one question. Returns (question, "") or (None, last_reason).
     `initial_reason` injects feedback from a wave-boundary collision so the
     re-run is informed, not a blind re-roll."""
-    passages, ptxt, etxt = await _slot_context(subject, topic, fmt)
+    passages, ptxt, etxt = await _slot_context(subject, topic, fmt, exam=exam)
     if not passages:
         return None, f"no study material for topic '{topic}'"
 
@@ -508,7 +525,7 @@ async def _gen_slot_inner(subject: str, topic: str, fmt: str, slot_id: int,
             wider = BOOK_TOP_K + 3 * (attempt + 1)   # 7, then 10, ...
             q_terms = _rejected_terms(draft, topic)
             new_passages, new_ptxt, new_etxt = await _slot_context(
-                subject, topic, fmt, top_k=wider, query_extra=q_terms)
+                subject, topic, fmt, top_k=wider, query_extra=q_terms, exam=exam)
             if new_passages:
                 passages, ptxt, etxt = new_passages, new_ptxt, new_etxt
                 system = SLOT_SYSTEM.format(
@@ -565,7 +582,7 @@ async def generate_questions(subject: str, count: int,
     while pending:
         wave, pending = pending[:GEN_CONCURRENCY], pending[GEN_CONCURRENCY:]
         results = await asyncio.gather(*[
-            _gen_slot(subject, topic, fmt, sid, guard, initial_reason=reason)
+            _gen_slot(subject, topic, fmt, sid, guard, initial_reason=reason, exam=exam)
             for sid, topic, fmt, reason in wave
         ])
         for (sid, topic, fmt, was_requeued), (q, reason) in zip(wave, results):
@@ -590,7 +607,7 @@ async def generate_questions(subject: str, count: int,
         batch = [(1000 + topup + j, topics[(len(slots) + topup + j) % len(topics)])
                  for j in range(need)]
         results = await asyncio.gather(*[
-            _gen_slot(subject, topic, "plain", sid, guard) for sid, topic in batch
+            _gen_slot(subject, topic, "plain", sid, guard, exam=exam) for sid, topic in batch
         ])
         for (sid, topic), (q, reason) in zip(batch, results):
             if q is not None and guard.check(q) is None and len(out) < count:

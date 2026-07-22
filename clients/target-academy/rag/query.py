@@ -134,15 +134,24 @@ async def rag_lookup(
 
 
 def _pyq_search(embedding: list[float], subject: str, top_k: int,
-                threshold: float, format: str | None = None) -> list[dict]:
+                threshold: float, format: str | None = None,
+                exam: str | None = None) -> list[dict]:
     """Semantic search on pyq_chunks — same cosine similarity as book_passages
     but hits the PYQ table. Returns questions whose meaning is close to the
     query embedding, preserving framing + distractor style. Optional `format`
     filter ("match", "assertion", ...) returns only that question format —
-    used to hand the generator real examples of the exact format it must write."""
+    used to hand the generator real examples of the exact format it must write.
+
+    Optional `exam` filter restricts style examples to THIS exam's own real
+    papers (exam column added 2026-07-22, backfilled from source_file) — a
+    vdo-vpdo paper's match/statement examples must come from vdo-vpdo's own
+    past papers, not from group-c's or driver's, which have a totally
+    different real format mix. Without this, exam-mode generation could draw
+    its "how does a match question look" example from an unrelated exam."""
     conn = _db()
     vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
     fmt_where = "AND format = %s" if format else ""
+    exam_where = "AND exam = %s" if exam else ""
     sql = f"""
         SELECT
             chunk_text,
@@ -151,12 +160,16 @@ def _pyq_search(embedding: list[float], subject: str, top_k: int,
             format,
             1 - (embedding <=> %s::vector) AS similarity
         FROM pyq_chunks
-        WHERE subject = %s {fmt_where}
+        WHERE subject = %s {fmt_where} {exam_where}
         ORDER BY embedding <=> %s::vector
         LIMIT %s
     """
-    params = ([vec_str, subject, format, vec_str, top_k * 2] if format
-              else [vec_str, subject, vec_str, top_k * 2])
+    params = [vec_str, subject]
+    if format:
+        params.append(format)
+    if exam:
+        params.append(exam)
+    params += [vec_str, top_k * 2]
     with conn.cursor() as cur:
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -181,13 +194,16 @@ async def pyq_rag_lookup(
     top_k: int = 5,
     threshold: float = 0.20,
     format: str | None = None,
+    exam: str | None = None,
 ) -> list[dict]:
     """Semantic search on pyq_chunks for past questions relevant to a topic.
-    Returns [] on any error (table may not exist yet — fail soft)."""
+    `exam` (exam mode only) narrows style examples to that exam's own real
+    papers — see _pyq_search. Returns [] on any error (table may not exist
+    yet — fail soft)."""
     try:
         embedding = await asyncio.to_thread(_embed, topic)
         return await asyncio.to_thread(_pyq_search, embedding, subject, top_k,
-                                       threshold, format)
+                                       threshold, format, exam)
     except Exception:
         return []
 
@@ -404,24 +420,32 @@ async def passage_lookup(
         return []
 
 
-async def pyq_lookup(subject: str, top_k: int = 20) -> list[dict]:
+async def pyq_lookup(subject: str, top_k: int = 20,
+                     exam: str | None = None) -> list[dict]:
     """Random sample of a subject's real PYQs — used by generate.py's
     _extract_topics() as the seed set an LLM summarizes into distinct exam
     topics. Not a stand-in for pyq_rag_lookup(), which does semantic search
     for a single already-chosen topic's style examples; this one is for
     discovering the topic taxonomy in the first place, so a random (not
-    semantic) sample is the correct input."""
+    semantic) sample is the correct input.
+
+    Optional `exam` restricts the sample to that exam's own papers — in exam
+    mode this is a thin fallback (the official syllabus is the primary topic
+    source, see syllabus.py) but should still never infer topics from a
+    different exam's PYQs."""
     try:
         conn = _db()
-        sql = """
+        exam_where = "AND exam = %s" if exam else ""
+        sql = f"""
             SELECT chunk_text, source_file
             FROM pyq_chunks
-            WHERE subject = %s
+            WHERE subject = %s {exam_where}
             ORDER BY RANDOM()
             LIMIT %s
         """
+        params = [subject] + ([exam] if exam else []) + [top_k]
         with conn.cursor() as cur:
-            cur.execute(sql, (subject, top_k))
+            cur.execute(sql, params)
             rows = cur.fetchall()
         return [{"text": chunk_text, "source_file": source_file}
                 for chunk_text, source_file in rows]
