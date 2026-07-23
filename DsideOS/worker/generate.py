@@ -104,13 +104,30 @@ PASSAGE_THRESHOLD = 0.20
 PYQ_THRESHOLD = 0.10
 
 MAX_SLOT_ATTEMPTS = 3    # 1 draft + up to 2 informed retries per slot
-MAX_TOPUP = 8            # extra slots tried when drops leave the paper short
 IN_FORMAT_TOPUP_RETRIES = 2   # a dropped rare-format slot gets this many
                               # top-up attempts in its OWN format before
                               # falling back to plain (see generate_questions'
-                              # top-up loop) — counts against MAX_TOPUP same
-                              # as any other attempt, just doesn't give up on
-                              # the pre-planned format immediately
+                              # top-up loop) — counts against the topup
+                              # circuit-breaker same as any other attempt,
+                              # just doesn't give up on the pre-planned
+                              # format immediately
+# The paper's requested count is a PROMISE, not a target: a grounding
+# rejection is a legitimate reason to drop ONE question, never a reason to
+# under-deliver the PAPER. MAX_TOPUP used to be a flat 8 regardless of paper
+# size — fine for a 10-question test, but mathematically guaranteed to fall
+# short on a 100-question paper the moment more than 8 slots failed (observed
+# live: job dd0ccd49fa354c3f, 44 real drops, delivered 81/100 because topup's
+# budget ran out at 8, not because the harness couldn't recover more with
+# fresh topics/passages). Fix: topup now keeps retrying — new topic, fresh
+# RAG context each attempt — until the paper reaches its exact requested
+# count. TOPUP_CIRCUIT_BREAKER exists ONLY to stop a truly pathological case
+# (e.g. a subject with zero usable passages at all, where no number of
+# retries could ever succeed) from looping forever; it's sized as a large
+# multiple of the paper's own count so it should never trigger in practice —
+# if it does, that's a real corpus/retrieval problem worth surfacing, not
+# something to silently paper over by shipping short.
+TOPUP_CIRCUIT_BREAKER_MULTIPLE = 5   # give up only after 5x the paper's own
+                                     # question count in topup attempts
 # Slots are independent network-bound work; only the PaperGuard is
 # cross-question. Waves of K slots run fully parallel, then commit through the
 # guard sequentially at the wave boundary — a collision (two slots landing the
@@ -647,24 +664,28 @@ async def generate_questions(subject: str, count: int,
                 drops.append({"topic": topic, "format": fmt,
                               "reason": f"wave collision persisted: {collision}"})
 
-    # top-up: recover the count on fresh topics (same waves). Each dropped
-    # slot gets up to IN_FORMAT_TOPUP_RETRIES attempts IN ITS OWN ORIGINAL
-    # FORMAT before falling back to plain — a paper pre-planned (via
-    # blueprint.exam_format_plan) for N match questions must not have every
-    # failed match slot silently become plain; that would throw away the
-    # whole point of the per-subject-per-format plan through the exact
-    # mechanism it was built to fix. `drops` already carries each failure's
-    # original `format`, so this is a queue of (format, retries_left) rather
-    # than a single hardcoded "plain" — plain-format drops still get exactly
-    # MAX_TOPUP total attempts as before (retries_left starts at 0 for them,
-    # i.e. no special in-format retry needed since they're already plain).
+    # top-up: recover the count on fresh topics (same waves) — UNCAPPED except
+    # for a circuit breaker (see TOPUP_CIRCUIT_BREAKER_MULTIPLE's docstring):
+    # the requested count is a promise, not a target. A fixed topup budget
+    # (the old MAX_TOPUP=8) is mathematically guaranteed to under-deliver the
+    # moment a paper has more real failures than that budget — observed live
+    # on a 100-question paper with 44 drops, capped at recovering only 8,
+    # shipping 81/100. Each dropped slot gets up to IN_FORMAT_TOPUP_RETRIES
+    # attempts IN ITS OWN ORIGINAL FORMAT before falling back to plain — a
+    # paper pre-planned (via blueprint.exam_format_plan) for N match questions
+    # must not have every failed match slot silently become plain; that would
+    # throw away the whole point of the per-subject-per-format plan through
+    # the exact mechanism it was built to fix. `drops` already carries each
+    # failure's original `format`, so this is a queue of (format,
+    # retries_left) rather than a single hardcoded "plain".
     topup_queue: list[tuple[str, int]] = [
         (d["format"], IN_FORMAT_TOPUP_RETRIES if d["format"] != "plain" else 0)
         for d in drops
     ]
+    topup_ceiling = max(count * TOPUP_CIRCUIT_BREAKER_MULTIPLE, 20)
     topup = 0
-    while len(out) < count and topup < MAX_TOPUP:
-        need = min(count - len(out), GEN_CONCURRENCY, MAX_TOPUP - topup)
+    while len(out) < count and topup < topup_ceiling:
+        need = min(count - len(out), GEN_CONCURRENCY, topup_ceiling - topup)
         batch = []
         for j in range(need):
             if topup_queue:
@@ -685,8 +706,8 @@ async def generate_questions(subject: str, count: int,
             elif q is None:
                 if retries_left > 0:
                     # re-queue in the SAME format, one fewer retry left —
-                    # still counts against MAX_TOPUP overall, just doesn't
-                    # give up on the original format immediately
+                    # still counts against the circuit breaker overall, just
+                    # doesn't give up on the original format immediately
                     topup_queue.append((fmt, retries_left - 1))
                 else:
                     drops.append({"topic": topic, "format": f"{fmt}(topup)",
@@ -704,10 +725,21 @@ async def generate_questions(subject: str, count: int,
         "format_actual": {f: sum(1 for q in out if q.get("format") == f)
                           for f in set(q.get("format", "plain") for q in out)},
         "drops": drops,
+        "circuit_breaker_tripped": len(out) < count,
     }
     if len(out) < count:
-        logger.warning("generate: only %d/%d for '%s' (%d drops)",
-                       len(out), count, subject, len(drops))
+        # This should be RARE — it means topup_ceiling (5x the paper's own
+        # count) was exhausted without reaching the requested total, which
+        # only happens if a subject/format combo is structurally unable to
+        # ground ANY question (e.g. a corpus with real retrieval hits but no
+        # single quotable fact for that topic — see ground.py). Surfaced
+        # loudly, not silently absorbed, since the requested count is a
+        # promise: this is a real corpus/retrieval gap worth investigating,
+        # not an expected outcome.
+        logger.error("generate: CIRCUIT BREAKER TRIPPED — only %d/%d for '%s' "
+                    "after %d topup attempts (%d drops) — paper is short; "
+                    "this subject/format likely has a real grounding gap",
+                    len(out), count, subject, topup, len(drops))
     return out, meta
 
 
