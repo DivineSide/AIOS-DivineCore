@@ -150,7 +150,7 @@ _RESTRUCTURE_MODEL = "llama-3.3-70b-versatile"
 # a 429 (rate/quota) error instead of giving up — so a book bigger than one
 # key's daily budget still gets covered by falling through to the next key,
 # only degrading to "keep raw passage" once ALL configured keys are exhausted.
-_GROQ_KEY_ENVS = ["GROQ_API_KEY", "GROQ_API_KEY_2"]
+_GROQ_KEY_ENVS = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"]
 _groq_clients: list[OpenAI] | None = None
 
 # Groq's per-minute cap (12,000 TPM per key, confirmed live) is a REAL budget
