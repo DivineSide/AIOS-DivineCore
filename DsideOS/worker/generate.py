@@ -294,6 +294,31 @@ def _draft(system: str, messages: list[dict]) -> str:
     return _draft_anthropic(system, messages)
 
 
+def _complete(prompt: str, max_tokens: int = 1024) -> str:
+    """Single-user-turn completion (no passages/system contract) for small
+    helper tasks like topic extraction — routes through GEN_PROVIDER like
+    _draft() does, instead of being hardcoded to one provider regardless of
+    what's actually configured/funded. Previously _extract_topics() called
+    anthropic.Anthropic() directly no matter what GEN_PROVIDER was set to;
+    on a server with GEN_PROVIDER=sarvam and no ANTHROPIC_API_KEY (today's
+    actual deployment), that call was GUARANTEED to fail every time it
+    triggered — confirmed live via a real credit-exhaustion 400. Fails soft
+    to "" on any error, same as before; callers already handle empty output
+    by falling back to a subject-label topic."""
+    if GEN_PROVIDER == "sarvam":
+        resp = _sarvam_client().chat.completions.create(
+            model=SARVAM_MODEL, max_tokens=max_tokens,
+            extra_body={"reasoning_effort": _sarvam_reasoning_effort()},
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return (resp.choices[0].message.content or "").strip()
+    msg = _client().messages.create(
+        model=HAIKU, max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return msg.content[0].text.strip() if msg.content else ""
+
+
 def _parse_json_object(text: str) -> dict | None:
     t = text.strip()
     if t.startswith("```"):
@@ -377,11 +402,7 @@ async def _extract_topics(subject: str, count: int,
         f"overlap or be rewordings of each other. Cover as wide a range as possible."
     )
     try:
-        msg = _client().messages.create(
-            model=HAIKU, max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = msg.content[0].text.strip() if msg.content else ""
+        raw = _complete(prompt, max_tokens=1024)
     except Exception as e:
         logger.warning("topic extraction failed (%s) — using subject label", e)
         raw = ""
