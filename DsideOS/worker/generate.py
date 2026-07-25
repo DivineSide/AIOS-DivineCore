@@ -103,6 +103,29 @@ PYQ_TOP_K = 2            # style examples per slot
 PASSAGE_THRESHOLD = 0.20
 PYQ_THRESHOLD = 0.10
 
+TOPIC_DEDUP_THRESHOLD = 0.78   # cosine sim above this = treat as duplicate
+                               # enough to refetch. MEASURED, not guessed
+                               # (2026-07-25): real same-fact rephrasings
+                               # ("गढ़वाली बोली की उत्पत्ति" vs "...किस भाषा का
+                               # रूप") score 0.81 and 0.80; a genuinely
+                               # DIFFERENT topic in the same domain ("पंवार
+                               # वंश के शासक" vs "चंद वंश के शासक" — two
+                               # different dynasties) scores 0.73 — these
+                               # ranges OVERLAP, so no threshold perfectly
+                               # separates "same fact reworded" from
+                               # "related but distinct fact" on short topic
+                               # phrases with this embedding model. Goal is
+                               # NOT zero topic overlap (real exams legitimately
+                               # cluster several questions per broad theme) —
+                               # it's minimizing exact-same-fact collisions.
+                               # A false-positive refetch just produces
+                               # another valid topic (cheap); a false
+                               # negative reproduces today's Q77/Q82-style
+                               # contradiction (expensive) — asymmetric cost
+                               # justifies erring aggressive over conservative.
+TOPIC_DEDUP_MAX_REFETCH = 3    # refetch attempts per colliding topic before
+                               # accepting the closest candidate and moving on
+
 MAX_SLOT_ATTEMPTS = 3    # 1 draft + up to 2 informed retries per slot
 IN_FORMAT_TOPUP_RETRIES = 2   # a dropped rare-format slot gets this many
                               # top-up attempts in its OWN format before
@@ -361,6 +384,81 @@ def _parse_json_array(text: str) -> list:
         return []
 
 
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
+
+
+async def _dedupe_topics(topics: list[str], subject: str, exam: str | None,
+                         official_pool: list[str]) -> list[str]:
+    """Retrieval-first topic dedup: embed every topic BEFORE any generation
+    slot is built, and replace any pair that's semantically the same
+    underlying topic (not just a different string) — e.g. "गढ़वाली बोली की
+    उत्पत्ति" and "गढ़वाली भाषा किस भाषा से" share zero substrings but ask the
+    exact same fact. Keyword/stem comparison (what PaperGuard does post-hoc,
+    on generated QUESTIONS) can't catch this; only embedding similarity on
+    the TOPIC strings, done before generation starts, catches it up front —
+    so two slots never even get assigned to write about the same fact,
+    rather than catching it after two drafts already burned model calls.
+
+    Official-syllabus topics get a replacement resampled from the unused
+    remainder of the same official list (still authoritative, still
+    official-only). LLM-inferred topics get re-prompted for one fresh
+    replacement, explicitly excluding every topic already accepted.
+    TOPIC_DEDUP_MAX_REFETCH caps retries per collision; if still colliding
+    after that, the closest-to-unique candidate is accepted and logged
+    loudly — this must never silently block or shrink the paper, same
+    philosophy as the topup circuit breaker."""
+    if len(topics) < 2:
+        return topics
+
+    embeds = await asyncio.gather(*[
+        asyncio.to_thread(rag._embed, t) for t in topics
+    ])
+    accepted: list[str] = []
+    accepted_embeds: list[list[float]] = []
+    unused_official = [t for t in official_pool if t not in topics]
+
+    for topic, emb in zip(topics, embeds):
+        candidate, cand_emb = topic, emb
+        for attempt in range(TOPIC_DEDUP_MAX_REFETCH + 1):
+            sims = [_cosine(cand_emb, e) for e in accepted_embeds]
+            worst = max(sims) if sims else 0.0
+            if worst < TOPIC_DEDUP_THRESHOLD:
+                break
+            if attempt == TOPIC_DEDUP_MAX_REFETCH:
+                logger.warning(
+                    "topic-dedup[%s/%s]: '%s' still collides (sim=%.2f) after "
+                    "%d refetches — accepting anyway, not blocking the paper",
+                    subject, exam, candidate, worst, TOPIC_DEDUP_MAX_REFETCH)
+                break
+            if unused_official:
+                candidate = unused_official.pop(random.randrange(len(unused_official)))
+            else:
+                exclude = ", ".join(f'"{t}"' for t in accepted + [candidate])
+                prompt = (
+                    f"Give ONE distinct exam topic/concept for the subject "
+                    f"'{subject}', in Hindi (Devanagari). It must be "
+                    f"COMPLETELY DIFFERENT from all of these already-used "
+                    f"topics: {exclude}. Return ONLY the topic string, no "
+                    f"prose, no JSON, no quotes."
+                )
+                try:
+                    candidate = _complete(prompt, max_tokens=64).strip().strip('"')
+                except Exception as e:
+                    logger.warning("topic-dedup refetch failed (%s) — keeping "
+                                   "prior candidate", e)
+                    break
+            if not candidate:
+                break
+            cand_emb = await asyncio.to_thread(rag._embed, candidate)
+        accepted.append(candidate)
+        accepted_embeds.append(cand_emb)
+    return accepted
+
+
 async def _extract_topics(subject: str, count: int,
                           exam: str | None = None) -> list[str]:
     """Derive distinct exam topics for `count` questions.
@@ -378,6 +476,7 @@ async def _extract_topics(subject: str, count: int,
     if official:
         if len(official) >= n_topics:
             picked = random.sample(official, n_topics)
+            picked = await _dedupe_topics(picked, subject, exam, official)
             logger.info("topics[%s/%s]: %d/%d from official syllabus",
                         subject, exam, len(picked), n_topics)
             return picked
@@ -409,7 +508,8 @@ async def _extract_topics(subject: str, count: int,
     topics = [t for t in _parse_json_array(raw) if isinstance(t, str) and t.strip()]
     if not topics:
         return official or [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
-    return official + topics[:n_topics]
+    combined = official + topics[:n_topics]
+    return await _dedupe_topics(combined, subject, exam, official)
 
 
 # ── the slot engine ──────────────────────────────────────────────────────────

@@ -207,6 +207,26 @@ def build_statement(draft: dict, rng: random.Random) -> dict:
     correct_text = options[correct_pos]
     rng.shuffle(options)
     context = _clean_str(draft.get("context", "निम्नलिखित के संदर्भ में"), "context")
+    # HARD gate: `context` must be a short, single-topic phrase, not the raw
+    # official-syllabus SECTION HEADING it was seeded from. syllabus.py's
+    # topics are transcribed as compound groupings — e.g. "प्रथम विश्वयुद्ध
+    # और राष्ट्रीय आंदोलन: होमरूल, लखनऊ समझौता, रौलेट अधिनियम, जलियाँवाला
+    # बाग" — meant only to tell the drafting model what BROAD area to write
+    # about. STATEMENT_PROMPT already asks for a short natural phrase (its
+    # own example is clean), but the model sometimes echoes the compound
+    # heading back verbatim into `context`, which then renders straight into
+    # the STUDENT-FACING stem (observed live, 2026-07-24 — 5 of 100 real
+    # questions started with a leaked syllabus heading instead of a real
+    # stem). A colon followed by 2+ comma-separated items is the same shape
+    # every real syllabus heading has and a real topic phrase never does —
+    # mechanical, no NLP needed.
+    if ":" in context and context.count(",") >= 2:
+        raise FormatError(
+            "the context field looks like a raw syllabus section heading "
+            "(colon + multiple comma-separated items), not a short topic "
+            "phrase — write ONE natural sentence-fragment about the SPECIFIC "
+            "fact this question tests, e.g. 'रौलेट अधिनियम के विरोध के संदर्भ "
+            "में', not the whole syllabus heading it was seeded from")
     return {
         "stem": f"{context} निम्नलिखित कथनों पर विचार कीजिए :",
         "statements": stmts,
@@ -247,6 +267,20 @@ def build_assertion(draft: dict, rng: random.Random) -> dict:
     rel = str(_need(draft, "relation")).strip()
     if rel not in _AR_ANSWER:
         raise FormatError(f"relation must be one of {sorted(_AR_ANSWER)}")
+    # HARD gate: अभिकथन (A) and कारण (R) must be genuinely distinct claims —
+    # a reason cannot be its own explanation. Observed live in a real 100Q
+    # paper (2026-07-24): the model returned assertion == reason verbatim
+    # (both "नन्दा देवी राज जात यात्रा का आयोजन हर बारह वर्ष में..."), which
+    # build_statement's sibling format already guards against via its own
+    # true/false-mix check but this format never got the equivalent check —
+    # the question shipped with a logically impossible answer key (R can't
+    # "correctly explain" A when they're the same sentence). Whitespace/case
+    # normalized so trivial formatting differences don't hide a real repeat.
+    if " ".join(assertion.split()).lower() == " ".join(reason_txt.split()).lower():
+        raise FormatError(
+            "assertion (A) and reason (R) are the same claim restated — R "
+            "must be a DIFFERENT, genuinely explanatory statement, not a "
+            "repetition of A; write a real cause/context for A instead")
     # A/R options are canonical and NEVER shuffled (fixed convention in exams).
     return {
         "stem": ("नीचे दो वक्तव्य दिए गए हैं — एक को अभिकथन (A) तथा दूसरे को "
