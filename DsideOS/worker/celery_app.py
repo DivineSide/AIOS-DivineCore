@@ -5,8 +5,10 @@ Standalone broker/backend (own Redis). Tasks live in worker.tasks. A nightly
 beat task purges expired job folders.
 """
 from celery import Celery
+from celery.signals import worker_process_init
 
 from .settings import settings
+from . import tracing
 
 celery_app = Celery(
     "dsideos",
@@ -14,6 +16,13 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=["worker.tasks"],
 )
+
+
+@worker_process_init.connect
+def _init_tracing(**kwargs):
+    # Fires once per REAL worker process, after Celery's prefork — see
+    # tracing.py's module docstring for why this can't be import-time.
+    tracing.init_tracing(project_name="dsideos-worker")
 
 celery_app.conf.update(
     task_track_started=True,          # so the API sees STARTED, not just PENDING

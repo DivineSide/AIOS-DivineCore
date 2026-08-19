@@ -24,6 +24,7 @@ spread across (a)-(d) without run-to-run nondeterminism inside one paper.
 from __future__ import annotations
 
 import random
+import re
 
 _LETTERS = ["a", "b", "c", "d"]
 
@@ -47,6 +48,22 @@ def _clean_str(v, field: str) -> str:
     return " ".join(v.split())
 
 
+_OPTION_LABEL_RX = re.compile(r"^[\(\[]?\s*[a-dA-D]\s*[\)\].:]\s*")
+
+
+def _clean_option(v, field: str) -> str:
+    """Same as _clean_str, plus strips a leading option-label the MODEL
+    sometimes echoes into its own option text (observed live, 2026-07-26:
+    build_plain draft returned options like "(c) इत्यादि" — the renderer then
+    adds ITS OWN canonical (a)/(b)/(c)/(d) prefix on top, shipping doubled
+    labels like "(a) (c) इत्यादि" in the final paper). Scoped to option text
+    only (not stem/context/assertion/reason) — those are prose, not a
+    lettered choice, so a leading "(a)"-shaped substring there is real
+    content, not a label to strip."""
+    s = _clean_str(v, field)
+    return _OPTION_LABEL_RX.sub("", s, count=1).strip() or s
+
+
 # ── plain ────────────────────────────────────────────────────────────────────
 
 PLAIN_PROMPT = """{
@@ -66,7 +83,7 @@ def build_plain(draft: dict, rng: random.Random) -> dict:
     options = _need(draft, "options", list)
     if len(options) != 4:
         raise FormatError(f"exactly 4 options required, got {len(options)}")
-    options = [_clean_str(o, "options[]") for o in options]
+    options = [_clean_option(o, "options[]") for o in options]
     idx = _need(draft, "answer_index")
     if not isinstance(idx, int) or not 0 <= idx <= 3:
         raise FormatError("answer_index must be an integer 0-3")

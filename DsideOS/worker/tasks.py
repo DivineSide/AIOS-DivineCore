@@ -24,15 +24,12 @@ from . import jobs
 from .celery_app import celery_app  # noqa: F401  (registers the app)
 from .settings import settings
 
-# Make the Target Academy pipeline importable. (When this generalises beyond one
-# client, the pipeline moves into DsideOS; for now we import it in place.)
-REPO_ROOT = Path(__file__).resolve().parents[2]
-PIPELINE = REPO_ROOT / "clients" / "target-academy" / "pipeline"
-sys.path.insert(0, str(PIPELINE))
-
-# the RAG package (query.py: rag_lookup/pyq_lookup) — used by generate_task.
-RAG = REPO_ROOT / "clients" / "target-academy" / "rag"
-sys.path.insert(0, str(RAG))
+# pipeline/ and rag/ now live inside DsideOS itself (moved 2026-07-27 — both
+# were already generic, client-agnostic code; only clients/target-academy/
+# resources|templates remain genuinely client-specific, see Dockerfile).
+DSIDEOS_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(DSIDEOS_ROOT / "pipeline"))
+sys.path.insert(0, str(DSIDEOS_ROOT / "rag"))
 
 # Ensure the LLM key is available to the pipeline's llm.py loader.
 if settings.ANTHROPIC_API_KEY:

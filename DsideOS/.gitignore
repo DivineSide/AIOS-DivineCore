@@ -4,6 +4,10 @@
 # Job storage — client inputs/outputs, never commit (repo is PUBLIC)
 storage/
 
+# Phoenix local tracing artifacts (SQLite fallback state, logs) — real data
+# lives in Postgres (phoenix schema), see worker/tracing.py / CLAUDE.md
+.phoenix_data/
+
 # Bundled licensed fonts (Kruti Dev 010, Nirmala UI)
 fonts/*.ttf
 fonts/*.otf

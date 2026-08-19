@@ -9,7 +9,7 @@ claude-code_subagents.md
 # Celery Beat schedule state file (runtime, not source)
 celerybeat-schedule
 celerybeat-schedule.*
-
+.archive
 # Google OAuth secrets (never commit)
 credentials.json
 token.json
@@ -36,14 +36,21 @@ tools/social-tracker/.crm-preview.html
 tools/social-tracker/.crm-auth
 
 # Client builds — client IP and generated client content never goes public (repo is PUBLIC)
-clients/*/corpus/
 clients/*/templates/
 clients/*/review/
 clients/*/outputs/
 clients/*/resources/
 
+# Corpus (raw books, syllabus PDFs, PYQ papers) — copyrighted/licensed source
+# material, never goes public (repo is PUBLIC). Moved from clients/target-academy/
+# to DsideOS/ (2026-08-18 reorg, genuinely client-agnostic) — this rule MUST
+# track wherever corpus/ actually lives, or a reorg silently un-ignores it
+# (see incident: 2026-08-19, 1.2GB of corpus committed in 8cfc8a9 because this
+# line still said clients/*/corpus/ after the move).
+DsideOS/corpus/
+
 # RAG ingest checkpoints — full copyrighted book text (client IP, repo is PUBLIC).
-# Kept locally only; regenerable by re-running segmentation.
-clients/target-academy/rag/.checkpoints/
-clients/target-academy/rag/.reocr/
-clients/target-academy/rag/.translate/
+# Kept locally only; regenerable by re-running segmentation. Same reorg as above.
+DsideOS/rag/.checkpoints/
+DsideOS/rag/.reocr/
+DsideOS/rag/.translate/

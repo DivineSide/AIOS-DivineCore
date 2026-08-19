@@ -26,19 +26,21 @@ RUN pip install --no-cache-dir -r /app/worker-requirements.txt
 COPY DsideOS/fonts/ /usr/share/fonts/truetype/dsideos/
 RUN fc-cache -f -v || true
 
-# App code: the backend + the pipeline it imports in place.
+# App code: the backend + the pipeline (pipeline/ and rag/ now live inside
+# DsideOS/ itself, see tasks.py — this one COPY brings both along).
 COPY DsideOS/ /app/DsideOS/
-COPY clients/target-academy/pipeline/ /app/clients/target-academy/pipeline/
-COPY clients/target-academy/rag/ /app/clients/target-academy/rag/
 
-# NOTE: the builders need the client's branded assets at runtime —
-#   clients/target-academy/resources/ (front-page.docx, etc.)
-#   clients/target-academy/templates/ (logo, watermark)
-# These are client IP (gitignored, NOT in the repo or image). They are mounted
-# as a read-only volume at runtime — provisioned on the server, see DEPLOY.md.
-# The directories are created here so the mount targets exist.
-RUN mkdir -p /app/clients/target-academy/resources \
-             /app/clients/target-academy/templates
+# NOTE: the builders (pipeline/build_answer_key.py etc.) resolve their own
+# BASE as DsideOS/ (parents[1] from their own file location) and look for
+# resources/ and templates/ directly under it. The client's branded assets —
+#   DsideOS/resources/  (front-page.docx, etc.)
+#   DsideOS/templates/  (logo, watermark)
+# are client IP (gitignored, NOT in the repo or image, source of truth stays
+# at clients/target-academy/resources|templates/). Mounted as a read-only
+# volume at runtime — provisioned on the server, see DEPLOY.md. Directories
+# are created here so the mount targets exist even before the volume attaches.
+RUN mkdir -p /app/DsideOS/resources \
+             /app/DsideOS/templates
 
 ENV PYTHONPATH=/app/DsideOS:/app
 WORKDIR /app/DsideOS

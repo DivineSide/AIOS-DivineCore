@@ -42,8 +42,10 @@ services:
     volumes:
       - jobs:/data/jobs
       # Client branded assets (IP — not in the image). Provisioned on the server.
-      - ./assets/resources:/app/clients/target-academy/resources:ro
-      - ./assets/templates:/app/clients/target-academy/templates:ro
+      # Mounted at DsideOS/resources|templates — where the pipeline code (moved
+      # into DsideOS 2026-07-27) actually resolves BASE/resources|templates to.
+      - ./assets/resources:/app/DsideOS/resources:ro
+      - ./assets/templates:/app/DsideOS/templates:ro
       # Licensed Kruti Dev fonts (gitignored, not in image) - needed by
       # LibreOffice to render the Hindi paper PDF correctly.
       - ./assets/fonts:/usr/share/fonts/truetype/dsideos:ro

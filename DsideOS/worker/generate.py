@@ -126,6 +126,22 @@ TOPIC_DEDUP_THRESHOLD = 0.78   # cosine sim above this = treat as duplicate
 TOPIC_DEDUP_MAX_REFETCH = 3    # refetch attempts per colliding topic before
                                # accepting the closest candidate and moving on
 
+AR_EXPLAIN_THRESHOLD = 0.75    # cosine sim above this = R just restates A,
+                               # not a genuine explanation. formats.py's
+                               # build_assertion() already hard-rejects
+                               # BYTE-IDENTICAL A/R (2026-07-24 Q76 bug), but
+                               # a live paper (2026-07-26, Q86) shipped a
+                               # PARAPHRASE-level restatement instead: A =
+                               # "केदारनाथ...चार धामों में से एक धाम है", R =
+                               # "केदारनाथ...चार धामों में से एक धाम है" reworded
+                               # — same claim, not an explanation of WHY it's
+                               # true. MEASURED (2026-07-26, OpenAI embeddings):
+                               # that real bug pair scores 0.82; genuinely
+                               # distinct A/R pairs (independent causal reason,
+                               # not a reworded claim) score 0.35-0.37; a
+                               # borderline near-restatement scores 0.63 — clean
+                               # separation with margin on both sides at 0.75.
+
 MAX_SLOT_ATTEMPTS = 3    # 1 draft + up to 2 informed retries per slot
 IN_FORMAT_TOPUP_RETRIES = 2   # a dropped rare-format slot gets this many
                               # top-up attempts in its OWN format before
@@ -391,8 +407,36 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
+async def _ar_explain_check(q: dict) -> str:
+    """Assertion-reason semantic gate — catches a PARAPHRASE-level restatement
+    that formats.build_assertion()'s exact-match gate can't (byte-identical
+    A/R is already hard-rejected there; this catches the softer case where R
+    reworders A instead of explaining it, e.g. real Q86, 2026-07-26: A =
+    "केदारनाथ...चार धामों में से एक धाम है", R = same claim reworded — not a
+    cause/context for A, just A said twice). q['statements'] is always
+    exactly [f"अभिकथन (A) : {assertion}", f"कारण (R) : {reason}"] per
+    build_assertion — strip those fixed prefixes to get the raw claims back."""
+    stmts = q.get("statements") or []
+    if len(stmts) != 2:
+        return ""
+    a_txt = stmts[0].split(":", 1)[-1].strip()
+    r_txt = stmts[1].split(":", 1)[-1].strip()
+    a_emb, r_emb = await asyncio.gather(
+        asyncio.to_thread(rag._embed, a_txt),
+        asyncio.to_thread(rag._embed, r_txt),
+    )
+    if _cosine(a_emb, r_emb) >= AR_EXPLAIN_THRESHOLD:
+        return ("assertion (A) and reason (R) are too semantically similar — "
+                "R restates A's claim rather than explaining WHY it's true; "
+                "write a genuine cause/context distinct from A's own wording")
+    return ""
+
+
 async def _dedupe_topics(topics: list[str], subject: str, exam: str | None,
-                         official_pool: list[str]) -> list[str]:
+                         official_pool: list[str],
+                         seed_topics: list[str] | None = None,
+                         seed_embeds: list[list[float]] | None = None,
+                         ) -> list[str]:
     """Retrieval-first topic dedup: embed every topic BEFORE any generation
     slot is built, and replace any pair that's semantically the same
     underlying topic (not just a different string) — e.g. "गढ़वाली बोली की
@@ -410,15 +454,27 @@ async def _dedupe_topics(topics: list[str], subject: str, exam: str | None,
     TOPIC_DEDUP_MAX_REFETCH caps retries per collision; if still colliding
     after that, the closest-to-unique candidate is accepted and logged
     loudly — this must never silently block or shrink the paper, same
-    philosophy as the topup circuit breaker."""
-    if len(topics) < 2:
+    philosophy as the topup circuit breaker.
+
+    `seed_topics`/`seed_embeds` (exam mode's cross-subject pass, see
+    generate_exam): topics ALREADY CLAIMED BY OTHER SUBJECTS this paper,
+    pre-embedded, so this subject's own topics get checked against them too
+    — this function previously only ever compared topics WITHIN one
+    subject's own call, so two subjects each independently landing on
+    "नंदा देवी राजजात यात्रा" (a real culture/history crossover topic) never
+    got compared against each other and both shipped as the same question
+    (observed live, 2026-07-26, Q78/Q83). Seeding `accepted`/`accepted_embeds`
+    reuses the exact same collision/refetch machinery below, just pre-primed
+    with cross-subject claims instead of starting empty."""
+    if len(topics) < 2 and not seed_topics:
         return topics
 
     embeds = await asyncio.gather(*[
         asyncio.to_thread(rag._embed, t) for t in topics
     ])
-    accepted: list[str] = []
-    accepted_embeds: list[list[float]] = []
+    accepted: list[str] = list(seed_topics or [])
+    accepted_embeds: list[list[float]] = list(seed_embeds or [])
+    n_seed = len(accepted)
     unused_official = [t for t in official_pool if t not in topics]
 
     for topic, emb in zip(topics, embeds):
@@ -456,11 +512,14 @@ async def _dedupe_topics(topics: list[str], subject: str, exam: str | None,
             cand_emb = await asyncio.to_thread(rag._embed, candidate)
         accepted.append(candidate)
         accepted_embeds.append(cand_emb)
-    return accepted
+    return accepted[n_seed:]
 
 
 async def _extract_topics(subject: str, count: int,
-                          exam: str | None = None) -> list[str]:
+                          exam: str | None = None,
+                          seed_topics: list[str] | None = None,
+                          seed_embeds: list[list[float]] | None = None,
+                          ) -> list[str]:
     """Derive distinct exam topics for `count` questions.
 
     Exam mode (exam on the master syllabus): the OFFICIAL taxonomy seeds the
@@ -469,14 +528,21 @@ async def _extract_topics(subject: str, count: int,
     list smaller than n_topics) tops up from PYQ inference below.
 
     Subject mode (exam=None): PYQ-sample inference, unchanged — with no exam
-    anchor there is no single official syllabus to consult."""
+    anchor there is no single official syllabus to consult.
+
+    `seed_topics`/`seed_embeds`: topics already claimed by OTHER subjects in
+    this same exam paper (see generate_exam's cross-subject dedup pass) —
+    passed straight through to _dedupe_topics so a topic like "नंदा देवी
+    राजजात यात्रा" that legitimately fits both uk-history and uk-culture
+    only ever gets assigned to one of them."""
     n_topics = max(1, min(count // TOPICS_DIVISOR, TOPICS_CAP))
 
     official = syllabus.topics_for(subject, exam)
     if official:
         if len(official) >= n_topics:
             picked = random.sample(official, n_topics)
-            picked = await _dedupe_topics(picked, subject, exam, official)
+            picked = await _dedupe_topics(picked, subject, exam, official,
+                                          seed_topics, seed_embeds)
             logger.info("topics[%s/%s]: %d/%d from official syllabus",
                         subject, exam, len(picked), n_topics)
             return picked
@@ -509,7 +575,8 @@ async def _extract_topics(subject: str, count: int,
     if not topics:
         return official or [SUBJECT_LABELS.get(subject, subject.replace("-", " "))]
     combined = official + topics[:n_topics]
-    return await _dedupe_topics(combined, subject, exam, official)
+    return await _dedupe_topics(combined, subject, exam, official,
+                                seed_topics, seed_embeds)
 
 
 # ── the slot engine ──────────────────────────────────────────────────────────
@@ -663,6 +730,8 @@ async def _gen_slot_inner(subject: str, topic: str, fmt: str, slot_id: int,
             try:
                 q = formats.build(fmt, draft, seed=_seed(subject, topic, slot_id, attempt))
                 reason = validate_question(q) or guard.check(q) or ""
+                if not reason and fmt == "assertion":
+                    reason = await _ar_explain_check(q)
                 if not reason:
                     ok, greason = await asyncio.to_thread(ground.check, q, passages)
                     if ok:
@@ -720,6 +789,7 @@ async def generate_questions(subject: str, count: int,
                              exam: str | None = None,
                              slot_sem: asyncio.Semaphore | None = None,
                              fmt_counts: dict[str, int] | None = None,
+                             topics: list[str] | None = None,
                              ) -> tuple[list[dict], dict]:
     """Subject mode (exam=None) or one subject of an exam paper (exam set —
     official-syllabus topic seeding kicks in). Returns (questions, meta) —
@@ -740,10 +810,21 @@ async def generate_questions(subject: str, count: int,
     per-subject historical format proportions, not one ratio flattened
     across every subject. Subject-mode callers leave this unset and fall
     back to the global format_mix(), unchanged from before this parameter
-    existed."""
+    existed.
+
+    `topics` (exam mode only): pre-extracted, pre-deduped topics for THIS
+    subject, computed once for the whole paper by generate_exam's cross-subject
+    dedup pass (see its docstring — _extract_topics/_dedupe_topics only ever
+    compared topics WITHIN one subject's own call, so two subjects each
+    independently picking "नंदा देवी राजजात यात्रा" — a real culture/history
+    crossover topic — never got compared against each other; observed live,
+    2026-07-26, Q78/Q83 shipped as the same question twice). Subject-mode
+    callers leave this unset and fall back to the original per-subject-only
+    extraction, unchanged."""
     if slot_sem is None:
         slot_sem = asyncio.Semaphore(GEN_CONCURRENCY)
-    topics = await _extract_topics(subject, count, exam=exam)
+    if topics is None:
+        topics = await _extract_topics(subject, count, exam=exam)
     if fmt_counts is None:
         fmt_counts = blueprint.allocate(count, blueprint.format_mix())
     # slot list: rare formats first so they land on distinct early topics
@@ -896,15 +977,46 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
     timeout-bounded) via asyncio.to_thread since this is a sync DB call in
     an async function; any failure here is caught inside exam_format_plan
     itself and degrades to today's global-format_mix-per-subject behavior,
-    so a planning-query hiccup never blocks the job."""
+    so a planning-query hiccup never blocks the job.
+
+    Topics are ALSO extracted here, once, for every subject BEFORE any
+    generation slot starts, then run through ONE cross-subject dedup pass —
+    _extract_topics/_dedupe_topics previously only ever compared topics
+    WITHIN one subject's own call, so two subjects that legitimately share
+    ground (e.g. uk-history and uk-culture both touching "नंदा देवी राजजात
+    यात्रा") could each independently pick it with zero cross-check, shipping
+    the same question twice under two different subjects (observed live,
+    2026-07-26, Q78/Q83). Per-subject topic extraction still runs CONCURRENTLY
+    (asyncio.gather below) for the same wall-clock reason subjects do — only
+    the dedup PASS over the combined result is sequential, and it's cheap
+    (re-embeds ~n_topics short strings total, not the corpus)."""
     per_subject = blueprint.allocate(total, blueprint.subject_mix(exam))
     subjects = [(subject, n) for subject, n in per_subject.items() if n > 0]
     fmt_plan = await asyncio.to_thread(
         blueprint.exam_format_plan, exam, dict(subjects), rag._db())
+
+    raw_topics = await asyncio.gather(*[
+        _extract_topics(subject, n, exam=exam) for subject, n in subjects
+    ])
+    final_topics: dict[str, list[str]] = {}
+    pool_topics: list[str] = []
+    pool_embeds: list[list[float]] = []
+    for (subject, _), topics in zip(subjects, raw_topics):
+        official = syllabus.topics_for(subject, exam)
+        deduped = await _dedupe_topics(topics, subject, exam, official,
+                                       pool_topics, pool_embeds)
+        final_topics[subject] = deduped
+        new_embeds = await asyncio.gather(*[
+            asyncio.to_thread(rag._embed, t) for t in deduped
+        ])
+        pool_topics.extend(deduped)
+        pool_embeds.extend(new_embeds)
+
     slot_sem = asyncio.Semaphore(GEN_CONCURRENCY)
     results = await asyncio.gather(*[
         generate_questions(subject, n, exam=exam, slot_sem=slot_sem,
-                          fmt_counts=fmt_plan[subject])
+                          fmt_counts=fmt_plan[subject],
+                          topics=final_topics[subject])
         for subject, n in subjects
     ])
 

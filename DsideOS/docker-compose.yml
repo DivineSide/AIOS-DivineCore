@@ -37,10 +37,13 @@ services:
       - .env
     volumes:
       - jobs:/data/jobs
-      # Client branded assets — gitignored IP, so not in the image. Prod mounts
-      # them the same way (docker-compose.prod.yml); dev reads the repo copies.
-      - ../clients/target-academy/resources:/app/clients/target-academy/resources:ro
-      - ../clients/target-academy/templates:/app/clients/target-academy/templates:ro
+      # Client branded assets — gitignored IP, so not in the image. Source of
+      # truth stays at clients/target-academy/ (client-owned); mounted at
+      # DsideOS/resources|templates because that's where the pipeline code
+      # (moved into DsideOS 2026-07-27) actually resolves BASE/resources and
+      # BASE/templates to. Prod mounts them the same way (docker-compose.prod.yml).
+      - ../clients/target-academy/resources:/app/DsideOS/resources:ro
+      - ../clients/target-academy/templates:/app/DsideOS/templates:ro
     depends_on:
       - redis
 

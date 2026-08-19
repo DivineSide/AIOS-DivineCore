@@ -64,8 +64,8 @@ clear message. Your job before running is to PRODUCE that JSON correctly.
    - **Never auto-ship** a one-source answer, a sources-disagree answer, or a
      tricky "उपर्युक्त में से कोई नहीं" correct answer — flag for Mayank's check.
 
-3. **Run it:** `python clients/target-academy/pipeline/run_pipeline.py`
-   (consumes the one file in `review/input/`). Outputs land in `review/output/`:
+3. **Run it:** `python DsideOS/pipeline/run_pipeline.py`
+   (consumes the one file in `clients/target-academy/review/input/`). Outputs land in `clients/target-academy/review/output/`:
    - `<name> (Class).pptx` — branded in-class deck, **verbatim MCQs, NO answers**
    - `<name> - Solution (Teacher).docx` — answers + reasoning + ⚠ flags
      (**source provenance and flags live HERE ONLY — never on branded artifacts**)
