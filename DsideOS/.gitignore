@@ -1,6 +1,5 @@
 # Secrets
 .env
-
 # Job storage — client inputs/outputs, never commit (repo is PUBLIC)
 storage/
 
