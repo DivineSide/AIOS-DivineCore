@@ -8,14 +8,10 @@ on:
     branches: [main]
     paths:
       - "DsideOS/**"
-      - "clients/target-academy/pipeline/**"
-      - "clients/target-academy/rag/**"
       - ".github/workflows/dsideos-ci.yml"
   pull_request:
     paths:
       - "DsideOS/**"
-      - "clients/target-academy/pipeline/**"
-      - "clients/target-academy/rag/**"
   workflow_dispatch:
 
 permissions:
@@ -41,21 +37,21 @@ jobs:
       - name: Compile-check all modules
         run: |
           python -m py_compile \
-            clients/target-academy/pipeline/krutidev.py \
-            clients/target-academy/pipeline/build_paper.py \
-            clients/target-academy/pipeline/build_paper_format2.py \
-            clients/target-academy/pipeline/build_deck.py \
-            clients/target-academy/pipeline/build_solution.py \
-            clients/target-academy/pipeline/build_answer_key.py \
-            clients/target-academy/pipeline/run_pipeline.py \
-            clients/target-academy/pipeline/extract_docx.py \
-            clients/target-academy/pipeline/generate_solutions.py \
-            clients/target-academy/rag/query.py \
+            DsideOS/pipeline/krutidev.py \
+            DsideOS/pipeline/build_paper.py \
+            DsideOS/pipeline/build_paper_format2.py \
+            DsideOS/pipeline/build_deck.py \
+            DsideOS/pipeline/build_solution.py \
+            DsideOS/pipeline/build_answer_key.py \
+            DsideOS/pipeline/run_pipeline.py \
+            DsideOS/pipeline/extract_docx.py \
+            DsideOS/pipeline/generate_solutions.py \
+            DsideOS/rag/query.py \
             DsideOS/worker/generate.py \
             DsideOS/worker/tasks.py DsideOS/api/main.py
 
       - name: Font switch self-tests (krutidev.py)
-        run: python clients/target-academy/pipeline/krutidev.py
+        run: python DsideOS/pipeline/krutidev.py
 
       - name: Backend imports + route registration
         env:
