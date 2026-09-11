@@ -10,6 +10,7 @@ storage/
 # Bundled licensed fonts (Kruti Dev 010, Nirmala UI)
 fonts/*.ttf
 fonts/*.otf
+Rag_lecture_notes/
 
 # Python
 __pycache__/

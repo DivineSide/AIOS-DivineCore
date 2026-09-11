@@ -50,6 +50,8 @@ import logging
 import os
 import random
 import sys
+import threading
+import time
 import zlib
 from pathlib import Path
 
@@ -94,6 +96,26 @@ GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "anthropic").lower()
 # tightened enough to close the instruction-following gap.
 SARVAM_MODEL = os.environ.get("SARVAM_MODEL", "sarvam-105b")
 SARVAM_BASE_URL = "https://api.sarvam.ai/v1"
+
+# GEN_PROVIDER=groq — free-tier drafting on Groq's open-weight lineup, added
+# 2026-08-24 when Sarvam's ~7x price hike (2026-08-05) + a zero-balance key
+# made Sarvam unusable with no budget. gpt-oss-120b (Apache 2.0, MoE 117B
+# total / 5.1B active) is the pick: OpenAI's model card reports MMMLU Hindi
+# 82.2, and an independent Hindi benchmark (arXiv 2508.19831) puts it top of
+# >20B models on IFEval-Hi — the "follows instructions in Hindi" axis, which
+# is exactly what killed sarvam-30b here (86% of drops were one broken
+# instruction, not a knowledge gap). See rag/RAG_ROADMAP.md §8 for the full
+# decision + the paid candidates parked for later.
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+# gpt-oss exposes reasoning_effort as a real API param (low/medium/high,
+# default medium). We pin "low": this task is one short factual MCQ as JSON —
+# same reasoning as _sarvam_reasoning_effort's docstring, no multi-step
+# thinking needed, and reasoning tokens are pure latency+quota cost on a free
+# tier. This is ALSO the specific failure we live-tested on qwen3.6-27b
+# (2026-08-24): it burned its entire token budget on English chain-of-thought
+# and never emitted the Hindi answer. gpt-oss lets us dial that off.
+GROQ_REASONING_EFFORT = os.environ.get("GROQ_REASONING_EFFORT", "low")
 
 TOPICS_DIVISOR = 2       # ~count/2 distinct topics (was 4 — variety collapsed)
 TOPICS_CAP = 40
@@ -273,6 +295,121 @@ def _sarvam_client():
     return _sarvam
 
 
+# ── Groq drafting pool (free tier) ───────────────────────────────────────────
+# Same key-pool + token-bucket + rotate-on-429 shape as rag/build_passages.py's
+# _groq_pool/_TokenBucket — that pattern was tuned against real Groq free-tier
+# behaviour (see its comments: a blind inter-request sleep does NOT survive
+# concurrency, because N workers all spend the SAME key's budget at once).
+# Reused here rather than reinvented, but with gpt-oss-120b's own, TIGHTER
+# ceiling: 8,000 TPM / 200,000 TPD per key (vs the 12K TPM that file assumes
+# for llama-3.3-70b). GEN_CONCURRENCY defaults to 6, so without a real budget
+# gate a 100Q paper would thrash into 429s immediately.
+_GROQ_KEY_ENVS = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"]
+_GROQ_TPM_BUDGET = 7_200          # margin under the real 8,000 TPM cap
+_GROQ_TPM_WINDOW_S = 60.0
+# One draft call's worst case: SLOT_SYSTEM + 4 passages + 2 PYQ examples in,
+# up to 1500 out. Passages dominate; measured slot prompts land ~2-3K tokens.
+_GROQ_MAX_TOKENS_PER_CALL = 1500 + 3000
+GROQ_MAX_RATE_LIMIT_RETRIES = 4   # per key, before falling through to the next
+GROQ_RETRY_BACKOFF_BASE_S = 2.0   # 2s, 4s, 8s, 16s
+
+_groq_clients: list | None = None
+_groq_buckets: list | None = None
+
+
+class _GroqTokenBucket:
+    """Thread-safe sliding-window token budget for ONE Groq key. _draft is
+    called via asyncio.to_thread from several concurrent slots, so this must
+    be thread-safe, not just coroutine-safe."""
+
+    def __init__(self, budget: int, window_s: float):
+        self.budget = budget
+        self.window_s = window_s
+        self._lock = threading.Lock()
+        self._usage: list[tuple[float, int]] = []
+
+    def acquire(self, tokens: int) -> None:
+        while True:
+            with self._lock:
+                now = time.time()
+                cutoff = now - self.window_s
+                self._usage = [(t, n) for t, n in self._usage if t > cutoff]
+                used = sum(n for _, n in self._usage)
+                if used + tokens <= self.budget:
+                    self._usage.append((now, tokens))
+                    return
+                wait = self.window_s - (now - self._usage[0][0]) + 0.1
+            time.sleep(max(wait, 0.1))
+
+
+def _groq_pool() -> list:
+    global _groq_clients
+    if _groq_clients is None:
+        from openai import OpenAI
+        keys = [os.environ[k] for k in _GROQ_KEY_ENVS if os.environ.get(k)]
+        if not keys:
+            raise RuntimeError("No GROQ_API_KEY set (required for GEN_PROVIDER=groq).")
+        _groq_clients = [OpenAI(api_key=k, base_url=GROQ_BASE_URL,
+                                timeout=90, max_retries=2) for k in keys]
+        logger.info("groq drafting pool: %d key(s), model=%s effort=%s",
+                    len(_groq_clients), GROQ_MODEL, GROQ_REASONING_EFFORT)
+    return _groq_clients
+
+
+def _groq_bucket_pool() -> list:
+    global _groq_buckets
+    if _groq_buckets is None:
+        _groq_buckets = [_GroqTokenBucket(_GROQ_TPM_BUDGET, _GROQ_TPM_WINDOW_S)
+                         for _ in _groq_pool()]
+    return _groq_buckets
+
+
+def _is_groq_rate_error(exc: Exception) -> bool:
+    msg = f"{type(exc).__name__} {exc}".lower()
+    return any(s in msg for s in ("429", "rate_limit", "ratelimit", "quota",
+                                  "too many requests"))
+
+
+def _draft_groq(system: str, messages: list[dict]) -> str:
+    """Draft on Groq's free tier. Budget-gated per key, rotating to the next
+    key's independent quota on a 429 that slips past the bucket (server-side
+    accounting is stricter than our estimate, and a DAILY-quota exhaustion is
+    invisible to a 60s bucket). Raises the last error only once every key is
+    exhausted — _gen_slot_inner already treats a draft exception as a slot
+    failure with a reason, so the paper degrades rather than dying."""
+    pool = _groq_pool()
+    buckets = _groq_bucket_pool()
+    last_err: Exception | None = None
+    for client, bucket in zip(pool, buckets):
+        for attempt in range(GROQ_MAX_RATE_LIMIT_RETRIES):
+            bucket.acquire(_GROQ_MAX_TOKENS_PER_CALL)
+            try:
+                resp = client.chat.completions.create(
+                    model=GROQ_MODEL, max_tokens=1500,
+                    reasoning_effort=GROQ_REASONING_EFFORT,
+                    messages=[{"role": "system", "content": system}] + messages,
+                )
+                choice = resp.choices[0]
+                out = (choice.message.content or "").strip()
+                if not out:
+                    # Same canary as _draft_sarvam: an empty body with a
+                    # non-stop finish_reason means the budget went somewhere
+                    # other than content (reasoning, or a hard cap).
+                    logger.warning("GROQ empty content (finish=%s, completion_toks=%s)",
+                                   choice.finish_reason,
+                                   getattr(resp.usage, "completion_tokens", "?"))
+                return out
+            except Exception as e:
+                last_err = e
+                if not _is_groq_rate_error(e):
+                    raise
+                sleep_s = GROQ_RETRY_BACKOFF_BASE_S * (2 ** attempt)
+                logger.warning("GROQ 429 (attempt %d/%d) — backoff %.0fs",
+                               attempt + 1, GROQ_MAX_RATE_LIMIT_RETRIES, sleep_s)
+                time.sleep(sleep_s)
+    raise last_err or RuntimeError("all Groq keys exhausted")
+
+
 # ── model calls ──────────────────────────────────────────────────────────────
 
 def _draft_anthropic(system: str, messages: list[dict]) -> str:
@@ -328,6 +465,8 @@ def _draft_sarvam(system: str, messages: list[dict]) -> str:
 
 
 def _draft(system: str, messages: list[dict]) -> str:
+    if GEN_PROVIDER == "groq":
+        return _draft_groq(system, messages)
     if GEN_PROVIDER == "sarvam":
         return _draft_sarvam(system, messages)
     return _draft_anthropic(system, messages)
@@ -344,6 +483,13 @@ def _complete(prompt: str, max_tokens: int = 1024) -> str:
     triggered — confirmed live via a real credit-exhaustion 400. Fails soft
     to "" on any error, same as before; callers already handle empty output
     by falling back to a subject-label topic."""
+    if GEN_PROVIDER == "groq":
+        # Routed through _draft_groq's budget gate + key rotation rather than a
+        # bare client call: topic extraction fires per-subject at the START of
+        # a paper, i.e. concurrently across 7 subjects in exam mode, and it
+        # shares the SAME free-tier TPM budget as every draft call.
+        return _draft_groq("You are a helpful assistant.",
+                           [{"role": "user", "content": prompt}])
     if GEN_PROVIDER == "sarvam":
         resp = _sarvam_client().chat.completions.create(
             model=SARVAM_MODEL, max_tokens=max_tokens,

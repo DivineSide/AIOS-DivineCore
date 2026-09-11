@@ -112,6 +112,51 @@ HyDE, already shipped; don't re-propose it as a future improvement.
   the parallel `_bge`/`_e5` migration files in `rag/migrations/` for that
   abandoned exploration's residue, not yet cleaned up).
 
+## RAG rebuild journey (round 2, started 2026-08)
+
+Mayank is auditing and rebuilding the RAG pipeline stage-by-stage — chunking,
+embedding, search, retrieval, reranking, query parsing, LLM choice, augmented
+prompt, grounding, evaluation. Full plan, status per stage, and the reasoning
+behind each decision live in **`rag/RAG_ROADMAP.md`** — read it before
+picking this work back up.
+
+**Standing instruction: update `rag/RAG_ROADMAP.md` as we go, without being
+asked each time.** When a stage's status changes, a model/config decision
+gets made, or a real test produces a finding worth keeping, write it into the
+matching section immediately — don't wait for Mayank to ask, and don't rely
+on this conversation's memory alone. Where it's ambiguous which section
+something belongs in, or whether it's roadmap-worthy at all, ask him rather
+than guessing or skipping it. Keep entries in the roadmap's existing style:
+the decision/fact, the real evidence behind it (dated, since this space goes
+stale fast — see the Sarvam credit and DeepSeek free-tier surprises), and
+what's explicitly parked for later vs. settled now.
+
+## Don't spend API credits on work you can do yourself
+
+**Budget is a real constraint here.** Sarvam is dead (7x price hike + no
+credits), Anthropic has no credits, DeepSeek's key is at zero. The paid OpenAI
+key is the one working balance — treat it as scarce.
+
+Before any paid API call, ask whether it's actually needed:
+
+- **Reading a scanned PDF/image?** Read it directly — vision is a built-in
+  capability, not something to farm out to `complete_vision()`. Only script an
+  OCR pass when the volume genuinely can't be read in-context (hundreds of
+  pages), and say so first.
+- **Transforming text you already have?** Do it directly. Don't call a model to
+  reformat, summarise, or restructure something already in context.
+- **Testing a pipeline change?** Use the smallest run that proves the point,
+  not a full 100Q paper.
+
+Paid calls are for work that genuinely needs the pipeline's own models —
+drafting, grounding, embeddings — or volume beyond what fits in context. When a
+paid call IS warranted, say why before making it.
+
+(Learned 2026-09-10: OCR'd a 10-page syllabus via gpt-4o vision when reading
+the pages directly would have cost nothing. Also note `complete_vision()` tries
+Anthropic first whenever `ANTHROPIC_API_KEY` is set — with a dead key that's a
+wasted round-trip per page.)
+
 ## Reading this codebase
 
 Start with `.overview.md` (stack, API shape, deploy flow) and each folder's
