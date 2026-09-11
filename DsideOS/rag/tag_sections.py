@@ -32,6 +32,16 @@ load_dotenv(BASE.parent.parent / ".env")
 REOCR = BASE / ".reocr"
 ANCHOR = 150          # prefix length used to locate a passage in the source
 MAX_HEAD = 90         # ignore "headings" longer than this — body text that ate a #
+MIN_SECTION = 2       # merge sections smaller than this into the preceding one
+
+# Headings that are STRUCTURE, not topics. A chapter marker, table caption or
+# chapter summary makes a useless section: "अध्याय 19" tells the model nothing
+# about what to ask, and "तालिका 14.2" is a caption whose passages belong to the
+# surrounding topic. Numbered list items ("2. अपरदन झीलें") are sub-items of the
+# section above them, promoted only because they happened to carry a #.
+NOISE_HEAD = re.compile(
+    r"^(अध्याय\s*\d|UNIT\s*\d|तालिका|सारणी|Table|संक्षेप|Summing\s*Up"
+    r"|अशुद्ध|\d+\.\s)", re.I)
 
 
 def norm(s: str) -> str:
@@ -49,7 +59,7 @@ def load_headings(md: str) -> list[tuple[int, int, str]]:
     out = []
     for m in re.finditer(r"^(#{1,4})\s*(.+)$", md, re.M):
         title = norm(m.group(2))
-        if not title or len(title) > MAX_HEAD:
+        if not title or len(title) > MAX_HEAD or NOISE_HEAD.search(title):
             continue
         out.append((len(norm(md[: m.start()])), len(m.group(1)), title))
     return out
@@ -91,7 +101,7 @@ def main() -> None:
         rows = cur.fetchall()
         print(f"  {book}: {len(rows)} passages, {len(heads)} headings")
 
-        updates = []
+        assigned = []          # (pid, section) in book order
         for pid, txt in rows:
             total += 1
             off = S.find(norm(txt)[:ANCHOR])
@@ -100,8 +110,26 @@ def main() -> None:
                 continue
             sec = section_for(off, heads)
             if sec:
-                updates.append((sec, pid))
-                tagged += 1
+                assigned.append((pid, sec))
+
+        # Merge undersized sections into the PRECEDING one. A 1-passage section
+        # cannot support sampling (nothing left once the cooldown marks it) and
+        # is usually a sub-heading of the section above it. Book order makes the
+        # predecessor the right merge target — it is the parent topic.
+        runs: list[list] = []
+        for pid, sec in assigned:
+            if runs and runs[-1][0] == sec:
+                runs[-1][1].append(pid)
+            else:
+                runs.append([sec, [pid]])
+        merged: list[list] = []
+        for sec, pids in runs:
+            if merged and len(pids) < MIN_SECTION:
+                merged[-1][1].extend(pids)       # fold into previous section
+            else:
+                merged.append([sec, list(pids)])
+        updates = [(sec, pid) for sec, pids in merged for pid in pids]
+        tagged += len(updates)
 
         if a.dry_run:
             seen, runs = None, []
@@ -115,7 +143,13 @@ def main() -> None:
             for sec, n in runs[:25]:
                 print(f"       n={n:3d}  {sec[:70]}")
         else:
-            cur.executemany("UPDATE book_passages SET section=%s WHERE id=%s", updates)
+            # One round trip, not one per row: executemany against a remote
+            # DB was ~0.5s/row (371 rows = 3min). VALUES-join is ~1s total.
+            from psycopg2.extras import execute_values
+            execute_values(cur,
+                "UPDATE book_passages AS b SET section = v.section "
+                "FROM (VALUES %s) AS v(section, id) WHERE b.id = v.id",
+                updates)
             conn.commit()
             print(f"    -> wrote {len(updates)} rows")
 

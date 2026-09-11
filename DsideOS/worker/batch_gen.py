@@ -44,6 +44,7 @@ sections a paper draws from (rag sampling + reuse tracking, migration 007).
 from __future__ import annotations
 
 import json
+import re
 
 # One question per section. See module docstring.
 QUESTIONS_PER_SECTION = 1
@@ -101,10 +102,27 @@ sentence stating a name, place, year, work, scheme, or pairing.
   material happens to group things — if a question only makes sense relative to
   a text the student cannot see, it is broken.
 
+# THE REASON FIELD — READ THIS TWICE
+`reason` is shown to a TEACHER as a bare statement of fact. It is NOT an
+explanation of where you found it. Write the fact and stop.
+
+  RIGHT: "विष्णुप्रयाग में विष्णु गंगा और धौलीगंगा मिलकर अलकनंदा बनाती हैं।"
+  WRONG: "विष्णुप्रयाग में ... बनाती हैं, जैसा कि सामग्री में कहा गया है।"
+  WRONG: "सामग्री में बताया गया है कि दिसंबर 2017 में लागत US$ 139.79 मिलियन थी।"
+  WRONG: "सारणी 22.3 में बताया गया है कि पिथौरागढ़ का रैंक 1 है।"
+
+NEVER write any of these anywhere in a stem or reason: सामग्री, अध्ययन सामग्री,
+पाठ, पाठ्य, प्रदत्त, दिए गए, उपर्युक्त, स्रोत, सारणी, तालिका, अनुच्छेद,
+"जैसा कि ... कहा गया", "के अनुसार", "में बताया गया", "में उल्लेख".
+A single such phrase makes the whole question worthless — it is rejected
+automatically, not read by a human. If the fact came from a table, state the
+fact plainly without naming the table.
+
 # FINAL CHECK before you answer
-For each question, point to the sentence in ITS OWN section that makes the
-correct option correct. If no sentence states it, choose a different fact from
-that section — do NOT fall back on your own knowledge."""
+For each question: (1) point to the sentence in ITS OWN section that makes the
+correct option correct — if none states it, pick a different fact from that
+section rather than using your own knowledge; (2) re-read your `reason` and
+delete any phrase that refers to where the fact came from."""
 
 
 def _schema(n: int) -> dict:
@@ -179,6 +197,58 @@ def build_batch_prompt(subject: str, subject_label: str,
     return system, user, {"type": "json_schema", "json_schema": _schema(n)}
 
 
+# Attribution phrases the model appends to `reason` ("..., जैसा कि सामग्री में
+# कहा गया है"). Measured 2026-09-11: gpt-oss-120b did this on 6/6 questions in
+# the first batched run, so every question was dropped by validate_gen's
+# material-reference gate despite the FACTS being correct and grounded.
+#
+# The prompt now forbids it explicitly (see BATCH_SYSTEM), but prompt adherence
+# is exactly what cannot be relied on — it is the failure mode that killed
+# sarvam-30b (86% of its drops). `reason` is teacher-facing prose, NOT
+# load-bearing for correctness: the stem, options and answer carry the
+# question, and grounding checks the FACT, not this sentence. So a trailing
+# attribution clause is strippable, unlike a bad stem which must be rejected.
+#
+# Stems are deliberately NOT stripped: a stem that refers to the material is
+# broken as a QUESTION (the student cannot see the text), so it must fail the
+# gate and be regenerated, not silently patched.
+_ATTRIB_RX = re.compile(
+    r"\s*(?:,|।)?\s*(?:जैसा कि|जैसाकि)?\s*"
+    r"(?:इस |उपर्युक्त |दी गई |दिए गए |प्रदत्त )?"
+    r"(?:अध्ययन\s*)?(?:सामग्री|पाठ|पाठ्यांश|स्रोत|सारणी|तालिका|अनुच्छेद)"
+    r"[^।।]*?(?:कहा गया है|बताया गया है|उल्लेख(?:ित)? है|के अनुसार|में दिया गया है)"
+    r"\s*[।।.]?\s*$"
+)
+
+
+def strip_attribution(reason: str) -> str:
+    """Remove a trailing source-attribution clause from a reason.
+
+    Returns the bare fact. Idempotent, and a no-op when no clause is present.
+    If stripping would empty the reason, the original is kept — an empty reason
+    is worse than one that trips the gate, because the gate at least reports it.
+
+    Complexity: O(len(reason)) — one anchored regex, no backtracking blowup
+    (the inner class excludes the sentence terminator).
+    """
+    if not reason:
+        return reason
+    out = _ATTRIB_RX.sub("", reason).strip()
+    if not out:
+        return reason
+    # Leading form: "सामग्री में बताया गया है कि <fact>" -> "<fact>"
+    lead = re.match(
+        r"^\s*(?:इस |उपर्युक्त |प्रदत्त )?(?:अध्ययन\s*)?"
+        r"(?:सामग्री|पाठ|पाठ्यांश|स्रोत|सारणी\s*[\d.]*|तालिका\s*[\d.]*)"
+        r"[^।।]*?(?:में )?(?:बताया गया है|कहा गया है|उल्लेख है|दिया गया है)"
+        r"\s*कि\s*(.+)$", out)
+    if lead and lead.group(1).strip():
+        out = lead.group(1).strip()
+    if out and out[-1] not in "।।.":
+        out += "।"
+    return out
+
+
 def parse_batch(raw: str, sections: list[tuple[str, list[dict]]]) -> list[dict]:
     """Raw model reply -> drafts, each tagged with its own section's passages.
 
@@ -208,7 +278,7 @@ def parse_batch(raw: str, sections: list[tuple[str, list[dict]]]) -> list[dict]:
             "stem": q.get("stem", ""),
             "options": q.get("options", []),
             "answer_index": q.get("answer_index", 0),
-            "reason": q.get("reason", ""),
+            "reason": strip_attribution(q.get("reason", "")),
             "_section": name,
             "_passages": passages,
         }

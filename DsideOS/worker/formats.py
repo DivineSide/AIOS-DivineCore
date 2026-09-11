@@ -188,6 +188,8 @@ At least one statement must be true and at least one false."""
 def _statement_options(n: int, correct: frozenset[int]) -> tuple[list[str], int]:
     """Canonical option set for n statements; returns (options, correct_idx)."""
     def label(sel: frozenset[int]) -> str:
+        if not sel:
+            return "इनमें से कोई नहीं"
         if len(sel) == n:
             return "उपर्युक्त सभी"
         nums = " और ".join(str(i + 1) for i in sorted(sel))
@@ -197,9 +199,20 @@ def _statement_options(n: int, correct: frozenset[int]) -> tuple[list[str], int]
     if n >= 2:
         cands += [frozenset(c) for c in [(0, 1), (0, 2), (1, 2)] if max(c) < n]
     cands.append(frozenset(range(n)))
+    # n=2 yields only 3 distinct selections ({0}, {1}, {0,1}) but four options
+    # are required, so EVERY 2-statement draft raised "could not build 4
+    # distinct statement options" — silently, three times, then the slot was
+    # dropped. STATEMENT_PROMPT explicitly invites "2 to 3 statements", so the
+    # model hit this whenever it obeyed. "कोई नहीं" is the standard fourth
+    # option in real papers and is always false here (the contract guarantees
+    # at least one TRUE statement), so it is a valid distractor, never the key.
+    if n == 2:
+        cands.append(frozenset())          # rendered as "इनमें से कोई नहीं"
     seen, uniq = set(), []
     for c in [correct] + cands:
-        if c not in seen and c:
+        # `c` may legitimately be the EMPTY set (the n=2 "कोई नहीं" distractor),
+        # so test membership only — a plain truthiness check would drop it.
+        if c not in seen:
             seen.add(c)
             uniq.append(c)
     sel4 = uniq[:4]

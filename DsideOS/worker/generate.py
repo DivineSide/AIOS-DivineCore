@@ -70,7 +70,9 @@ for _p in (str(WORKER_DIR), str(RAG)):
         sys.path.insert(0, _p)
 
 import query as rag  # noqa: E402
+import sample as rag_sample  # noqa: E402
 
+import batch_gen  # noqa: E402
 import blueprint  # noqa: E402
 import formats  # noqa: E402
 import ground  # noqa: E402
@@ -462,6 +464,45 @@ def _draft_sarvam(system: str, messages: list[dict]) -> str:
                        choice.finish_reason,
                        getattr(resp.usage, "completion_tokens", "?"))
     return out
+
+
+def _draft_structured(system: str, user: str, response_format: dict) -> str:
+    """Draft with CONSTRAINED DECODING — the schema is enforced by the sampler,
+    not by prompt adherence, so a wrong-shaped reply is impossible rather than
+    something we detect and retry (see batch_gen's docstring).
+
+    Groq only: gpt-oss-120b supports `strict: true` (verified live 2026-09-06).
+    Sarvam/Anthropic have no equivalent here, so this raises rather than
+    silently degrading to unconstrained output — a silent fallback would
+    reintroduce exactly the parse failures the schema exists to eliminate.
+
+    Error handling: rate-limit retries and key rotation are inherited from
+    _draft_groq's pool/bucket; anything else propagates to the caller, which
+    turns it into one drop per section.
+    """
+    if GEN_PROVIDER != "groq":
+        raise RuntimeError(
+            f"structured output requires GEN_PROVIDER=groq, got {GEN_PROVIDER!r}")
+    pool, buckets = _groq_pool(), _groq_bucket_pool()
+    last: Exception | None = None
+    for client, bucket in zip(pool, buckets):
+        for attempt in range(GROQ_MAX_RATE_LIMIT_RETRIES):
+            bucket.acquire(_GROQ_MAX_TOKENS_PER_CALL)
+            try:
+                resp = client.chat.completions.create(
+                    model=GROQ_MODEL, max_tokens=8000,
+                    reasoning_effort=GROQ_REASONING_EFFORT,
+                    response_format=response_format,
+                    messages=[{"role": "system", "content": system},
+                              {"role": "user", "content": user}],
+                )
+                return (resp.choices[0].message.content or "").strip()
+            except Exception as e:
+                last = e
+                if not _is_groq_rate_error(e):
+                    raise
+                time.sleep(GROQ_RETRY_BACKOFF_BASE_S * (2 ** attempt))
+    raise last or RuntimeError("all Groq keys exhausted")
 
 
 def _draft(system: str, messages: list[dict]) -> str:
@@ -1091,6 +1132,145 @@ async def generate_questions(subject: str, count: int,
     return out, meta
 
 
+def _interleave_formats(questions: list[dict]) -> list[dict]:
+    """Spread same-format questions apart in the finished paper.
+
+    WHY: slots are built rare-formats-first then all `plain`
+    (generate_questions builds `slots` that way so rare formats land on
+    distinct early topics), and numbering is sequential — so every match /
+    assertion / statement question clustered at the FRONT of the paper. Real
+    papers interleave them.
+
+    This is a PRESENTATION concern, deliberately decoupled from generation
+    order: constraining batch composition to fix it would couple two unrelated
+    things. Applied once, at the end, just before numbering.
+
+    Greedy spacing: repeatedly take the format with the most questions left
+    that is not the one just placed. O(n * k) for k formats (k=5), i.e. linear.
+    Stable within a format, so a subject's questions keep their relative order.
+    """
+    if len(questions) < 3:
+        return questions
+    from collections import defaultdict
+    buckets: dict[str, list[dict]] = defaultdict(list)
+    for q in questions:
+        buckets[q.get("format", "plain")].append(q)
+    out: list[dict] = []
+    last: str | None = None
+    while any(buckets.values()):
+        # most-remaining first, but never the format just placed (unless it is
+        # the only one left — a single-format paper must still be emitted)
+        cand = [f for f, qs in buckets.items() if qs and f != last]
+        if not cand:
+            cand = [f for f, qs in buckets.items() if qs]
+        pick = max(cand, key=lambda f: len(buckets[f]))
+        out.append(buckets[pick].pop(0))
+        last = pick
+    return out
+
+
+# ── batched generation (round-2 rebuild, 2026-09-11) ─────────────────────────
+# GEN_BATCHED=1 routes generation through ONE model call per subject instead of
+# one per question. See worker/batch_gen.py for the prompt/schema and
+# rag/RAG_ROADMAP.md §4 for why retrieval no longer embeds anything.
+#
+# The old per-slot path (_gen_slot) is kept for now as a fallback — batching is
+# new and unproven on a full paper. Once a real 100Q run is clean, delete the
+# slot engine rather than maintaining two prompt surfaces and two gate paths.
+GEN_BATCHED = os.environ.get("GEN_BATCHED", "0") == "1"
+
+
+async def generate_questions_batched(subject: str, count: int,
+                                     exam: str | None = None,
+                                     ) -> tuple[list[dict], dict]:
+    """One model call for this subject's whole allocation.
+
+    Interface — same (questions, meta) contract as generate_questions(), so
+    callers and the Celery task are unchanged.
+
+    Flow:
+      sections = rag_sample.sections_for(subject, count)   # metadata + RANDOM()
+      draft    = ONE batched call, strict json_schema, 1 question per section
+      per question: formats.build -> validate -> guard -> ground
+      mark_used + advance_generation                       # reuse bookkeeping
+
+    What is NOT here, deliberately: no topic extraction (sections come from the
+    corpus), no topic dedup embeddings (sections are distinct by construction),
+    no HyDE, no per-slot retry loop. Those existed to fix problems this design
+    does not have — see RAG_ROADMAP §4.
+
+    Complexity: 1 LLM call + 1 grounding call per question + ~2 DB round trips
+    per section. Versus the slot engine: ~4 API calls per question.
+    Scale note: fine to ~40 sections per subject; beyond that split the batch
+    (batch_gen.build_batch_prompt's docstring explains why).
+    """
+    import psycopg2  # local: only the batched path needs a raw connection
+    conn = psycopg2.connect(os.environ["SUPABASE_DB_URL"], connect_timeout=30)
+    drops: list[dict] = []
+    out: list[dict] = []
+    try:
+        sections = await asyncio.to_thread(rag_sample.sections_for,
+                                           subject, count, conn)
+        if not sections:
+            logger.error("batch[%s]: no tagged sections — has tag_sections.py "
+                        "been run for this subject?", subject)
+            return [], {"subject": subject, "drops": [
+                {"topic": subject, "format": "plain",
+                 "reason": "no tagged sections for this subject"}]}
+
+        label = SUBJECT_LABELS.get(subject, subject)
+        system, user, rfmt = batch_gen.build_batch_prompt(subject, label, sections)
+        try:
+            raw = await asyncio.to_thread(_draft_structured, system, user, rfmt)
+        except Exception as e:
+            logger.warning("batch[%s]: draft call failed: %s", subject, e)
+            return [], {"subject": subject, "drops": [
+                {"topic": s, "format": "plain", "reason": f"batch call failed: {e}"}
+                for s, _ in sections]}
+
+        drafts = batch_gen.parse_batch(raw, sections)
+        logger.info("batch[%s]: %d sections -> %d drafts", subject,
+                    len(sections), len(drafts))
+
+        guard = PaperGuard(total=count)
+        for d in drafts:
+            passages = d.pop("_passages")
+            section = d.pop("_section")
+            try:
+                q = formats.build("plain", d, seed=_seed(subject, section, 0, 0))
+            except formats.FormatError as e:
+                drops.append({"topic": section, "format": "plain", "reason": str(e)})
+                continue
+            reason = validate_question(q) or guard.check(q) or ""
+            if reason:
+                drops.append({"topic": section, "format": "plain", "reason": reason})
+                continue
+            ok, greason = await asyncio.to_thread(ground.check, q, passages)
+            if not ok:
+                drops.append({"topic": section, "format": "plain", "reason": greason})
+                continue
+            guard.commit(q)
+            q["subject"] = subject
+            out.append(q)
+
+        # Bookkeeping: every passage the MODEL SAW is marked, including ones
+        # whose question was dropped — re-showing them would reproduce the same
+        # question, so a drop must not make a passage look unused.
+        seen = [p["id"] for _, ps in sections for p in ps]
+        await asyncio.to_thread(rag_sample.mark_used, seen, conn)
+        await asyncio.to_thread(rag_sample.advance_generation, conn)
+    finally:
+        conn.close()
+
+    for i, q in enumerate(out, 1):
+        q["n"] = i
+        q.pop("_claim", None)
+    logger.info("batch[%s]: delivered %d/%d (%d drops)",
+                subject, len(out), count, len(drops))
+    return out, {"subject": subject, "requested": count,
+                 "delivered": len(out), "drops": drops}
+
+
 async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
     """Exam mode. Harness owns the counts (blueprint SUBJECT_MIX — measured
     opening proposal, client-lockable); the OFFICIAL syllabus owns the topic
@@ -1137,6 +1317,27 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
     the dedup PASS over the combined result is sequential, and it's cheap
     (re-embeds ~n_topics short strings total, not the corpus)."""
     per_subject = blueprint.allocate(total, blueprint.subject_mix(exam))
+
+    if GEN_BATCHED:
+        # One call per subject, subjects still concurrent. No topic extraction
+        # or cross-subject topic dedup: sections come from the corpus and are
+        # distinct by construction, so the machinery those passes existed for
+        # (a 9-topic syllabus pool colliding across subjects) has no job here.
+        subs = [(su, n) for su, n in per_subject.items() if n > 0]
+        results = await asyncio.gather(*[
+            generate_questions_batched(su, n, exam=exam) for su, n in subs
+        ])
+        out: list[dict] = []
+        metas: dict[str, dict] = {}
+        for (su, _), (qs, m) in zip(subs, results):
+            out.extend(qs)
+            metas[su] = m
+        out = _interleave_formats(out)
+        for i, q in enumerate(out, 1):
+            q["n"] = i
+        return out, {"exam": exam, "per_subject_plan": per_subject,
+                     "batched": True, "subjects": metas}
+
     subjects = [(subject, n) for subject, n in per_subject.items() if n > 0]
     fmt_plan = await asyncio.to_thread(
         blueprint.exam_format_plan, exam, dict(subjects), rag._db())

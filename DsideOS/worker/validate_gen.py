@@ -31,13 +31,27 @@ _YEAR_MIN, _YEAR_MAX = 600, 2026
 # names) is the objectively eliminable case, and shape is mechanical.
 _SHAPE_YEAR = re.compile(r"^[0-9]{3,4}(\s*[-–]\s*[0-9]{2,4})?(\s*ई[.०]?(\s*पू[.०]?)?)?$")
 _SHAPE_NUM = re.compile(r"^[0-9][0-9,.\s/%]*$")
+# A measurement is a NUMBER, not text, even when its unit is Devanagari.
+# Found live 2026-09-11: "17.98 मीटर" classified as devanagari-text, so
+# unit-bearing answers bypassed PaperGuard's numeric-answer budget entirely —
+# a geography paper could come out almost all measurements while the cap
+# reported zero numeric answers. Units are listed explicitly rather than
+# "number + any word", so a genuine text answer that merely opens with a digit
+# ("1857 का विद्रोह") stays text.
+_UNITS = (r"मीटर|मी\.?|किमी|कि\.?मी\.?|किलोमीटर|सेमी|फीट|फुट|इंच|मील"
+          r"|हेक्टेयर|एकड़|वर्ग\s*किमी|वर्ग\s*किलोमीटर|वर्ग\s*मीटर"
+          r"|प्रतिशत|फीसदी|डिग्री|सेल्सियस|लाख|करोड़|हजार|अरब"
+          r"|किलोग्राम|किग्रा|टन|क्विंटल|लीटर|मिलियन|बिलियन"
+          r"|वर्ष|साल|दिन|घंटे|मिनट|km|m|cm|ft|%")
+_SHAPE_MEASURE = re.compile(
+    r"^[0-9][0-9,.\s/]*\s*(?:" + _UNITS + r")\.?$", re.I)
 
 
 def _shape_class(s: str) -> str:
     t = str(s).strip()
     if _SHAPE_YEAR.match(t):
         return "year"
-    if _SHAPE_NUM.match(t):
+    if _SHAPE_NUM.match(t) or _SHAPE_MEASURE.match(t):
         return "number"
     return "devanagari-text" if _dev_ratio(t) >= 0.5 else "latin-text"
 
