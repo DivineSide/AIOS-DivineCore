@@ -65,6 +65,19 @@ def _odd_shape_out(items: list[str]) -> str | None:
     return None
 
 
+# A Devanagari word with Latin letters spliced INSIDE it ("उत्तarakhand") is
+# OCR/transliteration damage, not a legitimate English technical term. Real
+# mixed usage keeps the scripts in separate words ("Hip roofs वाली छत"), never
+# inside one. Caught live 2026-09-11 leaking into two generated stems.
+_MIXED_SCRIPT = re.compile(r"[ऀ-ॿ][A-Za-z]{2,}|[A-Za-z]{2,}[ऀ-ॿ]")
+
+
+def _mixed_script_hit(text: str) -> str | None:
+    """The first script-spliced token, or None. O(len(text))."""
+    m = _MIXED_SCRIPT.search(text or "")
+    return m.group(0) if m else None
+
+
 def _dev_ratio(text: str) -> float:
     letters = _LETTER.findall(text)
     if not letters:
@@ -112,6 +125,13 @@ _MATERIAL_REFS = (
     "पाठ के अनुसार", "सामग्री के अनुसार", "अध्ययन सामग्री", "प्रदत्त सामग्री",
     "दी गई सामग्री", "उपरोक्त सामग्री", "पाठ में", "स्रोत [",
     "के साथ उल्लेखित", "सामग्री में", "सामग्री से",
+    # Table/figure references are the same bug in a different costume: a stem
+    # like "कार्यात्मक वर्गीकरण तालिका के अनुसार ..." only makes sense to
+    # someone looking at a table the student cannot see. Caught live
+    # 2026-09-11 — it passed every gate because the list named only
+    # "सामग्री"-shaped phrases.
+    "तालिका के अनुसार", "सारणी के अनुसार", "तालिका में", "सारणी में",
+    "उपर्युक्त तालिका", "दी गई तालिका", "चित्र के अनुसार", "आरेख के अनुसार",
 )
 
 
@@ -156,6 +176,13 @@ def validate_question(q: dict) -> str | None:
                     f"({sig}) inherited from a damaged source passage — this is "
                     f"not a real word; rebuild this field from a DIFFERENT, "
                     f"cleanly-stated fact in the study material")
+
+    for label, text in garble_fields:
+        hit = _mixed_script_hit(text)
+        if hit:
+            return (f"{label} contains '{hit}' — Devanagari and Latin letters "
+                    f"are spliced inside one word (OCR damage inherited from the "
+                    f"source); rewrite that word in a single script")
 
     ans = str(q.get("answer", "")).lower()
     if ans not in _LETTERS:
