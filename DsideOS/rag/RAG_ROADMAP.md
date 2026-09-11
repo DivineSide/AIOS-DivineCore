@@ -75,12 +75,36 @@ Exhaustion fallback: when a subject has too few eligible rows, order by
 `used_ago DESC` (least-recently-used) instead of failing, and LOG it — that log
 line is the early warning that a corpus needs expanding.
 
-**Still to build:**
-1. `syllabus_topic` column — tag every passage with its canonical syllabus topic
-   (the metadata that makes filtering actually selective; see §Chunking note)
-2. `sample_passages(subject, topic, n)` — eligible-first query with LRU fallback
-3. Post-run bookkeeping — mark used (0) → increment non-nulls → clear past 5
-4. Replace `passage_lookup()` in `generate.py` with the above
+**Built and verified (2026-09-11):**
+1. `section` column + `rag/tag_sections.py` — the BOOK'S OWN authored headings,
+   read from the `.reocr` transcript (which retains ~2x the structure that
+   survived chunking, since ingest split on sentences and build_passages merged
+   on char count — headings were never a boundary). uk-geography: 371/385
+   tagged, 58 sections after merging undersized ones (1-passage sections went
+   54 → 2). Syllabus topics map ONTO sections separately, so a syllabus
+   revision rewrites ~8 mapping rows, not thousands of tags.
+2. `rag/sample.py` — `sections_for()` / `mark_used()` / `advance_generation()`.
+3. Wired into `generate.py` as `generate_questions_batched` (GEN_BATCHED=1).
+
+**Measured result:** two consecutive papers shared ZERO passages and ZERO
+sections. The variety problem that opened this audit is solved deterministically.
+
+**Bugs this surfaced, all fixed:**
+- `_GroqTokenBucket.acquire()` HUNG FOREVER when one request exceeded the whole
+  per-minute budget (a 10-section batch needs ~20k vs a 7.2k/min ceiling). It
+  now raises instead of looping — an invisible deadlock became an actionable
+  error.
+- Batch chunking must be TOKEN-aware, not section-count-aware: sections range
+  from 1 to 31 passages, so "4 sections" was 3k tokens for one subject and 8k
+  for another, and the oversized ones failed outright.
+- `_shape_class` read "17.98 मीटर" as text, so unit-bearing numbers bypassed
+  PaperGuard's numeric-answer budget entirely.
+
+**Still open:**
+- Tag the other three UK subjects (blocked on Mayank's per-book taxonomy read)
+- Grounding rejections are now the DOMINANT drop reason (5/10 on a uk-geography
+  run) — that is the gate working, but worth checking whether sampled passages
+  are too thin to support a question, or the model is over-reaching.
 
 ## 5. Retrieval Fusion
 

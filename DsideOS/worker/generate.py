@@ -331,6 +331,18 @@ class _GroqTokenBucket:
         self._usage: list[tuple[float, int]] = []
 
     def acquire(self, tokens: int) -> None:
+        """Block until `tokens` of budget is free in the sliding window.
+
+        Raises if a single request exceeds the whole budget: that can NEVER be
+        satisfied, so the old unconditional loop hung forever with no error
+        (hit live 2026-09-11 — a 10-section batch needed ~20k tokens against a
+        7.2k/min budget and the process just stopped). Failing loudly turns an
+        invisible deadlock into a caller-visible error it can act on.
+        """
+        if tokens > self.budget:
+            raise RuntimeError(
+                f"request needs {tokens} tokens but the per-key budget is "
+                f"{self.budget}/min — split the batch or raise the tier")
         while True:
             with self._lock:
                 now = time.time()
@@ -484,13 +496,20 @@ def _draft_structured(system: str, user: str, response_format: dict) -> str:
         raise RuntimeError(
             f"structured output requires GEN_PROVIDER=groq, got {GEN_PROVIDER!r}")
     pool, buckets = _groq_pool(), _groq_bucket_pool()
+    # Reserve from the REAL prompt size — a batch prompt scales with section
+    # count, so the fixed per-slot estimate under-reserves badly and the
+    # server-side 429 lands before our own bucket notices. ~3 chars/token is
+    # conservative for Devanagari (which tokenises worse than Latin).
+    est_in = (len(system) + len(user)) // 3
+    max_out = min(8000, max(1200, _GROQ_TPM_BUDGET - est_in - 500))
+    need = est_in + max_out
     last: Exception | None = None
     for client, bucket in zip(pool, buckets):
         for attempt in range(GROQ_MAX_RATE_LIMIT_RETRIES):
-            bucket.acquire(_GROQ_MAX_TOKENS_PER_CALL)
+            bucket.acquire(need)
             try:
                 resp = client.chat.completions.create(
-                    model=GROQ_MODEL, max_tokens=8000,
+                    model=GROQ_MODEL, max_tokens=max_out,
                     reasoning_effort=GROQ_REASONING_EFFORT,
                     response_format=response_format,
                     messages=[{"role": "system", "content": system},
@@ -1219,18 +1238,49 @@ async def generate_questions_batched(subject: str, count: int,
                  "reason": "no tagged sections for this subject"}]}
 
         label = SUBJECT_LABELS.get(subject, subject)
-        system, user, rfmt = batch_gen.build_batch_prompt(subject, label, sections)
-        try:
-            raw = await asyncio.to_thread(_draft_structured, system, user, rfmt)
-        except Exception as e:
-            logger.warning("batch[%s]: draft call failed: %s", subject, e)
-            return [], {"subject": subject, "drops": [
-                {"topic": s, "format": "plain", "reason": f"batch call failed: {e}"}
-                for s, _ in sections]}
 
-        drafts = batch_gen.parse_batch(raw, sections)
-        logger.info("batch[%s]: %d sections -> %d drafts", subject,
-                    len(sections), len(drafts))
+        # CHUNKING: one call per subject is the goal, but a batch prompt scales
+        # with section count and the Groq free tier caps a KEY at ~7.2k
+        # tokens/min. A 10-section prompt needs ~20k and can never be served —
+        # which used to hang the token bucket forever (fixed in acquire(), but
+        # the request still has to fit). So split into chunks that do.
+        # Chunks still batch: 4 questions per call is 4x fewer calls than the
+        # slot engine, and cross-question dedup awareness holds WITHIN a chunk.
+        # Chunk by ESTIMATED TOKENS, not by a fixed section count: sections
+        # vary from 1 to 31 passages, so "4 sections" was 3k tokens for some
+        # subjects and 8k for others — and the oversized ones failed outright.
+        # Budget per call = TPM ceiling minus the system prompt, an output
+        # reserve, and headroom. ~3 chars/token is conservative for Devanagari.
+        max_per_call = max(1, int(os.environ.get("GEN_BATCH_MAX_SECTIONS", "6")))
+        budget_chars = max(1500, (_GROQ_TPM_BUDGET - 2500) * 3)
+        chunks, cur, cur_chars = [], [], 0
+        for sec in sections:
+            sec_chars = len(sec[0]) + sum(len(p.get("text", "")) for p in sec[1])
+            if cur and (cur_chars + sec_chars > budget_chars
+                        or len(cur) >= max_per_call):
+                chunks.append(cur)
+                cur, cur_chars = [], 0
+            cur.append(sec)
+            cur_chars += sec_chars
+        if cur:
+            chunks.append(cur)
+        drafts: list[dict] = []
+        for ci, chunk in enumerate(chunks, 1):
+            system, user, rfmt = batch_gen.build_batch_prompt(subject, label, chunk)
+            try:
+                raw = await asyncio.to_thread(_draft_structured, system, user, rfmt)
+            except Exception as e:
+                logger.warning("batch[%s] chunk %d/%d failed: %s",
+                               subject, ci, len(chunks), e)
+                drops += [{"topic": sec, "format": "plain",
+                           "reason": f"batch call failed: {e}"} for sec, _ in chunk]
+                continue
+            drafts += batch_gen.parse_batch(raw, chunk)
+        logger.info("batch[%s]: %d sections in %d call(s) -> %d drafts",
+                    subject, len(sections), len(chunks), len(drafts))
+        if not drafts:
+            return [], {"subject": subject, "requested": count,
+                        "delivered": 0, "drops": drops}
 
         guard = PaperGuard(total=count)
         for d in drafts:

@@ -1,0 +1,44 @@
+=== 5/10 delivered in 215s ===
+
+Q1: उत्तराखंड में कौन‑सा कृषि क्षेत्र हरित क्रांति से सबसे अधिक लाभान्वित हुआ?
+      (a) घाटी (valleys)
+    > (b) मैदान (plains)
+      (c) पहाड़ी (hills)
+      (d) उच्च पर्वतीय (high mountains)
+    why: हरित क्रांति ने राज्य के मैदान क्षेत्र की खेती की व्यवस्था को अत्यधिक लाभ पहुँचाया।
+
+Q2: नवम्बर 2019 में राज्य सरकार ने मण्डी रिवॉल्विंग फंड कितनी राशि से स्थापित किया?
+      (a) ₹ 15 करोड़
+    > (b) ₹ 10 करोड़
+      (c) ₹ 5 करोड़
+      (d) ₹ 20 करोड़
+    why: नवम्बर 2019 में राज्य सरकार ने ₹ 10 करोड़ का मण्डी रिवॉल्विंग फंड स्थापित किया।
+
+Q3: क्लाउडबर्स्ट की घटनाओं के दौरान प्रथम और द्वितीय क्रम के अपर धारा-भाग किससे अभिभूत होते देखे गए हैं?
+      (a) जलभवन
+      (b) ध्रुवीय हवाएँ
+    > (c) मलबा प्रवाह
+      (d) बर्फ पिघलना
+    why: प्रथम क्रम और द्वितीय क्रम के अपर धारा-भाग मलबा प्रवाह से अभिभूत होते देखे गए हैं।
+
+Q4: कुमाों के भविष्य के व्यापार-चिन्ह वाले फल क्षेत्रों में से मुख्य फल‑संग्रहण एवं निर्यात केंद्र कौन‑सा है?
+      (a) पहाड़पानी
+      (b) रामगढ़
+      (c) मुक्तेश्वर
+    > (d) भवाली
+    why: भवाली मुख्य फल‑संग्रहण एवं निर्यात केंद्र है।
+
+Q5: विवेकानंद माउंटेन एग्रिकल्चर रिसर्च सेंटर, अल्मोड़ा में मशरूम की खेती करने वाले किसान प्रति माह अधिकतम कितनी आय बढ़ा सकते हैं?
+    > (a) Rs. 18,000
+      (b) Rs. 15,000
+      (c) Rs. 20,000
+      (d) Rs. 25,000
+    why: विवेकानंद माउंटेन एग्रिकल्चर रिसर्च सेंटर, अल्मोड़ा में मशरूम खेती करने वाले किसान प्रति माह Rs. 18000 तक अपनी आय बढ़ा सकते हैं।
+
+answer shapes: {'latin-text': 2, 'devanagari-text': 3}
+drops (5):
+   [उत्तराखंड की झीलें (Lakes in Uttarak] the claimed fact is not stated in the source passages — build the question ONLY from facts the 
+   [जलवायु परिवर्तन के प्रति संवेदनशीलता] the claimed fact is not stated in the source passages — build the question ONLY from facts the 
+   [पशु (ANIMALS)] the claimed fact is not stated in the source passages — build the question ONLY from facts the 
+   [बागवानी (Horticulture)] the claimed fact is not stated in the source passages — build the question ONLY from facts the 
+   [फसल संयोजन (Crop Combinations)] the claimed fact is not stated in the source passages — build the question ONLY from facts the 
