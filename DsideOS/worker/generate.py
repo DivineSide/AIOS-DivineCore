@@ -1198,6 +1198,10 @@ def _interleave_formats(questions: list[dict]) -> list[dict]:
 # new and unproven on a full paper. Once a real 100Q run is clean, delete the
 # slot engine rather than maintaining two prompt surfaces and two gate paths.
 GEN_BATCHED = os.environ.get("GEN_BATCHED", "0") == "1"
+# Top-up rounds for the batched path. Bounded (unlike the slot
+# engine's uncapped loop) because each round costs a full model call
+# per format — on a thin subject that spins without converging.
+TOPUP_MAX_ROUNDS = max(0, int(os.environ.get("GEN_TOPUP_ROUNDS", "2")))
 
 
 def _style_examples(subject: str, exam: str | None, conn,
@@ -1326,9 +1330,9 @@ async def generate_questions_batched(subject: str, count: int,
                 except Exception as e:
                     logger.warning("batch[%s] %s chunk %d/%d failed: %s",
                                    subject, fmt, ci, len(chunks), e)
-                    drops += [{"topic": sec, "format": fmt,
+                    drops += [{"topic": sec, "format": fmt, "difficulty": dd,
                                "reason": f"batch call failed: {e}"}
-                              for sec, _ in chunk]
+                              for (sec, _), dd in zip(chunk, cdiff)]
                     continue
                 drafts += [(d, fmt) for d in batch_gen.parse_batch(raw, chunk, fmt=fmt)]
 
@@ -1347,11 +1351,13 @@ async def generate_questions_batched(subject: str, count: int,
             try:
                 q = formats.build(fmt, d, seed=_seed(subject, section, 0, 0))
             except formats.FormatError as e:
-                drops.append({"topic": section, "format": fmt, "reason": str(e)})
+                drops.append({"topic": section, "format": fmt,
+                              "difficulty": difficulty_tag, "reason": str(e)})
                 continue
             reason = validate_question(q) or guard.check(q) or ""
             if reason:
-                drops.append({"topic": section, "format": fmt, "reason": reason})
+                drops.append({"topic": section, "format": fmt,
+                              "difficulty": difficulty_tag, "reason": reason})
                 continue
             q["difficulty"] = difficulty_tag
             # NO GROUNDING GATE on the batched path (removed 2026-09-12, by
@@ -1372,6 +1378,68 @@ async def generate_questions_batched(subject: str, count: int,
             guard.commit(q)
             q["subject"] = subject
             out.append(q)
+
+        # TOP-UP — refill drops on FRESH sections, preserving the difficulty
+        # mix. Without this every drop is permanent, and the loss is not random:
+        # a hard question reaches for a niche fact, which is exactly what trips
+        # the material-reference and distinctness gates, so drops eat hard and
+        # moderate questions preferentially and the delivered paper skews easy
+        # (observed 2026-09-12: planned 5/3/2, delivered 5/2/1).
+        #
+        # Regenerating with the SAME (format, difficulty) as each drop keeps the
+        # plan intact rather than just topping the count back up with whatever
+        # is easiest to produce.
+        rounds = 0
+        while drops and len(out) < count and rounds < TOPUP_MAX_ROUNDS:
+            rounds += 1
+            want = drops[:count - len(out)]
+            fresh = await asyncio.to_thread(rag_sample.sections_for,
+                                            subject, len(want), conn)
+            if not fresh:
+                logger.warning("batch[%s] topup: no eligible sections left", subject)
+                break
+            recovered: list[dict] = []
+            # group the retry by format, same reason as the main pass
+            by_fmt: dict[str, list[tuple]] = {}
+            for d, sec in zip(want, fresh):
+                by_fmt.setdefault(d.get("format", "plain"), []).append(
+                    (sec, d.get("difficulty", "moderate")))
+            for rfmt_name, items in by_fmt.items():
+                secs_r = [s for s, _ in items]
+                diffs_r = [d for _, d in items]
+                system, user, rfmt = batch_gen.build_batch_prompt(
+                    subject, label, secs_r, difficulties=diffs_r,
+                    fmt=rfmt_name, style_examples=style)
+                try:
+                    raw = await asyncio.to_thread(_draft_structured, system, user, rfmt)
+                except Exception as e:
+                    logger.warning("batch[%s] topup %s failed: %s",
+                                   subject, rfmt_name, e)
+                    continue
+                for d in batch_gen.parse_batch(raw, secs_r, fmt=rfmt_name):
+                    ps = d.pop("_passages"); sec_name = d.pop("_section")
+                    dtag = d.pop("difficulty", "")
+                    try:
+                        q = formats.build(rfmt_name, d,
+                                          seed=_seed(subject, sec_name, rounds, 0))
+                    except formats.FormatError:
+                        continue
+                    if validate_question(q) or guard.check(q):
+                        continue
+                    q["difficulty"] = dtag
+                    q["subject"] = subject
+                    guard.commit(q)
+                    out.append(q)
+                    recovered.append(q)
+                # mark the retry's passages used too — the model saw them
+                seen_extra = [pp["id"] for _, ps_ in secs_r for pp in ps_]
+                await asyncio.to_thread(rag_sample.mark_used, seen_extra, conn)
+            # drop the ones we just retried regardless of outcome: retrying the
+            # same (format, difficulty) forever on a thin subject would spin.
+            drops = drops[len(want):]
+            logger.info("batch[%s] topup round %d: recovered %d",
+                        subject, rounds, len(recovered))
+
 
         # Bookkeeping: every passage the MODEL SAW is marked, including ones
         # whose question was dropped — re-showing them would reproduce the same
