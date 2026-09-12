@@ -1252,7 +1252,14 @@ async def generate_questions_batched(subject: str, count: int,
         # Budget per call = TPM ceiling minus the system prompt, an output
         # reserve, and headroom. ~3 chars/token is conservative for Devanagari.
         max_per_call = max(1, int(os.environ.get("GEN_BATCH_MAX_SECTIONS", "6")))
-        budget_chars = max(1500, (_GROQ_TPM_BUDGET - 2500) * 3)
+        # Budget for PASSAGE chars only. The call also carries the system
+        # prompt (~3.4k chars) and needs output headroom, so both come off the
+        # ceiling first — a chunk sized against the raw TPM number overshot by
+        # ~200 tokens and the whole chunk failed (observed 2026-09-12).
+        _SYS_TOKENS = len(batch_gen.BATCH_SYSTEM) // 3
+        _OUT_RESERVE = 1200 + 260 * max_per_call      # ~260 tok per question
+        budget_chars = max(1500,
+                           (_GROQ_TPM_BUDGET - _SYS_TOKENS - _OUT_RESERVE - 400) * 3)
         chunks, cur, cur_chars = [], [], 0
         for sec in sections:
             sec_chars = len(sec[0]) + sum(len(p.get("text", "")) for p in sec[1])
@@ -1295,10 +1302,21 @@ async def generate_questions_batched(subject: str, count: int,
             if reason:
                 drops.append({"topic": section, "format": "plain", "reason": reason})
                 continue
-            ok, greason = await asyncio.to_thread(ground.check, q, passages)
-            if not ok:
-                drops.append({"topic": section, "format": "plain", "reason": greason})
-                continue
+            # NO GROUNDING GATE on the batched path (removed 2026-09-12, by
+            # decision). The batched prompt hands the model ONE section's
+            # material per question and tells it to use only that, which is a
+            # much tighter constraint than the old per-slot prompt had — and a
+            # measured 10/10 run had zero grounding rejections, so the gate was
+            # costing a call per question to reject almost nothing.
+            #
+            # KNOWN TRADEOFF, stated plainly: nothing now verifies that a
+            # generated fact is TRUE. Constrained decoding guarantees shape,
+            # validate_question guarantees form, PaperGuard guarantees
+            # cross-question distinctness — none of them read for truth. A live
+            # test produced schema-perfect JSON asserting N.D. Tiwari was
+            # Uttarakhand's first CM (it was Nityanand Swami); that class of
+            # error now ships. ground.py is untouched and the old slot engine
+            # still calls it, so this is one line to re-enable.
             guard.commit(q)
             q["subject"] = subject
             out.append(q)
