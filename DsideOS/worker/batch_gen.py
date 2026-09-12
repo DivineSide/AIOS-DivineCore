@@ -105,12 +105,6 @@ at it: not "सामग्री के अनुसार", not "जैसा 
 में", and not implicitly either ("सूची में सम्मिलित है", "उपर्युक्त में से").
 If a fact came from a table, state the fact and never mention the table.
 
-# ACROSS THE WHOLE BATCH
-You can see all {n} of your questions at once — use that. Every question must
-turn on a DIFFERENT fact and a DIFFERENT entity: if two would share a correct
-answer, change one before you answer. Vary how the stems open; {n} questions
-that all begin the same way read as machine-made.
-
 # BEFORE YOU ANSWER
 For each question, point to the sentence in ITS OWN section that makes the key
 correct. If you cannot, go back to STEP 1 and pick a different fact from that

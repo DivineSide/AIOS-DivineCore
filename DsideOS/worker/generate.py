@@ -81,7 +81,10 @@ SONNET = "claude-sonnet-4-6"
 # (facts only, code builds the rest), so cost stays ~$1 per 100-question paper.
 GEN_MODEL = os.environ.get("GEN_MODEL", SONNET)
 
-GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "anthropic").lower()
+# Default is groq/gpt-oss-120b. "anthropic" was the default until the slot
+# engine was archived — it no longer has a code path and would raise, so a
+# stale .env or a fresh checkout pointing there was a latent break.
+GEN_PROVIDER = os.environ.get("GEN_PROVIDER", "groq").lower()
 # Tried sarvam-30b (2026-07-22): ~9x faster per raw draft call than 105b, but
 # a real 50Q pipeline test showed it ignores SLOT_SYSTEM's "never reference
 # the study material in the reason text" rule far more often than 105b does

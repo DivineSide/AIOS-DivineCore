@@ -185,11 +185,46 @@ Status: in progress — free-tier drafting model picked, paid candidates parked 
 
 ## 9. Augmented Prompt
 
-Status: not yet audited
+Status: rewritten 2026-09-12 as a CONSTRUCTION METHOD
+
+BATCH_SYSTEM was 22 prohibitions across 74 lines with no section describing how
+to actually build a question — a fence, not a method. Now five ordered steps:
+find the fact -> make the question standalone -> build distractors from one
+category -> prefer a name over a number -> write the reason as the bare fact.
+The bans survive as consequences inside the step they belong to.
+
+Per-call the prompt also carries: the subject's difficulty block (only that
+subject's, ~1k chars — all seven would dilute the steer), the format contract
+when the batch is not plain, and 2 real PYQs from this exam+subject as register
+reference, sampled fresh each run.
+
+Honest result: prohibitions 22 -> 9, but question quality did not measurably
+improve and numeric answers stayed high. Root cause is the SOURCE, not the
+prompt — sections built from statistical tables (migration, census) contain no
+non-numeric checkable facts, so "pick a stated fact" and "prefer a name"
+genuinely conflict there. A prompt cannot fix that; section quality can.
+
+REMOVED 2026-09-12: an "ACROSS THE WHOLE BATCH" section telling the model to
+avoid duplicating entities across its own questions. It was never part of the
+design — added on the assumption that cross-question awareness was a benefit of
+batching. It is also near-redundant: sections are distinct by construction, and
+PaperGuard owns cross-question dedup at PAPER level, which a batch of ~4 cannot
+see anyway.
 
 ## 10. Grounding / Verification
 
-Status: not yet audited
+Status: REMOVED from the generation path 2026-09-12 (deliberate)
+
+ground.py still exists and is untouched; nothing calls it. The batched prompt
+constrains each question to ONE section's material, which is tighter than the
+old per-slot prompt, and a measured 10/10 run had zero grounding rejections —
+the gate was costing a call per question to reject almost nothing.
+
+STATED TRADEOFF: nothing now verifies a generated fact is TRUE. Constrained
+decoding guarantees shape, validate_question guarantees form, PaperGuard
+guarantees paper-level distinctness — none read for truth. A live test produced
+schema-perfect JSON asserting N.D. Tiwari was Uttarakhand's first CM (it was
+Nityanand Swami); that class of error now ships. Re-enabling is one line.
 
 ## 11. Evaluation
 
