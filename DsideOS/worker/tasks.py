@@ -551,9 +551,20 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
         # and the official syllabus (worker.syllabus) seeds the topics.
         exam = (meta.get("exam") or "").strip().lower() or None
         if exam:
+            # EXAM MODE mirrors a real paper: the harness owns every count
+            # (blueprint allocates per-subject, then per-format and per-
+            # difficulty), so the caller chooses nothing beyond the exam.
             questions, gen_meta = asyncio.run(generate.generate_exam(exam, count))
         else:
-            questions, gen_meta = asyncio.run(generate.generate_questions(subject, count))
+            # SUBJECT MODE is a practice sheet the teacher composes: optional
+            # single format and/or single difficulty for the whole sheet,
+            # picked from fixed dropdowns (validated in generate_questions_
+            # batched). Either left unset falls back to the measured realistic
+            # mix, so the default output still reads like an exam.
+            questions, gen_meta = asyncio.run(generate.generate_questions_batched(
+                subject, count,
+                only_format=(meta.get("question_format") or None),
+                only_difficulty=(meta.get("difficulty") or None)))
         if not questions:
             raise RuntimeError("Generation produced no questions.")
 

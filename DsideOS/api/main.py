@@ -195,12 +195,20 @@ VALID_SUBJECTS = {
 # not import worker modules (separate container).
 VALID_EXAMS = {"vdo-vpdo", "lekhpal-patwari", "group-c", "police-constable"}
 
+# SUBJECT-MODE dropdowns. Both optional; unset = the measured realistic mix,
+# so a default sheet still reads like a real paper. Exam mode ignores both —
+# it mirrors an actual paper and owns every count itself.
+VALID_QUESTION_FORMATS = {"plain", "match", "statement", "assertion", "order"}
+VALID_DIFFICULTIES = {"easy", "moderate", "hard"}
+
 
 @app.post("/api/generate", response_model=JobAccepted, dependencies=[Depends(require_token)])
 def generate(
     subject: str = Form(""),
     count: int = Form(...),
     exam: str = Form(""),
+    question_format: str = Form(""),   # subject mode only, dropdown
+    difficulty: str = Form(""),        # subject mode only, dropdown
     paper_name: str = Form("Paper"),
     format: str = Form("format-1"),
     font: str = Form("krutidev"),
@@ -228,6 +236,19 @@ def generate(
     if not (1 <= count <= 100):
         raise HTTPException(400, "count must be between 1 and 100.")
 
+    question_format = question_format.strip().lower()
+    difficulty = difficulty.strip().lower()
+    if question_format and question_format not in VALID_QUESTION_FORMATS:
+        raise HTTPException(400, f"Unknown question_format {question_format!r}. "
+                                 f"Valid: {sorted(VALID_QUESTION_FORMATS)}")
+    if difficulty and difficulty not in VALID_DIFFICULTIES:
+        raise HTTPException(400, f"Unknown difficulty {difficulty!r}. "
+                                 f"Valid: {sorted(VALID_DIFFICULTIES)}")
+    if exam and (question_format or difficulty):
+        # Not an error worth failing on, but the caller should know they are
+        # ignored: an exam paper's composition is the blueprint's, not theirs.
+        question_format = difficulty = ""
+
     meta = {
         "paper_name": paper_name,
         "format": format,
@@ -235,6 +256,8 @@ def generate(
         "title_hindi": title_hindi,
         "subtitle_hindi": subtitle_hindi,
         "exam": exam,
+        "question_format": question_format,
+        "difficulty": difficulty,
         "tool_title": tool_title,
         "tool_path": tool_path,
         "mode": mode,

@@ -115,6 +115,19 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 # and never emitted the Hindi answer. gpt-oss lets us dial that off.
 GROQ_REASONING_EFFORT = os.environ.get("GROQ_REASONING_EFFORT", "low")
 
+# GEN_PROVIDER=openai — same constrained decoding, no TPM ceiling.
+# Groq's free tier caps a key at ~7,200 tokens/MINUTE, which is the real
+# constraint on this pipeline: it forces batches into 2-3 sections and makes a
+# 12-question paper take ~400s, almost all of it waiting for the bucket to
+# refill. OpenAI's limits are high enough that one call per subject is viable,
+# so a paper generates in seconds rather than minutes.
+#
+# The tradeoff is deliberate and worth restating: gpt-oss-120b is Apache 2.0
+# and self-hostable, which was the reason it was chosen (see RAG_ROADMAP §8).
+# Every gpt-5.x model is closed. Switching the DEFAULT would quietly reverse
+# that decision, so Groq stays the default and this is opt-in.
+OPENAI_MODEL = os.environ.get("OPENAI_GEN_MODEL", "gpt-5.4-mini")
+
 TOPICS_DIVISOR = 2       # ~count/2 distinct topics (was 4 — variety collapsed)
 TOPICS_CAP = 40
 PYQ_SEED_K = 40          # random PYQs fed to topic extraction
@@ -343,6 +356,37 @@ def _draft_groq(system: str, messages: list[dict]) -> str:
 
 # ── model calls ──────────────────────────────────────────────────────────────
 
+_openai_client = None
+
+
+def _openai() -> "OpenAI":
+    """Lazy singleton. Reads OPENAI_API_KEY from the environment like every
+    other OpenAI use in this repo (embeddings, the old grounding judge)."""
+    global _openai_client
+    if _openai_client is None:
+        from openai import OpenAI
+        _openai_client = OpenAI(timeout=180, max_retries=3)
+    return _openai_client
+
+
+def _draft_openai(system: str, user: str, response_format: dict) -> str:
+    """Constrained-decoding draft on OpenAI.
+
+    Same `json_schema` + `strict: true` contract as the Groq path, so the
+    schema guarantee is identical and batch_gen needs no branching.
+
+    Complexity: one network call. No bucket, no key rotation — see
+    OPENAI_MODEL's note on why the Groq throttle has no analogue here.
+    """
+    resp = _openai().chat.completions.create(
+        model=OPENAI_MODEL,
+        response_format=response_format,
+        messages=[{"role": "system", "content": system},
+                  {"role": "user", "content": user}],
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
 def _draft_structured(system: str, user: str, response_format: dict) -> str:
     """Draft with CONSTRAINED DECODING — the schema is enforced by the sampler,
     not by prompt adherence, so a wrong-shaped reply is impossible rather than
@@ -357,9 +401,16 @@ def _draft_structured(system: str, user: str, response_format: dict) -> str:
     _draft_groq's pool/bucket; anything else propagates to the caller, which
     turns it into one drop per section.
     """
+    if GEN_PROVIDER == "openai":
+        # No token bucket: OpenAI's rate limits are far above anything one
+        # paper needs, so the whole throttle/rotation apparatus Groq requires
+        # is simply absent here. Errors propagate to the caller, which turns
+        # them into one drop per section — same contract as the Groq path.
+        return _draft_openai(system, user, response_format)
     if GEN_PROVIDER != "groq":
         raise RuntimeError(
-            f"structured output requires GEN_PROVIDER=groq, got {GEN_PROVIDER!r}")
+            f"structured output requires GEN_PROVIDER=groq or openai, "
+            f"got {GEN_PROVIDER!r}")
     pool, buckets = _groq_pool(), _groq_bucket_pool()
     # Reserve from the REAL prompt size — a batch prompt scales with section
     # count, so the fixed per-slot estimate under-reserves badly and the
@@ -503,6 +554,8 @@ def _style_examples(subject: str, exam: str | None, conn,
 async def generate_questions_batched(subject: str, count: int,
                                      exam: str | None = None,
                                      fmt_counts: dict[str, int] | None = None,
+                                     only_format: str | None = None,
+                                     only_difficulty: str | None = None,
                                      ) -> tuple[list[dict], dict]:
     """One model call for this subject's whole allocation.
 
@@ -545,9 +598,30 @@ async def generate_questions_batched(subject: str, count: int,
         # and of each difficulty. Both are pure arithmetic (no API, no DB) and
         # are paired independently — see blueprint.plan_questions for why
         # difficulty must NOT be derived from format.
-        if fmt_counts is None:
-            fmt_counts = blueprint.allocate(len(sections), blueprint.format_mix())
-        plan = blueprint.plan_questions(len(sections), fmt_counts)
+        # SUBJECT-MODE OVERRIDES. Exam mode mirrors a real paper, so it takes
+        # the measured mixes and offers no choice. Subject mode is a practice
+        # sheet a teacher builds deliberately — "20 hard uk-history questions"
+        # or "15 match-the-following on rivers" — so a single format and/or a
+        # single difficulty can be pinned for the whole sheet. Either left
+        # unset falls back to the realistic mix, so the default output still
+        # looks like an exam.
+        n_sec = len(sections)
+        if only_format:
+            if only_format not in formats.FORMATS:
+                raise ValueError(f"unknown format {only_format!r}; "
+                                 f"valid: {sorted(formats.FORMATS)}")
+            fmt_counts = {only_format: n_sec}
+        elif fmt_counts is None:
+            fmt_counts = blueprint.allocate(n_sec, blueprint.format_mix())
+
+        if only_difficulty:
+            if only_difficulty not in blueprint.DIFFICULTY_MIX:
+                raise ValueError(f"unknown difficulty {only_difficulty!r}; "
+                                 f"valid: {sorted(blueprint.DIFFICULTY_MIX)}")
+            plan = [{"format": f, "difficulty": only_difficulty}
+                    for f, n in fmt_counts.items() for _ in range(n)]
+        else:
+            plan = blueprint.plan_questions(n_sec, fmt_counts)
         by_format = blueprint.group_by_format(plan)
         logger.info("batch[%s]: plan formats=%s difficulties=%s", subject,
                     {f: len(d) for f, d in by_format.items()},
@@ -563,10 +637,29 @@ async def generate_questions_batched(subject: str, count: int,
         # free-tier TPM ceiling (~7.2k/key/min): a batch prompt scales with
         # section count, so an unchunked 10-section call can never be served.
         max_per_call = max(1, int(os.environ.get("GEN_BATCH_MAX_SECTIONS", "6")))
-        _SYS_TOKENS = len(batch_gen.BATCH_SYSTEM) // 3
+        # The system prompt is NOT just BATCH_SYSTEM: build_batch_prompt appends
+        # the subject's difficulty block (~1k chars), the format contract for a
+        # non-plain batch (~700), and up to two PYQ style examples (~1.4k). Sizing
+        # against BATCH_SYSTEM alone under-counted by ~3k chars and a 4-section
+        # match batch came out at 8,984 tokens against a 7,200 ceiling — the call
+        # raised and took its whole chunk with it (observed 2026-09-12, delivered
+        # 2 of 4). Measure the REAL system prompt for this batch instead.
+        _probe_sys, _, _ = batch_gen.build_batch_prompt(
+            subject, label, [(sections[0][0], [])],
+            difficulties=["moderate"], fmt=next(iter(by_format), "plain"),
+            style_examples=style)
+        _SYS_TOKENS = len(_probe_sys) // 3
         _OUT_RESERVE = 1200 + 260 * max_per_call      # ~260 tok per question
-        budget_chars = max(1500,
-                           (_GROQ_TPM_BUDGET - _SYS_TOKENS - _OUT_RESERVE - 400) * 3)
+        if GEN_PROVIDER == "openai":
+            # No TPM ceiling worth chunking around — the whole subject goes in
+            # one call, which is what batching was supposed to be before the
+            # free tier forced it into pieces. max_per_call still applies: past
+            # ~40 sections, per-question attention degrades regardless of
+            # limits (see build_batch_prompt's scale note).
+            budget_chars = 10**9
+        else:
+            budget_chars = max(1500,
+                               (_GROQ_TPM_BUDGET - _SYS_TOKENS - _OUT_RESERVE - 600) * 3)
 
         drafts: list[tuple[dict, str]] = []      # (draft, format)
         pos = 0
