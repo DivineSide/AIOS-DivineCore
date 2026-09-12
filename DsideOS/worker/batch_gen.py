@@ -46,6 +46,11 @@ from __future__ import annotations
 import json
 import re
 
+# Sibling worker modules — batch_gen is imported with worker/ on
+# sys.path (see generate.py), so these are flat imports like its own.
+import difficulty
+import formats
+
 # One question per section. See module docstring.
 QUESTIONS_PER_SECTION = 1
 
@@ -125,16 +130,91 @@ section rather than using your own knowledge; (2) re-read your `reason` and
 delete any phrase that refers to where the fact came from."""
 
 
-def _schema(n: int) -> dict:
-    """Strict JSON schema for a batch of n questions.
+# Per-format response shapes. Each mirrors EXACTLY what the matching
+# formats.build_* expects, because one call handles one format (grouped by
+# format precisely so a single strict schema can describe the whole batch — a
+# schema cannot say "item 3 is a match and item 4 is plain").
+#
+# Only the FACTS are requested for non-plain formats, never the assembled
+# question: formats.py computes the कूट grid and the answer letter, which is
+# what makes a structurally inconsistent match/order question impossible rather
+# than merely unlikely. See formats.py's module docstring.
+_FORMAT_FIELDS: dict[str, dict] = {
+    "plain": {
+        "required": ["stem", "options", "answer_index"],
+        "properties": {
+            "stem": {"type": "string"},
+            "options": {"type": "array", "minItems": 4, "maxItems": 4,
+                        "items": {"type": "string"}},
+            "answer_index": {"type": "integer", "minimum": 0, "maximum": 3},
+        },
+    },
+    "match": {
+        "required": ["stem_subject", "pairs"],
+        "properties": {
+            "stem_subject": {"type": "string"},
+            "pairs": {"type": "array", "minItems": 4, "maxItems": 4,
+                      "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                "items": {"type": "string"}}},
+        },
+    },
+    "statement": {
+        "required": ["context", "statements", "correct_indexes"],
+        "properties": {
+            "context": {"type": "string"},
+            "statements": {"type": "array", "minItems": 2, "maxItems": 3,
+                           "items": {"type": "string"}},
+            "correct_indexes": {"type": "array", "minItems": 1, "maxItems": 3,
+                                "items": {"type": "integer",
+                                          "minimum": 0, "maximum": 2}},
+        },
+    },
+    "assertion": {
+        "required": ["assertion", "reason_r", "relation"],
+        "properties": {
+            "assertion": {"type": "string"},
+            # NOT "reason": the batch item already has a teacher-facing
+            # `reason`, and formats.build_assertion's own `reason` is the R
+            # STATEMENT. Renamed here and mapped back in parse_batch so the two
+            # never collide.
+            "reason_r": {"type": "string"},
+            "relation": {"type": "string",
+                         "enum": ["both-true-explains", "both-true-not-explains",
+                                  "a-true-r-false", "a-false-r-true"]},
+        },
+    },
+    "order": {
+        "required": ["stem", "items"],
+        "properties": {
+            "stem": {"type": "string"},
+            "items": {"type": "array", "minItems": 4, "maxItems": 4,
+                      "items": {"type": "string"}},
+        },
+    },
+}
+
+
+def _schema(n: int, fmt: str = "plain") -> dict:
+    """Strict JSON schema for a batch of n questions in ONE format.
 
     `strict: true` + `additionalProperties: false` gives constrained decoding —
     the model cannot emit a wrong shape. minItems == maxItems == n forces
     exactly one question per section, so a short batch is impossible by
     construction rather than something we detect afterwards.
     """
+    spec = _FORMAT_FIELDS.get(fmt, _FORMAT_FIELDS["plain"])
+    props = {
+        "section_number": {"type": "integer", "minimum": 1, "maximum": n},
+        # Echoing the assigned difficulty back is not decoration: an enum the
+        # model must emit makes it commit to the level BEFORE writing the stem,
+        # and gives a cheap post-hoc check that 50/30/20 actually landed.
+        "difficulty": {"type": "string",
+                       "enum": ["easy", "moderate", "hard"]},
+        "reason": {"type": "string"},
+        **spec["properties"],
+    }
     return {
-        "name": "question_batch",
+        "name": f"question_batch_{fmt}",
         "strict": True,
         "schema": {
             "type": "object",
@@ -148,19 +228,9 @@ def _schema(n: int) -> dict:
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
-                        "required": ["section_number", "stem", "options",
-                                     "answer_index", "reason"],
-                        "properties": {
-                            "section_number": {"type": "integer",
-                                               "minimum": 1, "maximum": n},
-                            "stem": {"type": "string"},
-                            "options": {"type": "array",
-                                        "minItems": 4, "maxItems": 4,
-                                        "items": {"type": "string"}},
-                            "answer_index": {"type": "integer",
-                                             "minimum": 0, "maximum": 3},
-                            "reason": {"type": "string"},
-                        },
+                        "required": (["section_number", "difficulty", "reason"]
+                                     + spec["required"]),
+                        "properties": props,
                     },
                 }
             },
@@ -169,7 +239,10 @@ def _schema(n: int) -> dict:
 
 
 def build_batch_prompt(subject: str, subject_label: str,
-                       sections: list[tuple[str, list[dict]]]
+                       sections: list[tuple[str, list[dict]]],
+                       difficulties: list[str] | None = None,
+                       fmt: str = "plain",
+                       style_examples: list[str] | None = None,
                        ) -> tuple[str, str, dict]:
     """(system, user, response_format) for one subject's batch.
 
@@ -184,17 +257,46 @@ def build_batch_prompt(subject: str, subject_label: str,
     is cheap to lose, since two subjects rarely share an answer entity.
     """
     n = len(sections)
+    diffs = list(difficulties or ["moderate"] * n)
+    diffs = (diffs + ["moderate"] * n)[:n]      # never misalign with sections
+
     blocks = []
     for i, (name, passages) in enumerate(sections, 1):
         body = "\n\n".join(p.get("text", "") for p in passages) or "(सामग्री उपलब्ध नहीं)"
-        blocks.append(f"### विषय {i}: {name}\n{body}")
+        blocks.append(f"### विषय {i}: {name}   [कठिनाई: {diffs[i-1]}]\n{body}")
     user = (
         "━━━ अध्ययन सामग्री (आपके तथ्यों का एकमात्र स्रोत) ━━━\n\n"
         + "\n\n".join(blocks)
-        + f"\n\n━━━\nअब {n} प्रश्न लिखिए — प्रत्येक विषय से ठीक एक, उसी क्रम में।"
+        + f"\n\n━━━\nअब {n} प्रश्न लिखिए — प्रत्येक विषय से ठीक एक, उसी क्रम में, "
+        + "और प्रत्येक की दी गई कठिनाई पर।"
     )
+
     system = BATCH_SYSTEM.format(n=n, subject=subject_label or subject)
-    return system, user, {"type": "json_schema", "json_schema": _schema(n)}
+
+    # Per-subject difficulty steer. Only THIS subject's block is injected —
+    # all seven would be ~7k wasted chars per call and would dilute the steer.
+    system += "\n\n" + difficulty.block(subject)
+
+    # Format contract, when this batch is not plain. One call per (subject,
+    # format) means the whole batch shares one contract and one schema shape.
+    if fmt != "plain" and fmt in formats.FORMATS:
+        _label = formats.FORMATS[fmt]["label"]
+        _contract = formats.FORMATS[fmt]["prompt"]
+        system += (f"\n\n# FORMAT — {_label}\n"
+                   f"Every question in this batch uses this format.\n"
+                   f"{_contract}")
+
+    # Real past questions from THIS exam+subject, for register only. Sampled
+    # fresh per run so papers do not converge on one example's phrasing.
+    if style_examples:
+        system += ("\n\n# REAL PAST QUESTIONS — STYLE REFERENCE ONLY\n"
+                   "Match their register, phrasing and length. Do NOT reuse "
+                   "their topics or facts: your topic comes from the study "
+                   "section you are given, never from these.\n\n"
+                   + "\n\n".join(f"[{i}] {e}" for i, e in
+                                  enumerate(style_examples, 1)))
+
+    return system, user, {"type": "json_schema", "json_schema": _schema(n, fmt)}
 
 
 # Attribution phrases the model appends to `reason` ("..., जैसा कि सामग्री में
@@ -249,7 +351,8 @@ def strip_attribution(reason: str) -> str:
     return out
 
 
-def parse_batch(raw: str, sections: list[tuple[str, list[dict]]]) -> list[dict]:
+def parse_batch(raw: str, sections: list[tuple[str, list[dict]]],
+                fmt: str = "plain") -> list[dict]:
     """Raw model reply -> drafts, each tagged with its own section's passages.
 
     Constrained decoding guarantees the shape, so this does no fence stripping
@@ -274,12 +377,24 @@ def parse_batch(raw: str, sections: list[tuple[str, list[dict]]]) -> list[dict]:
         if k in out:                      # duplicate section_number: keep first
             continue
         name, passages = sections[k - 1]
-        out[k] = {
-            "stem": q.get("stem", ""),
-            "options": q.get("options", []),
-            "answer_index": q.get("answer_index", 0),
+        draft = {
             "reason": strip_attribution(q.get("reason", "")),
+            "difficulty": q.get("difficulty", ""),
             "_section": name,
             "_passages": passages,
         }
+        # Pass through exactly the fields THIS format's builder expects. The
+        # schema already guaranteed they are present and well-shaped, so this
+        # is a copy, not a validation.
+        for key in _FORMAT_FIELDS.get(fmt, _FORMAT_FIELDS["plain"])["required"]:
+            draft[key] = q.get(key)
+        if fmt == "assertion":
+            # build_assertion reads the R statement from "reason"; the batch
+            # item's own "reason" is the teacher-facing explanation, so the
+            # schema named the R statement "reason_r" to avoid the collision.
+            # Map it back and move the teacher note to "why", which is what
+            # build_assertion actually reads for it.
+            draft["why"] = draft.pop("reason", "")
+            draft["reason"] = draft.pop("reason_r", "")
+        out[k] = draft
     return [out[k] for k in sorted(out)]

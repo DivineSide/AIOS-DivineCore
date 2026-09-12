@@ -125,6 +125,80 @@ def allocate(total: int, mix: dict[str, float]) -> dict[str, int]:
     return counts
 
 
+# ── difficulty planning (2026-09-12) ────────────────────────────────────────
+# Real papers grade difficulty, not just format. The target distribution is the
+# client's, from how UKSSSC papers actually read: half the paper answerable by
+# any prepared candidate, a third needing real preparation, a fifth genuinely
+# separating the top scorers.
+#
+# DIFFICULTY IS INDEPENDENT OF FORMAT. It is tempting to call match/assertion
+# "hard" and be done, but the measured format mix is ~87% plain — tying the two
+# together caps hard at ~13% and the 20% target becomes unreachable. So a plain
+# question can be hard (a niche fact, or a stem needing inference) and a match
+# can be easy (four obvious pairings). Complex formats SKEW harder in practice;
+# they are not locked to it.
+DIFFICULTY_MIX: dict[str, float] = {
+    "easy":     0.50,
+    "moderate": 0.30,
+    "hard":     0.20,
+}
+
+
+def difficulty_mix() -> dict[str, float]:
+    """DIFFICULTY_MIX, overridable via GEN_DIFFICULTY_MIX (same env-parsing
+    contract as format_mix/subject_mix — see _env_mix)."""
+    return _env_mix("GEN_DIFFICULTY_MIX") or DIFFICULTY_MIX
+
+
+def plan_questions(count: int, fmt_counts: dict[str, int],
+                   rng: random.Random | None = None) -> list[dict]:
+    """Pair each of `count` questions with a (format, difficulty).
+
+    Returns [{"format": str, "difficulty": str}, ...] of exactly len == count.
+
+    The two axes are allocated INDEPENDENTLY (see DIFFICULTY_MIX's note), then
+    zipped after shuffling the difficulty list — so difficulty is not correlated
+    with format by construction, but a paper still gets exactly its planned
+    counts of each. Shuffling (rather than sorting hard onto complex formats)
+    is what keeps a hard `plain` question possible.
+
+    Complexity: O(count log count) from the shuffle; count <= ~40 per subject.
+    Tradeoff: independent allocation can produce an "easy assertion", which is
+    rarer in real papers than a hard one. Accepted — the alternative (weighting
+    difficulty by format) reintroduces the 13% ceiling this design exists to
+    avoid. The prompt tells the model to make an easy assertion genuinely easy.
+    """
+    rng = rng or random.Random()
+    diff_counts = allocate(count, difficulty_mix())
+    difficulties = [d for d, n in diff_counts.items() for _ in range(n)]
+    rng.shuffle(difficulties)
+
+    formats = [f for f, n in fmt_counts.items() for _ in range(n)]
+    # fmt_counts comes from allocate() on the same count, but a caller could
+    # pass a stale plan — pad/trim to `count` rather than silently misalign.
+    if len(formats) < count:
+        formats += ["plain"] * (count - len(formats))
+    formats = formats[:count]
+    rng.shuffle(formats)
+
+    return [{"format": f, "difficulty": d}
+            for f, d in zip(formats, difficulties)]
+
+
+def group_by_format(plan: list[dict]) -> dict[str, list[str]]:
+    """{format: [difficulty, ...]} — the batching key.
+
+    Generation runs ONE call per (subject, format) so each batch has a single
+    strict JSON schema; a mixed-shape batch cannot be schema-enforced (a schema
+    cannot say "item 3 is a match and item 4 is plain"). Difficulties ride along
+    per question inside each format's batch.
+    """
+    out: dict[str, list[str]] = {}
+    for q in plan:
+        out.setdefault(q["format"], []).append(q["difficulty"])
+    return out
+
+
 # ── per-subject format planning (2026-07-22) ────────────────────────────────
 # WHY: the global FORMAT_MIX above is measured across ALL subjects combined,
 # then applied identically to every subject's own slice of the paper. Real

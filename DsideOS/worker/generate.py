@@ -53,6 +53,7 @@ import sys
 import threading
 import time
 import zlib
+from collections import Counter
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -1199,8 +1200,40 @@ def _interleave_formats(questions: list[dict]) -> list[dict]:
 GEN_BATCHED = os.environ.get("GEN_BATCHED", "0") == "1"
 
 
+def _style_examples(subject: str, exam: str | None, conn,
+                    k: int = 2) -> list[str]:
+    """A few REAL past questions from this exam+subject, for register only.
+
+    Subject-level, never topic-level (deliberate): a newly added syllabus topic
+    would have no past questions, and per-topic examples drag generation toward
+    the example's own niche. Sampled fresh each run so consecutive papers do not
+    converge on one example's phrasing.
+
+    Falls back exam-scoped -> subject-global, and returns [] rather than raising
+    — style is a nice-to-have, not a precondition for generating.
+
+    Complexity: 1 indexed query. O(k) rows returned.
+    """
+    try:
+        with conn.cursor() as cur:
+            if exam:
+                cur.execute("""SELECT chunk_text FROM pyq_chunks
+                               WHERE exam=%s AND subject=%s
+                               ORDER BY RANDOM() LIMIT %s""", (exam, subject, k))
+                rows = cur.fetchall()
+                if rows:
+                    return [r[0][:700] for r in rows]
+            cur.execute("""SELECT chunk_text FROM pyq_chunks
+                           WHERE subject=%s ORDER BY RANDOM() LIMIT %s""",
+                        (subject, k))
+            return [r[0][:700] for r in cur.fetchall()]
+    except Exception as e:
+        logger.warning("style examples unavailable for %s: %s", subject, e)
+        return []
+
 async def generate_questions_batched(subject: str, count: int,
                                      exam: str | None = None,
+                                     fmt_counts: dict[str, int] | None = None,
                                      ) -> tuple[list[dict], dict]:
     """One model call for this subject's whole allocation.
 
@@ -1239,69 +1272,88 @@ async def generate_questions_batched(subject: str, count: int,
 
         label = SUBJECT_LABELS.get(subject, subject)
 
-        # CHUNKING: one call per subject is the goal, but a batch prompt scales
-        # with section count and the Groq free tier caps a KEY at ~7.2k
-        # tokens/min. A 10-section prompt needs ~20k and can never be served —
-        # which used to hang the token bucket forever (fixed in acquire(), but
-        # the request still has to fit). So split into chunks that do.
-        # Chunks still batch: 4 questions per call is 4x fewer calls than the
-        # slot engine, and cross-question dedup awareness holds WITHIN a chunk.
-        # Chunk by ESTIMATED TOKENS, not by a fixed section count: sections
-        # vary from 1 to 31 passages, so "4 sections" was 3k tokens for some
-        # subjects and 8k for others — and the oversized ones failed outright.
-        # Budget per call = TPM ceiling minus the system prompt, an output
-        # reserve, and headroom. ~3 chars/token is conservative for Devanagari.
+        # PLAN BEFORE RETRIEVING ANYTHING: how many questions of each format,
+        # and of each difficulty. Both are pure arithmetic (no API, no DB) and
+        # are paired independently — see blueprint.plan_questions for why
+        # difficulty must NOT be derived from format.
+        if fmt_counts is None:
+            fmt_counts = blueprint.allocate(len(sections), blueprint.format_mix())
+        plan = blueprint.plan_questions(len(sections), fmt_counts)
+        by_format = blueprint.group_by_format(plan)
+        logger.info("batch[%s]: plan formats=%s difficulties=%s", subject,
+                    {f: len(d) for f, d in by_format.items()},
+                    dict(Counter(q["difficulty"] for q in plan)))
+
+        # Real past questions from this exam+subject, sampled fresh per run for
+        # register only (see batch_gen's style-example note).
+        style = await asyncio.to_thread(_style_examples, subject, exam, conn)
+
+        # ONE CALL PER (format, chunk). Grouping by format is what lets each
+        # batch carry a single strict schema — a schema cannot say "item 3 is a
+        # match and item 4 is plain". Chunking within a format is the Groq
+        # free-tier TPM ceiling (~7.2k/key/min): a batch prompt scales with
+        # section count, so an unchunked 10-section call can never be served.
         max_per_call = max(1, int(os.environ.get("GEN_BATCH_MAX_SECTIONS", "6")))
-        # Budget for PASSAGE chars only. The call also carries the system
-        # prompt (~3.4k chars) and needs output headroom, so both come off the
-        # ceiling first — a chunk sized against the raw TPM number overshot by
-        # ~200 tokens and the whole chunk failed (observed 2026-09-12).
         _SYS_TOKENS = len(batch_gen.BATCH_SYSTEM) // 3
         _OUT_RESERVE = 1200 + 260 * max_per_call      # ~260 tok per question
         budget_chars = max(1500,
                            (_GROQ_TPM_BUDGET - _SYS_TOKENS - _OUT_RESERVE - 400) * 3)
-        chunks, cur, cur_chars = [], [], 0
-        for sec in sections:
-            sec_chars = len(sec[0]) + sum(len(p.get("text", "")) for p in sec[1])
-            if cur and (cur_chars + sec_chars > budget_chars
-                        or len(cur) >= max_per_call):
-                chunks.append(cur)
-                cur, cur_chars = [], 0
-            cur.append(sec)
-            cur_chars += sec_chars
-        if cur:
-            chunks.append(cur)
-        drafts: list[dict] = []
-        for ci, chunk in enumerate(chunks, 1):
-            system, user, rfmt = batch_gen.build_batch_prompt(subject, label, chunk)
-            try:
-                raw = await asyncio.to_thread(_draft_structured, system, user, rfmt)
-            except Exception as e:
-                logger.warning("batch[%s] chunk %d/%d failed: %s",
-                               subject, ci, len(chunks), e)
-                drops += [{"topic": sec, "format": "plain",
-                           "reason": f"batch call failed: {e}"} for sec, _ in chunk]
+
+        drafts: list[tuple[dict, str]] = []      # (draft, format)
+        pos = 0
+        for fmt, difficulties in by_format.items():
+            take = sections[pos: pos + len(difficulties)]
+            pos += len(difficulties)
+            if not take:
                 continue
-            drafts += batch_gen.parse_batch(raw, chunk)
-        logger.info("batch[%s]: %d sections in %d call(s) -> %d drafts",
-                    subject, len(sections), len(chunks), len(drafts))
+            chunks, cur, cur_chars, cur_diff = [], [], 0, []
+            for sec, d in zip(take, difficulties):
+                sec_chars = len(sec[0]) + sum(len(p.get("text", "")) for p in sec[1])
+                if cur and (cur_chars + sec_chars > budget_chars
+                            or len(cur) >= max_per_call):
+                    chunks.append((cur, cur_diff))
+                    cur, cur_chars, cur_diff = [], 0, []
+                cur.append(sec); cur_diff.append(d); cur_chars += sec_chars
+            if cur:
+                chunks.append((cur, cur_diff))
+
+            for ci, (chunk, cdiff) in enumerate(chunks, 1):
+                system, user, rfmt = batch_gen.build_batch_prompt(
+                    subject, label, chunk, difficulties=cdiff, fmt=fmt,
+                    style_examples=style)
+                try:
+                    raw = await asyncio.to_thread(_draft_structured, system, user, rfmt)
+                except Exception as e:
+                    logger.warning("batch[%s] %s chunk %d/%d failed: %s",
+                                   subject, fmt, ci, len(chunks), e)
+                    drops += [{"topic": sec, "format": fmt,
+                               "reason": f"batch call failed: {e}"}
+                              for sec, _ in chunk]
+                    continue
+                drafts += [(d, fmt) for d in batch_gen.parse_batch(raw, chunk, fmt=fmt)]
+
+        logger.info("batch[%s]: %d sections -> %d drafts", subject,
+                    len(sections), len(drafts))
         if not drafts:
             return [], {"subject": subject, "requested": count,
                         "delivered": 0, "drops": drops}
 
+
         guard = PaperGuard(total=count)
-        for d in drafts:
+        for d, fmt in drafts:
             passages = d.pop("_passages")
             section = d.pop("_section")
+            difficulty_tag = d.pop("difficulty", "")
             try:
-                q = formats.build("plain", d, seed=_seed(subject, section, 0, 0))
+                q = formats.build(fmt, d, seed=_seed(subject, section, 0, 0))
             except formats.FormatError as e:
-                drops.append({"topic": section, "format": "plain", "reason": str(e)})
+                drops.append({"topic": section, "format": fmt, "reason": str(e)})
                 continue
             reason = validate_question(q) or guard.check(q) or ""
             if reason:
-                drops.append({"topic": section, "format": "plain", "reason": reason})
+                drops.append({"topic": section, "format": fmt, "reason": reason})
                 continue
+            q["difficulty"] = difficulty_tag
             # NO GROUNDING GATE on the batched path (removed 2026-09-12, by
             # decision). The batched prompt hands the model ONE section's
             # material per question and tells it to use only that, which is a
