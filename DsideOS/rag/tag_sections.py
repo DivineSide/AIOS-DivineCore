@@ -41,7 +41,14 @@ MIN_SECTION = 2       # merge sections smaller than this into the preceding one
 # section above them, promoted only because they happened to carry a #.
 NOISE_HEAD = re.compile(
     r"^(अध्याय\s*\d|UNIT\s*\d|तालिका|सारणी|Table|संक्षेप|Summing\s*Up"
-    r"|अशुद्ध|\d+\.\s)", re.I)
+    r"|अशुद्ध|\d+\.\s"
+    # Coaching-note furniture. Several uk-general-studies books are transcribed
+    # lecture notes, so "Lecture- 3" and "Short Trick-" appear as real headings
+    # — but they describe the TEACHING, not a topic. A section named
+    # "Short Trick-" tells a question generator nothing (seen live on
+    # uttarakhand_gk_complete_notes_jardhari, 2026-09-12).
+    r"|Lecture\s*\W?\s*\d|Short\s*Trick|नोट|Note"
+    r"|प्रश्न\s*\d|अभ्यास|Practice|उदाहरण)", re.I)
 
 
 def norm(s: str) -> str:
