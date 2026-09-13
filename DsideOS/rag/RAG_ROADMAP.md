@@ -10,6 +10,61 @@ reference) and `DsideOS/CLAUDE.md` (accumulated production incidents).
 
 ---
 
+# PHASE 1 — COMPLETE (2026-09-13)
+
+The RAG generation path, rebuilt. Detail lives in the stage sections below;
+this is the index. Phases 2 (no-RAG national subjects) and 3 (code-generated
+reasoning figures) are in "Parked workstreams" at the end.
+
+## What shipped
+
+| area | state |
+|---|---|
+| **Syllabus** | Canonical transcription of the signed 2026 UKSSSC PDF. 156 hand-invented topics → 76 traceable ones. तर्कशक्ति added (26 topics, previously absent entirely); Hindi literature dropped (the 2026 revision removed it); computer gained AI/ML/IoT/blockchain/cloud/GenAI. |
+| **Retrieval** | Metadata filter + `ORDER BY RANDOM()`. No embeddings, no HyDE, no PYQ semantic search at query time. One indexed query. |
+| **Variety** | 5-generation cooldown (`used_ago`, migration 007). Two consecutive papers share ZERO passages and ZERO sections — the finding that opened this audit, solved deterministically rather than probabilistically. |
+| **Sections** | Topic layer taken from the BOOKS' own authored headings (`section`, migration 008), recovered from `.reocr` transcripts by exact-offset anchoring. uk-geography 371/385 → 58 sections; uk-general-studies 191/267 → 26. |
+| **Batching** | One call per (subject, format), each with its own strict JSON schema. ~1 API call per question, down from ~4. |
+| **Formats** | All five generate. Non-plain formats still return FACTS ONLY — code computes the कूट grid and answer letter, so a structurally inconsistent match/order question stays impossible. |
+| **Difficulty** | 50/30/20, allocated INDEPENDENTLY of format (tying them caps hard at ~13%, since the real mix is ~87% plain). Taught by per-subject definition + three worked exemplars; only the current subject's block is injected. |
+| **Top-up** | Regenerates drops on fresh sections at the SAME (format, difficulty), so gate rejections no longer skew the paper easy. |
+| **Subject mode** | Rebuilt on the batched engine. Two optional dropdowns (one format, one difficulty for the whole sheet); unset falls back to the realistic mix. |
+| **PYQ corpus** | All 4 generatable exams covered, 100% format-tagged. Backfilled 544 NULL rows at zero API cost; ingested police-constable (the only gap) with no OCR and no paid classification. |
+| **Prompt** | Rewritten as a five-step construction method. Prohibitions 22 → 9. |
+| **Provider** | Default `gpt-oss-120b` on Groq. `GEN_PROVIDER=openai` switch works with identical constrained decoding. |
+| **Slot engine** | Archived to `.archive/dsideos-slot-engine/`. `generate.py` 1,568 → ~800 lines. |
+
+## Bugs found by RUNNING it, not reading it
+
+Every one of these surfaced only under real execution:
+
+1. `_GroqTokenBucket.acquire()` **hung forever** when a request exceeded the whole per-minute budget — an invisible deadlock, no error, no log.
+2. Chunk budget under-counted **twice**: first by using a fixed section count (sections range 1–31 passages), then by sizing against `BATCH_SYSTEM` alone while the real prompt also carries the difficulty block, format contract and PYQ examples (~1,100 tokens short).
+3. Attribution phrases ("जैसा कि सामग्री में कहा गया है") killed **6/6** questions in the first batched run — the exact failure that killed Sarvam-30b.
+4. `_shape_class` read "17.98 मीटर" as text, so unit-bearing numbers **bypassed the numeric-answer budget entirely**.
+5. `_statement_options` rejected **every** 2-statement draft by construction, while the prompt explicitly invited "2 to 3 statements" — silent, burned all 3 attempts.
+6. Table references in stems ("तालिका के अनुसार") passed every gate.
+7. Mixed-script OCR damage (`उत्तarakhand`) leaked into stems.
+8. Subject mode called `generate_questions()` **after it was archived** — an AttributeError on any subject-mode request.
+9. `_seed()` went to the archive while still being called — a NameError `py_compile` cannot see.
+
+## Deliberate decisions worth remembering
+
+- **Grounding removed** from the generation path. Nothing now verifies a fact is TRUE; shape, form and paper-level distinctness are all still checked. `ground.py` is untouched — re-enabling is one line.
+- **Gate pruning investigated and rejected.** Every surviving `validate_question` check tests something a JSON schema cannot express (distinctness, Devanagari ratio, OCR garble, shape-eliminability). Only pure type/count checks became unreachable.
+- **Subtopics rejected** in favour of book sections + reuse tracking — invented names are not canonical and become maintenance debt.
+- **A "cross-question awareness" prompt section was added and then removed** — it was never part of the design, and PaperGuard owns paper-level dedup anyway.
+
+## Known limits going into Phase 2
+
+- **Section tagging** for uk-history, uk-culture, hindi — needs Mayank's per-book taxonomy. uk-culture needs a different approach: 588 of 647 passages have no transcript.
+- **Syllabus↔section mapping layer** — designed (sections describe the corpus, syllabus describes the exam, a small table joins them) but not built.
+- **No truth check** — see grounding above.
+- **Numeric drift** where a section is a statistical table (migration, census): "pick a stated fact" and "prefer a name over a number" genuinely conflict there. A source-material limit, not a prompt one.
+- **~23 min per 100Q paper** on Groq's free tier — the 8,000 tok/min ceiling is a per-REQUEST cap, not just a rate limit, so it forces ~4-section chunks. Lifting it is one env var.
+
+---
+
 ## 1. Chunking
 
 Status: not yet audited
@@ -101,10 +156,13 @@ sections. The variety problem that opened this audit is solved deterministically
   PaperGuard's numeric-answer budget entirely.
 
 **Still open:**
-- Tag the other three UK subjects (blocked on Mayank's per-book taxonomy read)
-- Grounding rejections are now the DOMINANT drop reason (5/10 on a uk-geography
-  run) — that is the gate working, but worth checking whether sampled passages
-  are too thin to support a question, or the model is over-reaching.
+- Tag the other three UK subjects (blocked on Mayank's per-book taxonomy read).
+  uk-culture needs a different approach — 588 of its 647 passages come from
+  books with no `.reocr` transcript, so nothing can be anchored.
+- The syllabus↔section mapping layer (see the Phase 1 summary at the top).
+
+(An earlier note here flagged grounding rejections as the dominant drop reason.
+Grounding was removed from the generation path on 2026-09-12 — see §10.)
 
 ## 5. Retrieval Fusion
 
