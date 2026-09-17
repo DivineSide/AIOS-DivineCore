@@ -40,8 +40,30 @@ BASE = Path(__file__).resolve().parents[1]
 # never does), so start_as_current_span() is always safe to call — it just
 # does nothing when tracing isn't active. This is the standard OTel contract,
 # not a DsideOS-specific guard.
-from opentelemetry import trace as _otel_trace
-_tracer = _otel_trace.get_tracer("dsideos.rag.query")
+#
+# ...but the IMPORT itself is not safe, and that shipped as a production
+# outage (2026-09-17): opentelemetry is in NO requirements file, so it is
+# absent from the worker image, and this unconditional import made
+# `import generate` raise ModuleNotFoundError — every LLM-subject generation
+# job failed in ~1s with "The job failed. Please try again." The module was
+# designed to degrade gracefully when tracing is off (PHOENIX_TRACING_ENABLED
+# defaults to 0) but could not get past line 1 of that design. Fall back to a
+# no-op tracer so the optional dependency is genuinely optional.
+try:
+    from opentelemetry import trace as _otel_trace
+    _tracer = _otel_trace.get_tracer("dsideos.rag.query")
+except ModuleNotFoundError:                          # tracing not installed
+    from contextlib import contextmanager
+
+    class _NoopSpan:
+        def set_attribute(self, *_a, **_k): pass
+
+    class _NoopTracer:
+        @contextmanager
+        def start_as_current_span(self, *_a, **_k):
+            yield _NoopSpan()
+
+    _tracer = _NoopTracer()
 
 EMBED_MODEL       = "text-embedding-3-small"
 DEFAULT_TOP_K     = 5
