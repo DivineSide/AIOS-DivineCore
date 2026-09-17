@@ -67,6 +67,14 @@ services:
       - redis
 
   # ── frontend ────────────────────────────────────────────────────────────────
+  # ⚠ DECLARED BUT NOT RUNNING (verified on the box 2026-09-17). No frontend
+  # container exists in production and nginx never proxies to it: the landing
+  # page is served as STATIC FILES from /var/www/dsideos-landing, and the
+  # console container (below, :3001) serves /r/ /f/ /g/ /_next/ and the public
+  # API paths. This declaration is what made DEPLOY.md's routing description
+  # wrong — either publish the image and point nginx at it, or delete this
+  # service. Do not assume it is live because it is listed here.
+  #
   # The dashboard lives in its OWN repo + image. This service just runs that
   # published image alongside the backend so Nginx can route to it. Update the
   # image ref to your frontend's GHCR path. Until it's published, comment this

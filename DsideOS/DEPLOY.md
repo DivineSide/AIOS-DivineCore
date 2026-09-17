@@ -3,13 +3,68 @@
 Server: `divinesideai` · `<SERVER_IP>` · 2 vCPU / 4 GB / 40 GB.
 Public URL (after DNS + first deploy): `https://dsideos.divinesideai.com`.
 
-The flow: **push to `main` → GitHub Actions tests → builds api/worker images →
+The flow: **push to `main` → GitHub Actions → builds api/worker images →
 pushes to GHCR → SSHes into the server → `docker compose pull && up -d` → Discord
-ping.** Caddy terminates TLS and path-splits `/api/*` (backend) vs `/*` (frontend).
+ping.**
 
 ---
 
-## One-time setup
+## ⚠ AS ACTUALLY DEPLOYED (verified on the box 2026-09-17)
+
+**The sections below this one describe the ORIGINAL Caddy-based plan. That is
+NOT what runs.** Verified against the live server; trust this section.
+
+**nginx terminates TLS and routes — not Caddy.** There is no Caddy container and
+`systemctl is-active caddy` reports inactive. The `Caddyfile` in this repo is
+dead config, kept only as a record of the original design. Real routing lives in
+five nginx sites under `/etc/nginx/sites-enabled/`: `dsideos`, `dsideos-console`,
+`crm`, `n8n`, `app`.
+
+**TLS is Certbot/Let's Encrypt**, auto-renewing via `certbot.timer`
+(`certbot renew --dry-run` passes for all four certs).
+
+**`dsideos.divinesideai.com` path-splits four ways**, longest-prefix wins:
+
+| path | goes to |
+|---|---|
+| `/api/` | FastAPI backend, `127.0.0.1:8000` (the `api` container) |
+| `/api/public/`, `/api/ingest/` | console container, `127.0.0.1:3001` |
+| `/r/ /f/ /g/ /go/ /kit/`, `/_next/` | console container (growth module: referral, feedback, tracked review redirect) |
+| `/` | **static** landing build on disk at `/var/www/dsideos-landing` |
+
+**There is no `frontend` container.** `docker-compose.prod.yml` still declares a
+`frontend` service pointing at `ghcr.io/divineside/dsideos-frontend`, but it is
+not running and nginx never proxies to it — the landing page is static files
+served directly by nginx. Either wire that service up or delete it from compose;
+leaving it declared-but-dead is what made this doc wrong in the first place.
+
+**Running containers** (7): `dsideos-api-1`, `dsideos-worker-1`, `dsideos-beat-1`,
+`dsideos-redis-1`, `dsideos-console-1`, plus two unrelated to DsideOS —
+`n8n` (kept deliberately) and `divinecore-crm` (idle since 2026-07-20).
+
+### Operational gotchas found the hard way
+
+**Docker's log driver is UNCAPPED by default** and there is no
+`/etc/docker/daemon.json`. A crash-looping PM2-managed n8n (long since replaced
+by the n8n *container*) wrote a **7.3GB** `/root/.pm2/logs/n8n-error.log` plus a
+1.8GB `pm2.log`, filling the disk to 72% and making the console container fail
+with `ENOSPC: no space left on device`. Cleared 2026-09-17 (disk 72% → 41%).
+`journald` is now capped at 200M via `SystemMaxUse`; **Docker's own log rotation
+is still uncapped** — setting it requires a daemon restart, which bounces every
+container, so it is deliberately left as a scheduled task rather than done live.
+
+**`pm2 list` is empty** — PM2 manages nothing now. Its logs were pure orphan.
+Note a log file held open by a live process must be TRUNCATED (`: > file`), not
+`rm`'d: unlinking an open file does not return the space until the handle closes.
+
+**CI does not run the test suite.** The `test` job is `py_compile` plus the
+krutidev check (~20s). `tests/test_reasoning.py` — the correctness gate for a
+question path that deliberately bypasses every runtime validator — is NOT run on
+push. Fixing that is the single highest-value CI change available.
+
+---
+
+## One-time setup (ORIGINAL Caddy plan — superseded, see the section above)
 
 ### 1. DNS (free subdomain — no purchase)
 In Hetzner DNS (or wherever divinesideai.com is managed), add an **A record**:

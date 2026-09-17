@@ -33,6 +33,9 @@ jobs:
         run: |
           pip install -r DsideOS/worker/requirements.txt
           pip install -r DsideOS/api/requirements.txt
+          # pytest is CI-only on purpose — it is NOT a runtime dependency and
+          # must not enter the production image via requirements.txt.
+          pip install pytest
 
       - name: Compile-check all modules
         run: |
@@ -52,6 +55,15 @@ jobs:
 
       - name: Font switch self-tests (krutidev.py)
         run: python DsideOS/pipeline/krutidev.py
+
+      # THE correctness gate for code-generated reasoning questions. That path
+      # deliberately bypasses validate_gen and PaperGuard (every check there is
+      # a proxy for an LLM failure mode that cannot occur when code computes the
+      # answer), so this suite is the ONLY thing standing between a wrong solver
+      # and a shipped paper with a wrong answer key. Until 2026-09-17 CI never
+      # ran it — the test job was py_compile plus the font check.
+      - name: Reasoning correctness suite
+        run: python -m pytest DsideOS/tests/ -q
 
       - name: Backend imports + route registration
         env:

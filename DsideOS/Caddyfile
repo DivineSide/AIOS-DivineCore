@@ -1,3 +1,16 @@
+# ⚠ DEAD CONFIG — NOT IN USE. Kept as a record of the original design only.
+#
+# The server runs NGINX, not Caddy (verified on the box 2026-09-17: no Caddy
+# container, `systemctl is-active caddy` = inactive). Real routing lives in
+# /etc/nginx/sites-enabled/{dsideos,dsideos-console,crm,n8n,app}, and TLS is
+# Certbot, not Caddy's automatic HTTPS.
+#
+# This file is also WRONG about the frontend: it proxies / to `frontend:3000`,
+# but no frontend container runs — nginx serves the landing page as static files
+# from /var/www/dsideos-landing. See DEPLOY.md's "AS ACTUALLY DEPLOYED" section.
+#
+# Editing this file changes nothing in production.
+
 # Caddy reverse proxy — automatic HTTPS via Let's Encrypt.
 # One public domain, path-split between frontend and backend.
 #
