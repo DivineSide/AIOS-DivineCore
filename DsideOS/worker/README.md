@@ -35,7 +35,7 @@ The document builders themselves are **not** here; they are in `pipeline/`.
 | `difficulty.py` | Per-subject prose definitions and worked exemplars of easy/moderate/hard, injected into the prompt. Only the current subject's block goes in. |
 | `syllabus.py` | Canonical transcription of the official UKSSSC 2026 syllabus. **Reference data, not a live caller** — the taxonomies were authored FROM it, and it is what you check a taxonomy against. |
 | `taxonomy.py` | The no-RAG topic source: samples question-sized syllabus leaves from `taxonomy_data/<family>/<subject>.json`, with a cross-paper reuse cooldown (migration 009). |
-| `taxonomy_data/` | 1,354 hand-authored topic leaves across 7 subjects. Authored source, not generated — kept here rather than under `corpus/` because `corpus/` is gitignored. |
+| `taxonomy_data/` | 1,354 hand-authored topic leaves across 7 authored subjects, plus 4 **derived** files (`indian-history/-geography/-polity/-economics.json`) carved out of `general-gk.json` by syllabus section. Authored source, not generated — kept here rather than under `corpus/` because `corpus/` is gitignored. **The `indian-*` files are a REGROUPING, not a re-authoring**: same bullets, same leaves. Edit `general-gk.json` and re-derive, or the two drift apart. `general-gk.json` deliberately keeps all 24 bullets (it is what exam mode allocates against), so in subject mode it overlaps the four. |
 | `validate_gen.py` | Mechanical gate for LLM output: `validate_question(q)` per question, `PaperGuard` across the paper (stem dedup, entity repeat, numeric budget). |
 
 ## Code-only reasoning path

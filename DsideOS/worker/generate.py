@@ -232,6 +232,12 @@ SUBJECT_LABELS = {
     "uk-culture":          "उत्तराखंड की संस्कृति",
     "uk-general-studies":  "उत्तराखंड सामान्य अध्ययन",
     "general-gk":          "सामान्य ज्ञान",
+    # Carved out of general-gk for SUBJECT mode so a teacher can order one
+    # discipline. Exam mode still allocates general-gk as one measured bucket.
+    "indian-history":      "भारत का इतिहास",
+    "indian-geography":    "भारत एवं विश्व का भूगोल",
+    "indian-polity":       "भारतीय राजव्यवस्था",
+    "indian-economics":    "भारतीय अर्थव्यवस्था",
     "hindi":               "सामान्य हिंदी",
     "computer":            "कंप्यूटर",
     "reasoning":           "सामान्य बुद्धि परीक्षण एवं तर्कशक्ति",

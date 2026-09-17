@@ -124,13 +124,27 @@ _FALLBACK = {
 }
 
 
+# The Indian-discipline subjects are CARVED OUT of general-gk (same authored
+# bullets, regrouped so a teacher can order one discipline — see
+# taxonomy_data/indian-*.json). They share general-gk's difficulty character
+# exactly: what makes a polity question hard is still "a precise article number
+# vs. two similar provisions". Aliasing keeps the worked exemplars, which is
+# what actually makes the model hit a level; the generic _FALLBACK has none.
+_ALIASES = {
+    "indian-history": "general-gk",
+    "indian-geography": "general-gk",
+    "indian-polity": "general-gk",
+    "indian-economics": "general-gk",
+}
+
+
 def block(subject: str) -> str:
     """The difficulty section of a system prompt, for ONE subject.
 
     Returns "" for an unknown subject rather than raising — a missing steer is
     better than a failed generation. Complexity: O(1), pure string building.
     """
-    d = _SUBJECTS.get(subject)
+    d = _SUBJECTS.get(_ALIASES.get(subject, subject))
     if d is None:
         d = _FALLBACK
         if not d["ex_easy"]:

@@ -194,6 +194,14 @@ VALID_SUBJECTS = {
     # blueprint; listed here so it can also be ordered on its own as a
     # reasoning-only worksheet.
     "reasoning",
+    # Carved out of general-gk by syllabus section (2.2 history, 2.3 geography,
+    # 2.4 polity, 2.5 economics) so a teacher can order ONE discipline —
+    # "General GK" was hiding 311 authored leaves behind a single option.
+    # SUBJECT MODE ONLY: every exam blueprint still allocates `general-gk` as
+    # one bucket, because its 0.22-0.30 share was measured from real papers at
+    # that level and never per discipline. Splitting the exam mix would mean
+    # inventing numbers.
+    "indian-history", "indian-geography", "indian-polity", "indian-economics",
 }
 
 # Exam families with a blueprint SUBJECT_MIX + official-syllabus topic seeding
