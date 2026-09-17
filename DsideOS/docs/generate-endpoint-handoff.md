@@ -168,6 +168,19 @@ def generate(
 | UK General Studies | `uk-general-studies` |
 | General GK | `general-gk` |
 | Hindi | `hindi` |
+| Computer | `computer` |
+| तर्कशक्ति (Reasoning) | `reasoning` |
+
+`reasoning` is generated entirely by code — no model call, no retrieval, no
+corpus — so it is the one subject that cannot fail on a dead API key or thin
+source material, and it is the only one that returns questions with **figures**
+(dice, triangle counting, clock dials, figure series, Venn option diagrams).
+Roughly 3 questions in 10 carry a diagram. Counts up to 100 fill exactly.
+
+Figures need no special handling by the caller: the images are written into the
+job's own directory and referenced from the questions JSON, and both paper
+layouts embed them. They appear in the delivered .docx/.pdf like any other
+question.
 
 ---
 

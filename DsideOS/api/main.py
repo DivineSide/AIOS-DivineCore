@@ -188,6 +188,12 @@ def full(
 VALID_SUBJECTS = {
     "uk-history", "uk-geography", "uk-culture",
     "uk-general-studies", "general-gk", "hindi", "computer",
+    # तर्कशक्ति — the code-only path (worker/reasoning). No model call, no
+    # retrieval, no corpus, so it is the one subject that cannot fail on a dead
+    # API key or a thin book. Already allocated at 10% inside every exam-mode
+    # blueprint; listed here so it can also be ordered on its own as a
+    # reasoning-only worksheet.
+    "reasoning",
 }
 
 # Exam families with a blueprint SUBJECT_MIX + official-syllabus topic seeding

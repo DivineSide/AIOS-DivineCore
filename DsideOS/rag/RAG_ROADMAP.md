@@ -65,6 +65,162 @@ Every one of these surfaced only under real execution:
 
 ---
 
+# PHASE 2 — NO-RAG PATH (2026-09-13)
+
+Solves the blocker above: 54 of 100 questions (general-gk 32, hindi 19, computer 3) could not generate AT ALL, because those subjects have zero sectioned passages. Rather than tag corpus that does not exist well enough, the topic layer is authored directly.
+
+## What shipped
+
+- **`worker/taxonomy_data/uksssc-master/*.json`** — hand-authored topic trees for all 7 subjects, **1,354 leaves / 275 facets** total. Two levels: `facet` (a verbatim span of the commission's own syllabus bullet where the bullet is a comma list, so level 1 is checkable against the PDF) → `leaf` (a question-sized topic, authored). Written by reading each subject's official bullets alongside ~90 real PYQs pulled from our own `pyq_chunks` — no internet, no API calls.
+- **`worker/taxonomy.py`** — the loader/sampler. `sections_for(subject, n, conn)` returns `[(leaf_label, []), ...]`, deliberately the same shape as `rag/sample.py`'s, so `generate.py` binds either source to one name. Empty list = the passage slot.
+- **`batch_gen.NORAG_SYSTEM`** — parallel prompt for knowledge-only generation. `BATCH_SYSTEM`'s "read the section, pick a sentence" and "point to the sentence that makes the key correct" are unsatisfiable with no passages; the no-RAG variant asks for the model's own knowledge and explicitly bars current-events/officeholder facts. `build_batch_prompt` picks it automatically when every passage list is empty. `_schema`/`parse_batch` needed zero changes — already format-driven, not passage-driven.
+- **`generate._sections_for`** — single source-selection point. Asks the DB whether the subject has any sectioned passage; falls to taxonomy if not. Used by BOTH the main pass and the top-up round so a paper's provenance cannot switch mid-run.
+- **Migration 009 + reuse tracking** — `taxonomy_leaf_reuse`, mirroring migration 007's passage cooldown for leaves. Same `used_ago` age-in-generations mechanic, same `REUSE_COOLDOWN=5`.
+
+## Verified live
+
+- `computer` 3/3 delivered, **zero drops**, on gpt-oss-120b via Groq — real exam-grade questions from leaf labels alone, no retrieval.
+- Six simulated rounds on `computer`: **zero overlap** between consecutive papers; cooldown ladder confirmed releasing leaves back to eligible after 5 generations.
+- RAG path (`uk-geography`) confirmed unaffected — still `BATCH_SYSTEM`, still real passages.
+
+## Decisions worth remembering
+
+- **Leaves carry no difficulty tag.** An earlier pass tagged each leaf easy/moderate/hard so `blueprint`'s 50/30/20 could pick intrinsically-matching topics. Dropped on Mayank's call — a taxonomy is a topic chart, not a question plan. Difficulty is still assigned per QUESTION by `blueprint`, as before. (Symptom that prompted it: three separate authors, me included, all skewed hard — uk-culture came out 18/41/40 — because the interesting material in a subject genuinely is the niche material.)
+- **Current affairs excluded, not special-cased.** `general-gk` bullets 23-24 carry only structural/evergreen leaves. A model with a knowledge cutoff generating "who currently heads X" ships confidently wrong answers; `NORAG_SYSTEM` bars it at the prompt level too.
+- **Reuse keyed by `(subject, family, label)`** — a string key, because leaves live in JSON, not a table. Consequence: renaming a leaf resets its history (cold start, not corruption).
+- **`GEN_BATCH_MAX_SECTIONS_NORAG=40`** separate from the RAG cap of 6. No-RAG batches are ~5x cheaper per section (~1,900 tok for 20 leaves vs ~8,984 for 4 RAG sections), so the RAG cap would have thrown away Phase 2's main advantage.
+
+## Bugs found by RUNNING it, not reading it
+
+Same pattern as Phase 1 — every one of these passed code review and failed a test.
+
+- **Eligibility asked backwards.** `taxonomy_leaf_reuse` only gets a row once a leaf is USED, so "which leaves are eligible" (`used_ago IS NULL`) returned the *just-used* ones as the only candidates — paper 2 reused all 8 of paper 1's leaves. The file is the source of truth for what EXISTS; the table only records what is COOLING. Ask for the cooling set and subtract. (Copied the query shape from `rag/sample.py`, where asking for eligible IS correct, because every passage already exists as a row.)
+- **One paper burned N generations of cooldown.** `advance_generation` ran per-subject while subjects run concurrently, so each subject aged every *other* subject's fresh marks. A 7-subject paper consumed ~7 generations of a 5-generation window, leaving leaves at `used_ago` 1..4 instead of a uniform 1 — the cooldown was worth roughly one paper, not five. Fixed by splitting: `mark_used` stays per-subject, `advance_generation` moved to a paper-level `_advance_generation()`. **This affected the PASSAGE path identically** and had been silently degrading RAG-path variety since migration 007 shipped.
+- **Stale rows starved the LRU fallback.** A renamed or deleted leaf leaves its row behind (migration 009 tolerates this deliberately — no cleanup job). Those stale labels consumed the fallback query's `LIMIT` and were then filtered out in Python, so the caller came up short: measured on a 74-leaf subject with 50 stale rows, a 12-question request **delivered 4**. Filter to known labels inside SQL (`label = ANY(%s)`), never after the LIMIT.
+- **A "fast path" that defeated its own purpose.** `_KNOWN_NORAG_SUBJECTS` skipped the has-sections DB check for five subjects — including `uk-history` and `uk-culture`, the two queued for tagging. Running `tag_sections.py` on them would have had no effect. Removed; routing is one indexed `LIMIT 1`, so a subject that gains sectioning switches automatically.
+
+## Archived alongside Phase 2
+
+Moved to `.archive/dsideos-dead-code/` (on-disk, gitignored — same convention as the slot engine). Both had zero callers; neither is deleted, because the reasoning in them may be wanted back.
+
+- **`blueprint.exam_format_plan` + `_jitter` + `subject_format_mix`** — the per-subject format pre-pass `generate_exam()` used to run. The batched engine plans format inside `generate_questions_batched`, so the whole chain went dark. The idea is still sound (history really does carry more match questions than computer; a flattened ratio rounds rare formats to 0 at 5-16 questions per subject) and the measured-from-corpus version with additive smoothing is preserved intact. If revived, check `pyq_chunks.format` NULL coverage first.
+- **`syllabus.topics_for`** — exam mode's old topic seeder. It fed official syllabus BULLETS to the generator as topics, but a bullet is a section heading, not a question-sized topic (`formats.py` even had a gate rejecting stems that echoed one). Phase 2's taxonomy does that job at the right granularity. **`worker/syllabus.py` itself stays**: its `TOPICS` dict is the canonical page-by-page transcription of the UKSSSC 2026 syllabus and is what the taxonomies were authored FROM — reference data, and the thing to check a taxonomy against.
+
+## Known limits
+
+- **Nothing checks a generated fact is true** — unchanged from Phase 1, and more exposed here: the RAG path at least constrained the model to supplied text, this path is the model's own knowledge. Same tradeoff, consciously taken.
+- **`taxonomy.REUSE_COOLDOWN` is hardcoded at 5** while `rag/sample.py`'s is env-configurable (`RAG_REUSE_COOLDOWN`). Deliberate for now (the two pools are different sizes and may want different tuning), but they should be aligned once Phoenix shows real exhaustion rates.
+- **PYQ format examples are still format-blind.** `_style_examples` pulls k=2 at subject level, so a `match` batch is shown `plain` examples (466 of 520 general-gk PYQs are plain). Matters more here: with passages gone, PYQs are the only signal about what a real paper looks like. Corpus can support it — every subject has enough `plain`, and `match` has 12-37 per subject.
+- **Scarce formats stay scarce.** `assertion` (7 corpus-wide), `order` (9), `statement` (33) are genuinely rare in real UKSSSC papers — a web-sourcing pass confirmed the scarcity rather than fixing it, and found zero verbatim computer-subject `match` questions.
+- **`uk-history` and `uk-culture` now have BOTH** a taxonomy and (eventually) sectionable corpus. `_sections_for` prefers real sections when they exist, so tagging those books later silently switches them back to the RAG path — intended, but worth knowing.
+
+---
+
+# PHASE 3 — REASONING (तर्कशक्ति), CODE-ONLY (2026-09-15)
+
+The first question source in this pipeline where **the answer is computed, not asserted**. Phases 1 and 2 both end with a model stating a fact that nothing verifies. A direction-and-distance question depends only on the walk we invented, so code picks the parameters, computes the answer from those same parameters, and fills a template. **No model call, no retrieval, no DB.**
+
+## What shipped
+
+- **`worker/reasoning/`** — `pools.py` (cosmetic vocabulary) + 5 generators (`direction`, `series`, `coding`, `relations`, `arrangement`) + a registry. Each generator is `generate(rng) -> question dict`, pure, returning the same shape `formats.build` produces.
+- **Branch in `generate_questions_batched`** *before* the DB connection opens — everything below it (sections, style examples, prompt building, drafting, top-up) is machinery for extracting facts from a model.
+- **`reasoning: 0.10` in all 4 `SUBJECT_MIX` families**, carved back out of `general-gk` which had been absorbing it (the file's own comment said so). A 100Q vdo-vpdo paper now allocates exactly 10 — matching the real papers.
+- **`tests/test_reasoning.py`** — 27 tests, 1000 seeds per generator (150 for the brute-force uniqueness proof), ~23s.
+
+## Grounded in a full PYQ survey, not one paper
+
+`corpus/reasoning-reference/SURVEY.md` records every available paper. The findings changed the plan:
+
+- The **official syllabus specifies no per-section counts at all** — only "100 questions, 100 marks, 2 hours". Reasoning's share is a product decision; Mayank set 10.
+- The block is **exactly 10 questions** in both papers that have one — at Q21-30 in one, Q91-100 in another. Count stable, position arbitrary.
+- **One surveyed paper has no reasoning at all** (lekhpal-patwari 2025).
+- **13 of 18 catalogued questions need no figure.** Text-only first was the evidence-driven call, not a shortcut.
+- Real distractors are **the partial results of the solution path** (3 and 4 flank the true 5 in a 3-4-5 walk), never random near-misses. Every generator reproduces this.
+
+## Gate exemption
+
+Reasoning bypasses `validate_question` and `PaperGuard` entirely — the branch never calls them, so no signature or caller changed. Each gate is a proxy for an LLM failure mode that cannot occur here, and two were **measured** blocking real content:
+
+- **numeric budget**: caps numeric answers at 20% *per subject* = 2 per 10-question block. Simulated against a real UKSSSC block: **3 of 10 rejected.** A distance answer is numeric by nature.
+- **`_YEAR` 600-2026**: a series containing `2048`, or a coding answer of `3456`, is read as an implausible CE date. **Both rejected** in testing.
+
+`pipeline/validate.py` (build-time) still runs and passes 200/200 — it checks document shape, not model behaviour.
+
+## Bugs found by RUNNING it
+
+- **Gendered participle in a shared pool** — `मुड़ा और` sat in `TURN_WORDS`, producing "उषा ने … मुड़ा और … चली". Now gender-neutral only; anything that inflects belongs in a `*_M`/`*_F` pair. Regression-tested.
+- **Visible term offered as a distractor** — series "10, 22, 34, 46, ?" offered `46`. A candidate eliminates it without arithmetic. Shown terms are now banned from the option set.
+- **Type clustering** — round-robin-then-shuffle defeated its own purpose: **51 of 200 blocks had a run of 3+ identical types**, including three consecutive coding questions. Now shuffled *within* each round: 0 of 300.
+- **A uniqueness check that only searched half the space.** `arrangement._is_unique` permuted ORDERINGS while holding the true gaps fixed, so it could not detect an unpinned interior point: "D→C=23, D→B=14" plus two betweens left A free to slide, and A→C could be anything from 10 to 22. The generator shipped an unanswerable question and the check passed it. Fixed by searching gap assignments too; the clue set now states every consecutive gap.
+- **Series variety was 20x thinner than claimed** — measured 1,426 distinct stems in 20,000 seeds (7%) against direction's 99.8%, because a series has **no cosmetic slots** (no names, verbs or units). Widening the parameter ranges took it to 6,586 (33%). The lesson generalises: a type's variety ceiling is set by whichever axis it lacks.
+
+## Measured variety (20,000 seeds)
+
+| type | distinct stems | why |
+|---|---|---|
+| direction | 19,965 (99.8%) | 60 names x 2 verb sets x 3 units x walk parameters |
+| coding | 12,460 (62.3%) | 28 words x 4 rules x k x 2 output modes |
+| series | 6,586 (32.9%) | parameters only — no cosmetic axis exists |
+
+## Phase 3c — figures (2026-09-16, shipped)
+
+**All five figure types are built**: `dice`, `triangles`, `clock` (drawn dial), `figseries`, `venn`. 16 types total (11 text + 5 figure). 115 tests. Verified end to end: 14/14 questions kept by `run_pipeline.validate` (zero dropped), 7 figure PNGs embedded in both `build_paper` and `build_paper_format2`.
+
+**Pillow only** — matplotlib, cairo, svglib and reportlab are absent from both the environment and `worker/requirements.txt`, which is all the Docker image installs. Pillow was already a dependency, so figures added none. 3x supersampling + LANCZOS because `ImageDraw` has no antialiasing of its own.
+
+**Generators stay pure; one module touches disk.** A figure generator returns a JSON `_figure` spec and never a file; `reasoning/render.py` is the only writer. That keeps figure logic testable at thousands of seeds/second and lets the same spec render as SVG or a web preview later without touching a generator.
+
+**Rendering RAISES rather than skipping — the hazard that justified the split.** `run_pipeline.validate` checks image existence and silently DROPS questions whose files are missing, then ships the rest: a figure that fails to write produces a *short paper with no error anywhere*. `render.py` verifies every write and raises `FigureError` instead, turning a silent shortfall into a loud failure at generation time.
+
+**Three pre-existing bugs found and fixed while wiring this up:**
+- `build_paper.py:286` discarded `add_figure`'s return value while every other branch appended to `q_paras`, so the stem figure was excluded from `keep_question_together` — a column break could land between a question's figure and its options.
+- **`build_paper_format2.py` had ZERO image support** (grep: 0 hits). Every figure silently vanished on that layout, and a question whose options are images was dropped outright by the stem/options guard. It now renders both `image` and `option_images`, sized smaller (4.0x3.4cm stem, 3.0x2.6cm option) because the figure sits in a table cell, not a page column.
+- Both builders now share the same path-confinement rule, so a relative `figs/q7.png` resolves identically and a malicious ref is rejected in both.
+
+**Correct by construction, per type:**
+- `clock` — the dial was BUILT but never attached: `clock.py` emitted no `_figure`, so `figures._draw_clock` was dead code and the questions printed as text. Found by reading the first real PDF, not by a test. Now ~50% of clock questions show a drawn dial instead of printing the time, and a test asserts the drawn variant never prints the time in its stem (which would make the dial pointless).
+- `dice` — three isometric views; the bottom face is forced by which faces never appear beside the top. Reproduces the real vdo-vpdo Q21 exactly on seed 1. (The printed key "4,4,6" contradicts its own derivation — the same OCR damage as Q91's clock key; built from the derivation.)
+- `triangles` — the count is EXHAUSTIVE over every triple of segments, never a formula. Verified against 1/5/13/27 and the real Q26's keyed 27. An earlier construction paired mismatched fractions and counted 21 where a 3-row triangle has 13.
+- `figseries` — the true series is *generated* by rotating symbols one quadrant per step, then two figures are swapped; the key is the index we swapped, never inferred from the picture. Only UNIQUELY-restoring swaps are emitted, because a period-4 rotation over 4 shown figures otherwise admits a second valid swap and two defensible answers. The rule was decoded from the real Q22 strip (read off the unwatermarked Hindi column at 3x) and reproduces its keyed answer (A).
+- `venn` — the set RELATION is chosen first; the correct layout and the Hindi description both derive from it, so picture and words cannot disagree. The only type using `option_images`. A test re-derives each relation from raw circle coordinates and asserts no two layouts draw the same arrangement.
+
+**Tests re-derive answers from the PICTURE, not the generator.** The `figseries` test solves each question the way a candidate would — both rotation directions, all six swaps — and fails if more than one figure number is justifiable. 3,000 seeds, zero mismatches.
+
+**Font portability is a real trap, not a theoretical one.** Local Windows has Arial; the container has Devanagari fonts but **no guaranteed Latin TTF**, and dice digits are Latin. Fonts resolve through a documented chain ending at `ImageFont.load_default()`, with a test that clears the candidate list and asserts resolution still succeeds. `figseries` symbols are drawn as geometry rather than glyphs for the same reason — a missing glyph renders as a blank box, which in that type would destroy the very thing being compared.
+
+### Found by printing it (2026-09-17)
+
+Three defects that every test passed over, surfaced only by building a real PDF and reading it:
+
+1. **The clock dial was never wired in** (above) — the renderer existed and was correct; the generator just never emitted a spec.
+2. **The figure-series strip printed illegibly.** `build_paper` caps a stem figure at 4.8cm WIDE and 4.0cm tall, and a 5-square row is ~3:1 — so it printed 4.8 x 1.6cm, under 1cm per square for four symbols. The strip now WRAPS to 3 per row (1.43cm per square after the height cap). The test asserted aspect ratio, which was the wrong property; it now asserts the printed size of one square.
+3. **A 100-question block silently delivered 95.** Dedup keyed on stem+options, but `figseries` uses ONE fixed stem by design — the picture is what varies — so every figseries question after the first looked like a duplicate. The shortfall was a log line, nothing failed. Dedup now folds in the figure spec; 100/100 delivered, and the measured ceiling in the table above is superseded.
+
+**The lesson is the same one the survey taught:** correctness tests and print tests are different tests. Every one of these passed the correctness gate, because none of them produced a WRONG answer — they produced a right answer nobody could read, or no question at all.
+
+## Productisation (2026-09-17)
+
+`/api/generate` reached reasoning only through **exam mode** (the blueprint allocates 10% to reasoning in all four families), because `"reasoning"` was missing from the API's `VALID_SUBJECTS`. A caller asking for a reasoning-only worksheet got HTTP 400. Added, plus the dev dashboard's hardcoded copy of the same list. Subject mode now serves counts up to 100.
+
+Note the API deliberately does NOT import worker modules (separate container), so `VALID_SUBJECTS`/`VALID_EXAMS` are hand-synced copies — a new subject must be added in both places.
+
+## Deferred
+
+**Figure matrix completion** (real vdo-vpdo Q28) — a 3x3 grid whose missing cell is chosen from four option images. Needs a two-dimensional pattern rule rather than the single rotation `figseries` uses, and it did not appear in the second surveyed paper: the lowest-value figure type per unit of work.
+
+**All twelve text types shipped** (2026-09-16): direction, series, coding, relations, arrangement, lettersum, calendar_year, grouping, household, clock, coded_relations, sufficiency. A 10-question block draws 10 different types. 52 tests.
+
+Phase 3b notes:
+- **`util.py` extracted first** — the distractor routine was already copied three times; twelve types would have made it twelve.
+- **Two source questions were re-solved before being modelled.** The calendar key (2009 → 2015) and the logical-grouping key (→ गोविन्द) are both correct. The clock water-image key is **unsolvable** — none of its List-II times is a correct image of any List-I time, and its four pairings imply four different transformations. That type was built from the definition (`720 − t`) instead, and emits `plain` rather than the source's `match` layout.
+- **A wrong composition shipped and was caught by reading output, not by a passing test count**: `coded_relations` had `("wife","son") → "mother"`, but if R is P's wife and P is S's son, R is S's daughter-in-law. Every entry in that table is now hand-verified.
+- **Dedup had to widen twice.** First to reject on *either* the semantic key or the stem (a fresh word set was reusing a printed stem); then to include the OPTIONS, because `lettersum` carries its whole question there — 4,975 real questions behind 6 stem templates, which starved a block.
+- **A 100-question hand-read (2026-09-16) found 3 more issues**, all in the types that encode domain logic rather than compute a value: a second wrong `_COMPOSE` entry (`("son","mother")` claimed grandson; X and Z are siblings), `grouping` offering names absent from its own statements (436/3000), and 62% of `sufficiency` questions stating the age outright. The first was a WRONG ANSWER KEY; the other two made questions trivially eliminable. All three now have regression tests, and the composition table is verified against a concrete family model rather than itself. **The other nine types produced nothing wrong across 99 questions** — the architecture held; the hand-written tables were the soft spot.
+- **Difficulty tagging added (2026-09-16)**: every reasoning question now carries `difficulty`, derived from its own parameters. Measured 38/41/21 against the 50/30/20 target — hard on target, easy ~12pts light. Left as-is deliberately: intrinsic difficulty cannot be dialled to a target the way the LLM path's allocation can, and forcing it would mean restricting generators to trivial parameter ranges. A test guards a sane band plus the rule that no type may be stuck on one level (`lettersum` was, and silently dragged the mix).
+- **Ceiling measured honestly**: blocks up to 100 now fill exactly (100/100 after the figure-dedup fix, 2026-09-17); 200 delivers ~191 and 300 ~277, limited by the thinnest types (calendar_year 153 distinct, clock 852). A 10-question exam-mode block and a 100-question subject-mode worksheet both fill.
+
+---
+
 ## 1. Chunking
 
 Status: not yet audited
