@@ -283,7 +283,15 @@ def add_questions(doc, questions):
             q_paras.append(lp)
         # the question's own diagram (Q3-type), embedded verbatim under the stem
         if q.get("image"):
-            add_figure(doc, q["image"])
+            # APPEND the figure's paragraph to q_paras (fixed 2026-09-16).
+            # Every other branch here appends — compare the option-image branch
+            # below — but this one discarded add_figure's return, so the figure
+            # paragraph was the ONE part of a question that keep_question_together
+            # never saw. A column or page break could therefore land between a
+            # question's stem and its own diagram, or between the diagram and
+            # its options. Latent until now because no generated question had a
+            # figure; code-generated figures make it live.
+            q_paras.append(add_figure(doc, q["image"]))
         # option diagrams (Q60-type): each (a)-(d) is a cropped figure, kept
         # compact and inline beside its label so all four fit in the column
         if q.get("option_images"):

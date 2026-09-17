@@ -29,7 +29,8 @@ from pathlib import Path
 from docx import Document
 from docx.oxml   import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared  import Pt, RGBColor
+from docx.shared  import Cm, Pt, RGBColor
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).parent))
 from krutidev import DEFAULT_FONT, render_runs  # noqa: E402
@@ -55,6 +56,61 @@ BODY_PT    = 12
 
 
 # ── XML helpers ───────────────────────────────────────────────────────────────
+
+# Figure support (added 2026-09-16). This builder had NONE — a question with
+# `image` or `option_images` silently lost its diagram, and a figure question
+# whose options are images was skipped entirely by the stem/options guard in
+# build(). Code-generated reasoning figures made that a live data loss rather
+# than a theoretical one.
+#
+# Sizes are smaller than build_paper's 4.8cm: format-2 puts the figure inside a
+# table cell (COL1+COL2 wide), not a page column.
+STEM_FIG_W_CM = 4.0
+STEM_FIG_H_CM = 3.4
+OPT_FIG_W_CM = 3.0
+OPT_FIG_H_CM = 2.6
+
+# Set per build() call to the directory holding questions.json — the SAME rule
+# build_paper.py:343 uses, so a relative "figs/q7.png" resolves identically in
+# both builders.
+_IMG_BASE = BASE
+
+
+def _img_path(rel):
+    """Resolve an image ref, confined to the job dir. Mirrors build_paper._img_path.
+
+    Rejects absolute paths and anything escaping the base, so a malicious ref
+    (another tenant's scan, a licensed template, a server file) cannot be
+    embedded. Kept byte-identical in spirit to build_paper's version: two
+    builders reading the same JSON must not disagree about what is legal.
+    """
+    base = Path(_IMG_BASE).resolve()
+    p = Path(rel)
+    if p.is_absolute():
+        raise ValueError(f"image path must be relative to the job dir: {rel!r}")
+    dest = (base / p).resolve()
+    if base != dest and base not in dest.parents:
+        raise ValueError(f"image path escapes the job dir: {rel!r}")
+    return dest
+
+
+def _add_figure(para, rel, max_w_cm=STEM_FIG_W_CM, max_h_cm=STEM_FIG_H_CM):
+    """Embed a figure into an existing paragraph, contained in a w x h box.
+
+    Contain-fit by aspect ratio, exactly as build_paper.add_figure does, so a
+    wide strip and a square dial each fill the box in their own proportion.
+    Only `width` is passed to python-docx; it infers height from the image.
+    """
+    path = _img_path(rel)
+    with Image.open(path) as im:
+        pw, ph = im.size
+    w_cm = max_w_cm
+    h_cm = w_cm * ph / pw
+    if h_cm > max_h_cm:
+        h_cm, w_cm = max_h_cm, max_h_cm * pw / ph
+    para.add_run().add_picture(str(path), width=Cm(w_cm))
+    return para
+
 
 def _el(tag, **attrs):
     e = OxmlElement(tag)
@@ -195,8 +251,13 @@ def add_question_table(doc, q, student_safe: bool = True):
     ONLY on the separate answer-key / solution files. Set False only for an
     explicit teacher/master copy.
     """
+    # A figure question carries `option_images` INSTEAD of usable text options
+    # (venn/diagram types emit placeholder strings only so the letter range and
+    # the option count stay well-defined). Size the block from whichever is
+    # present, exactly as build_paper.py:289-294 and run_pipeline.validate do.
+    opt_imgs = q.get("option_images") or []
     opts = q.get("options") or []
-    n_opts = max(2, len(opts))          # at least the 2 label rows the layout needs
+    n_opts = max(2, len(opt_imgs) or len(opts))  # >= the 2 label rows the layout needs
     # 4 fixed rows historically (Question, Type, then 4 Option rows, Solution,
     # Marks). Size the Option block to the ACTUAL option count so a 5th/6th option
     # is never silently dropped and an 'e'/'f' answer still lands on a real row.
@@ -219,6 +280,14 @@ def add_question_table(doc, q, student_safe: bool = True):
     _fmt_para(para)
     for text, font in _runs(q["stem"]):
         _add_run(para, text, bold=True, font=font)
+
+    # The question's own diagram goes in the SAME cell as the stem, on its own
+    # line — the cell is the only place it can live in this layout, and a
+    # separate row would break the fixed 8-row contract the client imports.
+    if q.get("image"):
+        fig_para = rows[0].cells[1].add_paragraph()
+        _fmt_para(fig_para)
+        _add_figure(fig_para, q["image"])
 
     # Row 1: Type | multiple_choice (colspan 2)
     _fill_label(rows[1].cells[0], "Type")
@@ -246,10 +315,19 @@ def add_question_table(doc, q, student_safe: bool = True):
     # answer-key / solution files. Only a teacher/master copy (student_safe=False)
     # prints the marking.
     has_answer = correct_idx >= 0
-    for i, opt in enumerate(opts):
+    for i in range(len(opt_imgs) or len(opts)):
         row = rows[2 + i]
         _fill_label(row.cells[0], "Option")
-        _fill_runs(row.cells[1], _runs(opt), width=COL1_W, bold=False)
+        if i < len(opt_imgs):
+            # Draw the diagram INSTEAD of the placeholder text — printing
+            # "(चित्र A)" beside no picture leaves the question unanswerable.
+            _apply_tcPr(row.cells[1]._tc, COL1_W)
+            cell = row.cells[1]
+            para = cell.paragraphs[0]
+            _fmt_para(para)
+            _add_figure(para, opt_imgs[i], OPT_FIG_W_CM, OPT_FIG_H_CM)
+        else:
+            _fill_runs(row.cells[1], _runs(opts[i]), width=COL1_W, bold=False)
         if student_safe:
             mark = ""
         elif has_answer:
@@ -299,8 +377,11 @@ def build(src: Path, out_path: Path, font: str = DEFAULT_FONT,
     embedded (the format-2 table would otherwise carry the correct-answer marking
     and worked solution in its own cells, and the file is named like a plain paper
     so a student could download it). The key + solutions ship as separate files."""
-    global _FONT
+    global _FONT, _IMG_BASE
     _FONT = font  # _runs() reads this via render_runs()
+    # Image refs resolve beside the JSON — the same rule build_paper.py:343
+    # uses, so "figs/q7.png" means the same thing to both builders.
+    _IMG_BASE = Path(src).resolve().parent
     data = json.loads(Path(src).read_text(encoding="utf-8"))
     questions = data["questions"]
     doc = Document()
@@ -311,7 +392,11 @@ def build(src: Path, out_path: Path, font: str = DEFAULT_FONT,
 
     for q in questions:
         # skip a malformed question rather than crash the whole paper build
-        if not str(q.get("stem", "")).strip() or not (q.get("options") or []):
+        # A figure question may carry `option_images` INSTEAD of text options
+        # (that is how build_paper treats them too), so accept either. Before
+        # this, such a question was dropped here with only a stderr line.
+        has_opts = bool(q.get("options") or q.get("option_images"))
+        if not str(q.get("stem", "")).strip() or not has_opts:
             print(f"  [format2] skipping question with no stem/options: "
                   f"n={q.get('n')}", file=sys.stderr)
             continue
