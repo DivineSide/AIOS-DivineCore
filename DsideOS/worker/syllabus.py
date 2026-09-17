@@ -220,11 +220,13 @@ TOPICS: dict[str, list[str]] = {
 }
 
 
-def topics_for(subject: str, exam: str | None) -> list[str] | None:
-    """Official topic list for this subject IF the exam is syllabus-backed.
-    Returns None when exam mode isn't active, the exam family isn't on the
-    master syllabus, or the subject has no official taxonomy — callers fall
-    back to PYQ-sample inference (subject-mode behavior)."""
-    if not exam or exam not in MASTER_SYLLABUS_EXAMS:
-        return None
-    return TOPICS.get(subject)
+# topics_for() lived here until 2026-09-13 — ARCHIVED to
+# .archive/dsideos-dead-code/, zero callers. It fed these bullets to the
+# generator as "topics", but a bullet is a SECTION HEADING, not a question-
+# sized topic. Phase 2 does that job properly: worker/taxonomy_data/ holds
+# hand-authored trees decomposing each bullet below into question-sized
+# leaves, sampled by worker/taxonomy.py.
+#
+# THIS FILE IS NOT DEAD. The TOPICS dict above is the canonical transcription
+# of the official UKSSSC 2026 syllabus and is what the taxonomies were
+# authored FROM — reference data, and the thing to check a taxonomy against.

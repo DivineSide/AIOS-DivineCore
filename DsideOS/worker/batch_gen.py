@@ -33,13 +33,22 @@ stripping and most of validate_gen's structural checks. It does NOT make the
 content true — that stays grounding's job (the same verified call returned
 well-formed JSON claiming N.D. Tiwari was Uttarakhand's first CM).
 
+NO-RAG MODE (2026-09-13): `sections` may carry EMPTY passage lists — that is
+worker/taxonomy.py's sections_for() for subjects with no sectioned corpus,
+handing back (leaf_label, []) instead of (book_section, [passages]). This
+module detects that (every passage list empty) and swaps in NORAG_SYSTEM,
+whose instructions ask for knowledge instead of quotation. parse_batch and
+_schema are untouched by this — they are format-driven, not passage-driven,
+so nothing downstream of the prompt needs to know which mode produced it.
+
 Interface:
     build_batch_prompt(subject, subject_label, sections)
         -> (system, user, response_format)
     parse_batch(raw, sections) -> list[draft dict]
 
 `sections` is [(section_name, [passage dicts]), ...] — the caller decides which
-sections a paper draws from (rag sampling + reuse tracking, migration 007).
+sections a paper draws from (rag sampling + reuse tracking, migration 007, OR
+taxonomy leaf sampling, no reuse tracking yet — see taxonomy.py).
 """
 from __future__ import annotations
 
@@ -110,6 +119,75 @@ For each question, point to the sentence in ITS OWN section that makes the key
 correct. If you cannot, go back to STEP 1 and pick a different fact from that
 section rather than supplying one from your own knowledge — an unsupported
 fact is the single most common way a question fails."""
+
+
+# NO-RAG variant (2026-09-13, Phase 2): for subjects with zero sectioned
+# passages (general-gk, hindi, computer, uk-culture pre-tagging), the "topic"
+# is a hand-authored taxonomy LEAF (worker/taxonomy_data/, see worker/taxonomy.py)
+# instead of a book section. There is no source text to quote, so every
+# passage-dependent instruction in BATCH_SYSTEM is either dropped or rewritten:
+#   STEP 1 "read the section, pick a sentence"   -> draw on your own knowledge
+#   "BEFORE YOU ANSWER, point to the sentence"   -> unsatisfiable, removed
+#   material-reference forbidding ("सामग्री में...") -> kept: still meaningless
+#     here, but a model fine-tuned on the RAG framing may reach for it anyway
+#
+# The leaf label is deliberately narrow (a facet's question-sized child, not
+# the syllabus bullet) so the model cannot retreat to the five most famous
+# facts about the parent topic — see the taxonomy files' own docstrings.
+NORAG_SYSTEM = """# ROLE
+You are an Indian competitive-exam question writer (UKSSSC-style), writing in
+Hindi (Devanagari). English proper nouns and technical terms stay in English.
+
+# WHAT YOU ARE MAKING
+{n} numbered topics follow, each a specific, narrow subject drawn from the
+official {subject} syllabus. Write EXACTLY ONE question per topic, in order.
+Question K comes only from topic K.
+
+# HOW TO BUILD ONE QUESTION — follow these four steps in order
+
+STEP 1 — FIND THE FACT.
+The topic label names something specific and checkable — a name, a place, a
+year, a rule, a pairing. Draw on your own knowledge of the subject to state
+the single most precise, correct fact that topic is actually about. Do not
+widen the topic back out to its parent category: if the topic is "पुर्तगाली
+मूल के हिंदी में आगत शब्द", answer about Portuguese loanwords specifically,
+not आगत शब्द in general.
+
+STEP 2 — DECIDE WHAT THE STUDENT MUST KNOW.
+Turn that fact into a question a candidate could answer while sitting in an
+exam hall with no book in front of them. Write it as a fact about the world:
+"चंद वंश की राजधानी किसने स्थानांतरित की?" — a standalone question, complete
+in itself.
+
+STEP 3 — BUILD THE DISTRACTORS FROM THE SAME FAMILY.
+Name the category your answer belongs to — a dynasty, a district, a river, a
+year, an organisation — then choose three more members of THAT SAME category.
+Four options of one kind is what forces a candidate to actually know the
+answer. If one option is a year and three are names, the year is visibly the
+odd one and the question tests nothing.
+Then check each distractor against your own stem and confirm it is genuinely
+wrong. If a distractor could also be a correct answer, the question has two
+right answers and is unusable.
+
+STEP 4 — PREFER A NAME OVER A NUMBER.
+Ask WHO, WHICH, or WHAT — a person, place, organisation, book, scheme or term.
+Real papers are ~90% text-answered. Years and quantities are easy to state,
+which is exactly why they are over-produced; use one only when the date or
+figure IS the point of the fact.
+
+# THE REASON FIELD
+`reason` is one sentence a teacher reads to see why the key is right. State the
+fact and stop: "मेरठ की खड़ी बोली आदर्श और मानक मानी जाती है।"
+Never write anything that points at a source: not "सामग्री के अनुसार", not
+"जैसा कि पाठ में कहा गया", not "उपर्युक्त में से" — there is no source text
+here, only your own knowledge, so no sentence should imply one.
+
+# IF YOU ARE UNSURE OF A FACT
+Pick a different, more certain fact under the SAME topic rather than guessing.
+An unsupported or shaky fact is the single most common way a question fails.
+Do NOT use current events, a currently-serving officeholder, or anything that
+could have changed recently — every fact must be one that stays true over
+time."""
 
 
 # Per-format response shapes. Each mirrors EXACTLY what the matching
@@ -220,6 +298,26 @@ def _schema(n: int, fmt: str = "plain") -> dict:
     }
 
 
+def is_norag(sections: list[tuple[str, list[dict]]]) -> bool:
+    """True when this batch has no source text — the taxonomy/no-RAG path.
+
+    THE single definition of "no-RAG", used both here (to pick NORAG_SYSTEM)
+    and by generate.py (to pick the larger batch cap, since a passage-less
+    batch is ~5x cheaper per section). Two separate expressions existed for one
+    turn and already disagreed on the empty-text edge case; one owner instead.
+
+    taxonomy.sections_for returns (leaf_label, []) for EVERY section, so no
+    passage has text. Checks ALL sections, not just the first: a mixed batch
+    cannot happen today (one call comes from one source) but if one ever did,
+    falling to the RAG prompt is the safe direction — the placeholder line
+    renders, rather than instructions silently mismatching the content.
+
+    Complexity: O(total passages), short-circuits on the first real text.
+    """
+    return bool(sections) and not any(
+        p.get("text") for _, ps in sections for p in ps)
+
+
 def build_batch_prompt(subject: str, subject_label: str,
                        sections: list[tuple[str, list[dict]]],
                        difficulties: list[str] | None = None,
@@ -242,18 +340,32 @@ def build_batch_prompt(subject: str, subject_label: str,
     diffs = list(difficulties or ["moderate"] * n)
     diffs = (diffs + ["moderate"] * n)[:n]      # never misalign with sections
 
+    norag = is_norag(sections)
+
     blocks = []
     for i, (name, passages) in enumerate(sections, 1):
-        body = "\n\n".join(p.get("text", "") for p in passages) or "(सामग्री उपलब्ध नहीं)"
-        blocks.append(f"### विषय {i}: {name}   [कठिनाई: {diffs[i-1]}]\n{body}")
-    user = (
-        "━━━ अध्ययन सामग्री (आपके तथ्यों का एकमात्र स्रोत) ━━━\n\n"
-        + "\n\n".join(blocks)
-        + f"\n\n━━━\nअब {n} प्रश्न लिखिए — प्रत्येक विषय से ठीक एक, उसी क्रम में, "
-        + "और प्रत्येक की दी गई कठिनाई पर।"
-    )
+        if norag:
+            blocks.append(f"### विषय {i}: {name}   [कठिनाई: {diffs[i-1]}]")
+        else:
+            body = "\n\n".join(p.get("text", "") for p in passages) or "(सामग्री उपलब्ध नहीं)"
+            blocks.append(f"### विषय {i}: {name}   [कठिनाई: {diffs[i-1]}]\n{body}")
+    if norag:
+        user = (
+            "━━━ प्रश्नों हेतु विषय-सूची ━━━\n\n"
+            + "\n\n".join(blocks)
+            + f"\n\n━━━\nअब {n} प्रश्न लिखिए — प्रत्येक विषय से ठीक एक, उसी क्रम में, "
+            + "और प्रत्येक की दी गई कठिनाई पर। अपने ही ज्ञान से।"
+        )
+    else:
+        user = (
+            "━━━ अध्ययन सामग्री (आपके तथ्यों का एकमात्र स्रोत) ━━━\n\n"
+            + "\n\n".join(blocks)
+            + f"\n\n━━━\nअब {n} प्रश्न लिखिए — प्रत्येक विषय से ठीक एक, उसी क्रम में, "
+            + "और प्रत्येक की दी गई कठिनाई पर।"
+        )
 
-    system = BATCH_SYSTEM.format(n=n, subject=subject_label or subject)
+    _base = NORAG_SYSTEM if norag else BATCH_SYSTEM
+    system = _base.format(n=n, subject=subject_label or subject)
 
     # Per-subject difficulty steer. Only THIS subject's block is injected —
     # all seven would be ~7k wasted chars per call and would dilute the steer.

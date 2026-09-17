@@ -1,48 +1,59 @@
 # -*- coding: utf-8 -*-
 """AI-generative question pipeline — subject + count -> N exam-grade questions.
 
-REDESIGNED 2026-07-12 as a HARNESS (same philosophy that fixed extraction):
-the model supplies knowledge, code builds structure, mechanical gates detect
-failure, and an informed retry loop corrects it. Modules:
+ARCHITECTURE (round-2 rebuild, 2026-09-11..13). The model supplies knowledge,
+code builds structure, mechanical gates detect failure. ONE model call per
+(subject, format) chunk — not one per question, which is what the archived
+slot engine did. Modules:
 
-  blueprint.py     — the harness owns every count (format slots per paper,
-                     subjects per exam) via largest-remainder allocation of
-                     MEASURED distributions from real papers. No prose quotas.
+  blueprint.py     — owns every count (format slots per paper, subjects per
+                     exam, difficulty split) via largest-remainder allocation
+                     of MEASURED distributions from real papers.
+  batch_gen.py     — the batch prompt + strict json_schema. Two system
+                     prompts: BATCH_SYSTEM when real passages are supplied,
+                     NORAG_SYSTEM when the topic is a taxonomy leaf and the
+                     model must draw on its own knowledge.
   formats.py       — per-format contracts. For सुमेलित/कथन/A-R/क्रम the model
                      returns only facts (pairs, statements, order, relation);
                      code assembles the stem block, options and answer letter,
                      so structural inconsistency is impossible.
   validate_gen.py  — pure-code invariants (options, Hindi, year sanity) +
                      paper-level guards (stem dedup, entity-repeat).
-  ground.py        — Haiku grounding gate: the claimed fact must be quotable
-                     from the source passages, else the question is rejected.
+  taxonomy.py      — no-RAG topic source: hand-authored syllabus leaves, with
+                     the same cross-paper reuse cooldown passages get.
 
-Per-slot flow (ONE topic, ONE format, its own context — variety by structure):
+Per-batch flow:
 
-    passages = passage_lookup(topic, subject)          # substance (multi-fact)
-    examples = pyq_rag_lookup(topic, subject, format)  # style, format-true
-    draft    = GEN_MODEL(contract, passages, examples) # knowledge only
-    q        = formats.build(draft)                    # code assembles
-    validate -> paper-guard -> ground                  # mechanical gates
-    failure  -> retry with the SPECIFIC reason fed back (<=2), else drop the
-                slot and top up from another topic. Deliverable stays clean;
-                drops are reported in gen-meta for the dashboard.
+    sections = _sections_for(subject, count, conn)   # RAG rows OR taxonomy leaves
+    plan     = blueprint.plan_questions(...)         # formats + difficulties
+    draft    = ONE call per (format, chunk), strict json_schema
+    q        = formats.build(draft)                  # code assembles
+    validate -> paper-guard                          # mechanical gates
+    drops    -> top-up round on FRESH sections, same (format, difficulty)
+    mark_used + advance_generation                   # reuse bookkeeping
+
+NO GROUNDING GATE (removed 2026-09-12, deliberately — see the note at its old
+call site). Nothing verifies a generated fact is TRUE; constrained decoding
+guarantees shape, validate_question guarantees form, PaperGuard guarantees
+cross-question distinctness. ground.py still exists and is one line to re-wire.
 
 Modes:
-    generate_questions(subject, count) -> (questions, meta)   # Phase A (live)
-    generate_exam(exam, total)         -> (questions, meta)   # Phase B —
-        per-exam quotas get locked WITH THE CLIENT; blueprint's measured
-        SUBJECT_MIX is the opening proposal.
+    generate_questions_batched(subject, count, ...) -> (questions, meta)
+        Subject mode. Optional only_format / only_difficulty pin the whole
+        sheet — a practice sheet a teacher builds deliberately.
+    generate_exam(exam, total) -> (questions, meta)
+        Exam mode. blueprint.SUBJECT_MIX allocates across subjects, which then
+        generate concurrently.
 
-Topic sourcing differs by mode (2026-07-18, syllabus.py):
-    subject mode — no exam context exists, so topics are inferred from a
-        random PYQ sample (what the exam family actually tests, in aggregate).
-    exam mode    — the OFFICIAL syllabus (syllabus.py, transcribed from the
-        commission's advertisement PDFs) seeds the topics; PYQs then only
-        supply per-topic style examples. A syllabus topic with zero PYQ
-        coverage still generates (style prompt degrades gracefully) — this is
-        how a fresh syllabus revision gets covered before any past paper
-        tests it, and it decouples topic VARIETY from PYQ-pool size.
+TOPIC SOURCING (2026-09-13) is by CORPUS SHAPE, not by mode — _sections_for
+decides per subject:
+    sectioned corpus exists  -> rag/sample.py, real passages, BATCH_SYSTEM
+    none exists              -> taxonomy.py, syllabus leaves, NORAG_SYSTEM
+The second case is why 54 of 100 questions (general-gk, hindi, computer) can
+generate at all; those subjects have zero tagged sections. Both sources return
+the same [(name, [passages])] shape, so everything downstream is agnostic.
+syllabus.py is the canonical transcription the taxonomies were authored FROM;
+it has no live callers on this path.
 """
 import asyncio
 import logging
@@ -73,6 +84,8 @@ import sample as rag_sample  # noqa: E402
 import batch_gen  # noqa: E402
 import blueprint  # noqa: E402
 import formats  # noqa: E402
+import reasoning  # noqa: E402
+import taxonomy  # noqa: E402
 from validate_gen import PaperGuard, validate_question  # noqa: E402
 
 HAIKU = "claude-haiku-4-5-20251001"
@@ -221,6 +234,7 @@ SUBJECT_LABELS = {
     "general-gk":          "सामान्य ज्ञान",
     "hindi":               "सामान्य हिंदी",
     "computer":            "कंप्यूटर",
+    "reasoning":           "सामान्य बुद्धि परीक्षण एवं तर्कशक्ति",
 }
 
 # Per-slot system prompt. Lean by design: the format CONTRACT carries the
@@ -322,8 +336,8 @@ def _draft_groq(system: str, messages: list[dict]) -> str:
     key's independent quota on a 429 that slips past the bucket (server-side
     accounting is stricter than our estimate, and a DAILY-quota exhaustion is
     invisible to a 60s bucket). Raises the last error only once every key is
-    exhausted — _gen_slot_inner already treats a draft exception as a slot
-    failure with a reason, so the paper degrades rather than dying."""
+    exhausted — generate_questions_batched catches a draft exception per chunk
+    and records its sections as drops, so the paper degrades rather than dying."""
     pool = _groq_pool()
     buckets = _groq_bucket_pool()
     last_err: Exception | None = None
@@ -509,18 +523,96 @@ def _interleave_formats(questions: list[dict]) -> list[dict]:
 
 
 # ── batched generation (round-2 rebuild, 2026-09-11) ─────────────────────────
-# GEN_BATCHED=1 routes generation through ONE model call per subject instead of
-# one per question. See worker/batch_gen.py for the prompt/schema and
-# rag/RAG_ROADMAP.md §4 for why retrieval no longer embeds anything.
+# ONE model call per subject instead of one per question. See worker/batch_gen.py
+# for the prompt/schema and rag/RAG_ROADMAP.md §4 for why retrieval no longer
+# embeds anything.
 #
-# The old per-slot path (_gen_slot) is kept for now as a fallback — batching is
-# new and unproven on a full paper. Once a real 100Q run is clean, delete the
-# slot engine rather than maintaining two prompt surfaces and two gate paths.
-GEN_BATCHED = os.environ.get("GEN_BATCHED", "0") == "1"
+# DEFAULT FLIPPED TO 1 (2026-09-13): the per-slot engine was archived
+# 2026-09-12, so GEN_BATCHED=0 now raises. The old default of "0" meant an
+# unset env var — a fresh checkout, or this repo's own .env — hit that raise
+# on every exam-mode call, and the error text told you to "unset GEN_BATCHED",
+# which reproduced the failure. Batching is the only path; the flag survives
+# only so an explicit =0 still fails loudly instead of silently changing
+# behaviour.
+GEN_BATCHED = os.environ.get("GEN_BATCHED", "1") == "1"
 # Top-up rounds for the batched path. Bounded (unlike the slot
 # engine's uncapped loop) because each round costs a full model call
 # per format — on a thin subject that spins without converging.
 TOPUP_MAX_ROUNDS = max(0, int(os.environ.get("GEN_TOPUP_ROUNDS", "2")))
+
+def _sections_for(subject: str, n: int, conn) -> list[tuple[str, list[dict]]]:
+    """RAG passages if this subject has sectioned corpus, else taxonomy leaves.
+
+    Same (name, [passage dicts]) shape either way — [(leaf, []), ...] for the
+    no-RAG path, which is exactly what batch_gen.build_batch_prompt already
+    renders correctly (empty passage list -> no-RAG prompt branch, see its
+    docstring). Callers (main pass + top-up) never need to know which fired.
+
+    Decision rule: ask the DB whether this subject has ANY sectioned passage.
+    That is the ground truth — tag_sections.py is what populates
+    book_passages.section, so a subject that gains sectioning later
+    (uk-history and uk-culture are both queued for it) switches to the RAG
+    path on its next run with no code change.
+
+    A hardcoded "these subjects are no-RAG" set was tried and removed the same
+    day: it skipped this query for exactly the subjects most likely to gain
+    sectioning, so tagging them would have silently had no effect. The query is
+    one indexed LIMIT 1 on a connection we already hold — not worth hardcoding
+    around.
+
+    Complexity: 1 indexed exists-check, then whichever source's own O(n)
+    sampling.
+
+    Falls back to [] (both sources exhausted or absent) — caller already
+    treats an empty return as "cannot generate this subject" and reports it.
+    """
+    with conn.cursor() as cur:
+        cur.execute("""SELECT 1 FROM book_passages
+                       WHERE subject = %s AND section IS NOT NULL LIMIT 1""",
+                    (subject,))
+        has_sections = cur.fetchone() is not None
+    if has_sections:
+        return rag_sample.sections_for(subject, n, conn)
+
+    if taxonomy.available(subject):
+        return taxonomy.sections_for(subject, n, conn)
+
+    # Neither source: try RAG anyway (a thin/untagged subject may still have
+    # SOME rows) rather than failing outright — sections_for's own fallback
+    # logic (least-recently-used) is better than an empty paper.
+    return rag_sample.sections_for(subject, n, conn)
+
+
+async def _advance_generation() -> None:
+    """Age every cooling-down passage AND taxonomy leaf by one generation.
+
+    ONE PAPER IS ONE GENERATION. Called once after a whole paper finishes, not
+    per subject: generate_questions_batched marks what it used, but subjects
+    run concurrently, so advancing inside each one ages the others' fresh
+    marks too — a 7-subject paper consumed 7 generations of a 5-generation
+    cooldown, which is worse than no cooldown at the tail.
+
+    Opens its own short-lived connection: the per-subject connections are
+    already closed by the time a paper is done, and this is one round trip.
+
+    Never raises — a bookkeeping failure must not fail a delivered paper. The
+    cost of a missed advance is a slightly longer cooldown, which is the safe
+    direction.
+    """
+    import psycopg2
+    try:
+        conn = psycopg2.connect(os.environ["SUPABASE_DB_URL"], connect_timeout=30)
+    except Exception as e:                       # noqa: BLE001 — see docstring
+        logger.warning("advance_generation: no connection (%s) — skipped", e)
+        return
+    try:
+        await asyncio.to_thread(rag_sample.advance_generation, conn)
+        await asyncio.to_thread(taxonomy.advance_generation,
+                                taxonomy.DEFAULT_FAMILY, conn)
+    except Exception as e:                       # noqa: BLE001 — see docstring
+        logger.warning("advance_generation failed (%s) — cooldowns not aged", e)
+    finally:
+        conn.close()
 
 
 def _style_examples(subject: str, exam: str | None, conn,
@@ -559,41 +651,110 @@ async def generate_questions_batched(subject: str, count: int,
                                      fmt_counts: dict[str, int] | None = None,
                                      only_format: str | None = None,
                                      only_difficulty: str | None = None,
+                                     advance: bool = True,
+                                     fig_dir=None,
                                      ) -> tuple[list[dict], dict]:
     """One model call for this subject's whole allocation.
 
-    Interface — same (questions, meta) contract as generate_questions(), so
-    callers and the Celery task are unchanged.
+    Returns the (questions, meta) contract every caller and the Celery task
+    already expect.
 
     Flow:
-      sections = rag_sample.sections_for(subject, count)   # metadata + RANDOM()
-      draft    = ONE batched call, strict json_schema, 1 question per section
-      per question: formats.build -> validate -> guard -> ground
-      mark_used + advance_generation                       # reuse bookkeeping
+      sections = _sections_for(subject, count, conn)  # RAG rows OR taxonomy leaves
+      draft    = ONE batched call per (format, chunk), strict json_schema
+      per question: formats.build -> validate -> paper-guard
+      drops    -> top-up round on fresh sections, same (format, difficulty)
+      mark_used                                       # reuse bookkeeping
+
+    `advance` — whether to age reuse cooldowns when this call finishes. True
+    for a standalone subject-mode sheet (this call IS the paper); False from
+    generate_exam, which advances once after every subject, because one paper
+    must consume exactly one generation of the cooldown window.
 
     What is NOT here, deliberately: no topic extraction (sections come from the
-    corpus), no topic dedup embeddings (sections are distinct by construction),
-    no HyDE, no per-slot retry loop. Those existed to fix problems this design
-    does not have — see RAG_ROADMAP §4.
+    corpus or the taxonomy), no topic dedup embeddings (sections are distinct
+    by construction), no HyDE, no per-slot retry loop, no grounding gate.
+    Those existed to fix problems this design does not have — see
+    RAG_ROADMAP §4 — except grounding, which was a deliberate removal (§10).
 
     Complexity: 1 LLM call + 1 grounding call per question + ~2 DB round trips
     per section. Versus the slot engine: ~4 API calls per question.
     Scale note: fine to ~40 sections per subject; beyond that split the batch
     (batch_gen.build_batch_prompt's docstring explains why).
     """
+    # REASONING (Phase 3, 2026-09-15): generated ENTIRELY BY CODE — no model
+    # call, no retrieval, no DB. Branching HERE, before the connection opens,
+    # is deliberate: everything below (sections, style examples, prompt
+    # building, drafting, top-up) is machinery for getting facts out of a
+    # model, and none of it means anything when code computes the answer.
+    #
+    # No gate runs either. validate_question and PaperGuard are proxies for LLM
+    # failure modes that cannot occur here — a numeric answer is CORRECT for a
+    # distance question, a 4-digit series term is not a hallucinated date, and
+    # two questions may legitimately share an answer. tests/test_reasoning.py
+    # is the gate; see worker/reasoning/__init__.py for the full argument.
+    if subject == "reasoning":
+        qs = reasoning.generate(count, seed=_seed(subject, exam or "", 0, 0))
+        for i, q in enumerate(qs, 1):
+            q["n"] = i
+            q["subject"] = subject
+            # Internal bookkeeping, same treatment as _claim on the LLM path.
+            # `_type` is KEPT — it is the only record of which generator made a
+            # question, which is what a "question 7 reads badly" report needs.
+            q.pop("_dedup_key", None)
+        # FIGURES. Generators returned `_figure` SPECS, never files — see
+        # reasoning/figures.py. Turning them into PNGs is the only part of this
+        # path that touches disk, and it happens HERE because this is the first
+        # place the job directory is known.
+        #
+        # render_all RAISES on any failure, deliberately: run_pipeline.validate
+        # silently DROPS a question whose image is missing and ships the paper
+        # short (run_pipeline.py:130-158), so a quiet failure here would surface
+        # as an unexplained 97-question paper.
+        if fig_dir is not None:
+            from reasoning import render as _render
+            n_fig = _render.render_all(qs, fig_dir)
+            if n_fig:
+                logger.info("reasoning: %d figure(s) rendered into %s",
+                            n_fig, fig_dir)
+        else:
+            # No output directory (preview, test, or a caller that only wants
+            # text). Drop the specs so they never reach questions.json — the
+            # questions stay valid, they just lose their diagrams.
+            from reasoning import render as _render
+            _render.strip_specs(qs)
+
+        short = count - len(qs)
+        logger.info("reasoning: delivered %d/%d (no API call)", len(qs), count)
+        return qs, {
+            "subject": subject, "requested": count, "delivered": len(qs),
+            "drops": ([{"topic": "reasoning", "format": "plain",
+                        "reason": f"{short} question(s) short — a generator's "
+                                  f"parameter space may be exhausted"}]
+                      if short > 0 else []),
+        }
+
     import psycopg2  # local: only the batched path needs a raw connection
     conn = psycopg2.connect(os.environ["SUPABASE_DB_URL"], connect_timeout=30)
     drops: list[dict] = []
     out: list[dict] = []
+    seen_leaves: list[str] = []   # no-RAG topic labels the model saw (migration 009)
+    # SOURCE SELECTION (Phase 2, 2026-09-13): a subject either has sectioned
+    # corpus passages (RAG path) or it does not and instead has a hand-authored
+    # taxonomy (no-RAG path, worker/taxonomy.py) — never both in practice,
+    # since sectioning and taxonomy-writing are separate one-time jobs run per
+    # subject. Decided ONCE per call via _sections_for and reused for the
+    # top-up round too, so a paper's sections never switch provenance mid-run
+    # (which would let NORAG_SYSTEM's prompt and real passages disagree).
     try:
-        sections = await asyncio.to_thread(rag_sample.sections_for,
-                                           subject, count, conn)
+        sections = await asyncio.to_thread(_sections_for, subject, count, conn)
         if not sections:
-            logger.error("batch[%s]: no tagged sections — has tag_sections.py "
-                        "been run for this subject?", subject)
+            logger.error("batch[%s]: no tagged sections and no taxonomy — has "
+                        "tag_sections.py been run, or worker/taxonomy_data/ authored, "
+                        "for this subject?", subject)
             return [], {"subject": subject, "drops": [
                 {"topic": subject, "format": "plain",
-                 "reason": "no tagged sections for this subject"}]}
+                 "reason": "no sections or taxonomy for this subject"}]}
 
         label = SUBJECT_LABELS.get(subject, subject)
 
@@ -639,7 +800,16 @@ async def generate_questions_batched(subject: str, count: int,
         # match and item 4 is plain". Chunking within a format is the Groq
         # free-tier TPM ceiling (~7.2k/key/min): a batch prompt scales with
         # section count, so an unchunked 10-section call can never be served.
-        max_per_call = max(1, int(os.environ.get("GEN_BATCH_MAX_SECTIONS", "6")))
+        # No-RAG sections carry no passage text, so the TPM math that set 6
+        # for the RAG path doesn't apply here — measured 2026-09-13: a 20-leaf
+        # no-RAG batch is ~1,900 tok vs ~8,984 tok for just 4 RAG sections
+        # with passages. Detect it the same way build_batch_prompt does (every
+        # passage list empty) and use the separate, larger cap. Both still stop
+        # at build_batch_prompt's own attention-degradation ceiling (~40).
+        _is_norag = batch_gen.is_norag(sections)
+        _cap_var = "GEN_BATCH_MAX_SECTIONS_NORAG" if _is_norag else "GEN_BATCH_MAX_SECTIONS"
+        _cap_default = "40" if _is_norag else "6"
+        max_per_call = max(1, int(os.environ.get(_cap_var, _cap_default)))
         # The system prompt is NOT just BATCH_SYSTEM: build_batch_prompt appends
         # the subject's difficulty block (~1k chars), the format contract for a
         # non-plain batch (~700), and up to two PYQ style examples (~1.4k). Sizing
@@ -754,7 +924,7 @@ async def generate_questions_batched(subject: str, count: int,
         while drops and len(out) < count and rounds < TOPUP_MAX_ROUNDS:
             rounds += 1
             want = drops[:count - len(out)]
-            fresh = await asyncio.to_thread(rag_sample.sections_for,
+            fresh = await asyncio.to_thread(_sections_for,
                                             subject, len(want), conn)
             if not fresh:
                 logger.warning("batch[%s] topup: no eligible sections left", subject)
@@ -792,9 +962,12 @@ async def generate_questions_batched(subject: str, count: int,
                     guard.commit(q)
                     out.append(q)
                     recovered.append(q)
-                # mark the retry's passages used too — the model saw them
+                # mark the retry's passages used too — the model saw them.
+                # Empty on the no-RAG path (leaves carry no passages); the
+                # leaf labels themselves are collected below instead.
                 seen_extra = [pp["id"] for _, ps_ in secs_r for pp in ps_]
                 await asyncio.to_thread(rag_sample.mark_used, seen_extra, conn)
+                seen_leaves += [s[0] for s in secs_r if not s[1]]
             # drop the ones we just retried regardless of outcome: retrying the
             # same (format, difficulty) forever on a thin subject would spin.
             drops = drops[len(want):]
@@ -805,11 +978,32 @@ async def generate_questions_batched(subject: str, count: int,
         # Bookkeeping: every passage the MODEL SAW is marked, including ones
         # whose question was dropped — re-showing them would reproduce the same
         # question, so a drop must not make a passage look unused.
+        #
+        # BOTH sources are marked here, not one or the other: a section with
+        # passages is a RAG row (mark by passage id), a section without is a
+        # taxonomy leaf (mark by label, migration 009). Each call is a no-op on
+        # an empty list, so the path this subject did not use costs nothing.
+        #
+        # MARK here, but ADVANCE at the paper level (generate_exam / the
+        # standalone path below): subjects run concurrently, so a per-subject
+        # advance_generation ages every OTHER subject's just-marked rows too —
+        # a 7-subject paper burned 7 generations of cooldown instead of 1,
+        # silently shortening the effective window (observed 2026-09-13: one
+        # paper left leaves at used_ago 1..4). One paper is one generation.
         seen = [p["id"] for _, ps in sections for p in ps]
         await asyncio.to_thread(rag_sample.mark_used, seen, conn)
-        await asyncio.to_thread(rag_sample.advance_generation, conn)
+
+        seen_leaves += [s[0] for s in sections if not s[1]]
+        if seen_leaves:
+            await asyncio.to_thread(taxonomy.mark_used, subject, seen_leaves, conn)
     finally:
         conn.close()
+
+    # Standalone (subject-mode) call: this IS the whole paper, so age the
+    # cooldowns now. generate_exam passes advance=False and does it once after
+    # every subject has finished — see _advance_generation's docstring.
+    if advance:
+        await _advance_generation()
 
     for i, q in enumerate(out, 1):
         q["n"] = i
@@ -820,51 +1014,35 @@ async def generate_questions_batched(subject: str, count: int,
                  "delivered": len(out), "drops": drops}
 
 
-async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
-    """Exam mode. Harness owns the counts (blueprint SUBJECT_MIX — measured
-    opening proposal, client-lockable); the OFFICIAL syllabus owns the topic
-    taxonomy (syllabus.py, per-subject seeding inside generate_questions).
-    Per-exam SUBJECT_MIX numbers remain the client-session deliverable.
+async def generate_exam(exam: str, total: int,
+                        fig_dir=None) -> tuple[list[dict], dict]:
+    """Exam mode. blueprint.SUBJECT_MIX allocates `total` across subjects (a
+    MEASURED opening proposal, lockable with the client); each subject then
+    generates independently via generate_questions_batched.
 
-    Subjects run CONCURRENTLY, not one after another: each subject gets its
-    own PaperGuard (created fresh inside generate_questions), so there is no
-    shared state a race could corrupt — a sequential for-loop here was only
-    ever adding wall-clock time, not correctness. Measured: a 10-question
-    exam paper (7 subjects, ~1-3 questions each) took ~10 minutes serial;
-    each subject barely used the wave concurrency inside generate_questions
-    because 1-3 slots rarely fills a GEN_CONCURRENCY=6 wave anyway — the
-    real waste was subjects waiting on each other, not slots within a
-    subject waiting on each other.
+    Subjects run CONCURRENTLY. Each gets its own PaperGuard (created inside
+    generate_questions_batched), so there is no shared state a race could
+    corrupt — a sequential loop here only ever added wall-clock time. Measured
+    on the old engine: a 10-question, 7-subject paper took ~10 min serial,
+    almost all of it subjects waiting on each other.
 
-    One semaphore is created HERE and shared across every subject's
-    generate_questions() call, so the GEN_CONCURRENCY cap applies to the
-    whole paper at once, not per-subject (see generate_questions'/_gen_slot's
-    docstrings) — and because it's scoped to this single call (this function
-    is exactly what each Celery task wraps in its own asyncio.run()), it can
-    never survive into a later job's event loop.
+    NOT here any more (see .archive/dsideos-slot-engine/ and
+    .archive/dsideos-dead-code/): the shared GEN_CONCURRENCY semaphore,
+    per-slot waves, blueprint's exam_format_plan() pre-pass, and the
+    cross-subject topic-extraction + dedup pass. Format and difficulty are
+    planned per subject inside
+    generate_questions_batched, and topics come from the corpus or the
+    taxonomy — both distinct by construction, so the dedup machinery that
+    existed to stop two subjects picking the same syllabus heading has no job.
 
-    Format variety is ALSO pre-decided here, once, before any subject starts
-    generating: blueprint.exam_format_plan() measures each subject's REAL
-    historical format mix from pyq_chunks (not one ratio flattened across
-    every subject — see blueprint.py's per-subject-format-planning section)
-    and hands each subject's generate_questions() call its own fmt_counts.
-    Uses rag._db() (query.py's thread-local psycopg2 connection, already
-    timeout-bounded) via asyncio.to_thread since this is a sync DB call in
-    an async function; any failure here is caught inside exam_format_plan
-    itself and degrades to today's global-format_mix-per-subject behavior,
-    so a planning-query hiccup never blocks the job.
+    Cross-SUBJECT duplicate awareness is therefore genuinely gone (one batch
+    call sees only its own subject). Cheap to lose — two subjects rarely share
+    an answer entity — but it is a real difference from the archived engine,
+    which compared topics across subjects after a live collision shipped the
+    same question twice (2026-07-26, Q78/Q83).
 
-    Topics are ALSO extracted here, once, for every subject BEFORE any
-    generation slot starts, then run through ONE cross-subject dedup pass —
-    _extract_topics/_dedupe_topics previously only ever compared topics
-    WITHIN one subject's own call, so two subjects that legitimately share
-    ground (e.g. uk-history and uk-culture both touching "नंदा देवी राजजात
-    यात्रा") could each independently pick it with zero cross-check, shipping
-    the same question twice under two different subjects (observed live,
-    2026-07-26, Q78/Q83). Per-subject topic extraction still runs CONCURRENTLY
-    (asyncio.gather below) for the same wall-clock reason subjects do — only
-    the dedup PASS over the combined result is sequential, and it's cheap
-    (re-embeds ~n_topics short strings total, not the corpus)."""
+    _interleave_formats mixes the finished questions so a paper does not run
+    all its match questions consecutively; numbering is assigned after that."""
     per_subject = blueprint.allocate(total, blueprint.subject_mix(exam))
 
     if GEN_BATCHED:
@@ -874,13 +1052,18 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
         # (a 9-topic syllabus pool colliding across subjects) has no job here.
         subs = [(su, n) for su, n in per_subject.items() if n > 0]
         results = await asyncio.gather(*[
-            generate_questions_batched(su, n, exam=exam) for su, n in subs
+            generate_questions_batched(su, n, exam=exam, advance=False,
+                                       fig_dir=fig_dir)
+            for su, n in subs
         ])
         out: list[dict] = []
         metas: dict[str, dict] = {}
         for (su, _), (qs, m) in zip(subs, results):
             out.extend(qs)
             metas[su] = m
+        # One paper = one generation, after every subject has marked its own.
+        await _advance_generation()
+
         out = _interleave_formats(out)
         for i, q in enumerate(out, 1):
             q["n"] = i
@@ -893,5 +1076,5 @@ async def generate_exam(exam: str, total: int) -> tuple[list[dict], dict]:
     raise RuntimeError(
         "GEN_BATCHED=0 is no longer supported — the per-question slot engine "
         "was archived 2026-09-12 to .archive/dsideos-slot-engine/. "
-        "Unset GEN_BATCHED or set it to 1."
+        "Set GEN_BATCHED=1, or unset it (the default is now 1)."
     )

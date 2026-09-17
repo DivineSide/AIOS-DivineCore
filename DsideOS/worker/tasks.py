@@ -61,11 +61,19 @@ def _check_zip_bomb(path: Path) -> None:
         raise ValueError("Document is too large or suspiciously compressed.")
 
 
-# Sarvam Vision (document OCR) is the DEFAULT extraction path: it reads the doc
-# as an image and returns clean Unicode, sidestepping the Kruti-Dev/English
-# ambiguity that garbles the legacy .docx text layer. Set USE_SARVAM_VISION=0 to
-# force the old text-layer path.
-_USE_SARVAM_VISION = os.environ.get("USE_SARVAM_VISION", "1") == "1"
+# Sarvam Vision (document OCR) reads the doc as an image and returns clean
+# Unicode, sidestepping the Kruti-Dev/English ambiguity that garbles the legacy
+# .docx text layer. It WAS the default extraction path.
+#
+# DEFAULT FLIPPED TO 0 (2026-09-16): Sarvam is dead — a ~7x price hike
+# (2026-08-05) plus a zero balance, and the SARVAM_API_KEY* values were removed
+# from .env the same day. With the flag on, every ingestion attempted a doomed
+# Sarvam call before falling through, so the default now points at the
+# Claude-vision path (_extract_with_vision) that actually has credentials.
+#
+# Set USE_SARVAM_VISION=1 to re-enable it if the account is ever funded again;
+# pipeline/extract_sarvam_vision.py is untouched and still works.
+_USE_SARVAM_VISION = os.environ.get("USE_SARVAM_VISION", "0") == "1"
 
 # A native .docx (typed in Word) has an unambiguous text layer that beats image
 # OCR on look-alike Devanagari glyphs — prefer it for .docx inputs that carry a
@@ -554,7 +562,8 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
             # EXAM MODE mirrors a real paper: the harness owns every count
             # (blueprint allocates per-subject, then per-format and per-
             # difficulty), so the caller chooses nothing beyond the exam.
-            questions, gen_meta = asyncio.run(generate.generate_exam(exam, count))
+            questions, gen_meta = asyncio.run(generate.generate_exam(
+                exam, count, fig_dir=jobs.input_dir(job_id)))
         else:
             # SUBJECT MODE is a practice sheet the teacher composes: optional
             # single format and/or single difficulty for the whole sheet,
@@ -564,7 +573,12 @@ def generate_task(self, job_id: str, subject: str, count: int, meta: dict):
             questions, gen_meta = asyncio.run(generate.generate_questions_batched(
                 subject, count,
                 only_format=(meta.get("question_format") or None),
-                only_difficulty=(meta.get("difficulty") or None)))
+                only_difficulty=(meta.get("difficulty") or None),
+                # Code-generated figures land here. This is the SAME directory
+                # build_paper resolves image refs against (_IMG_BASE, set from
+                # questions.json's parent at build_paper.py:343), which is why
+                # q["image"] can be a plain relative "figs/qN.png".
+                fig_dir=jobs.input_dir(job_id)))
         if not questions:
             raise RuntimeError("Generation produced no questions.")
 

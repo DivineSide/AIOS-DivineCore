@@ -16,3 +16,7 @@ Rag_lecture_notes/
 __pycache__/
 *.pyc
 .venv/
+
+# Generated papers/figures from local sample runs — build artifacts, not source.
+# The repo is PUBLIC and these run to ~15MB per sample.
+output/
